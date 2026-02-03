@@ -10,12 +10,8 @@
 mod_dwc_mapping_ui <- function(id) {
   ns <- shiny::NS(id)
 
-  bslib::card(
-    bslib::card_header("Field mapping to Darwin Core"),
-
-    bslib::layout_columns(
-      col_widths = c(4, 8),
-
+  bslib::layout_sidebar(
+    sidebar = bslib::sidebar(
       bslib::card(
         bslib::card_header("Actions"),
         shiny::actionButton(
@@ -32,24 +28,23 @@ mod_dwc_mapping_ui <- function(id) {
         shiny::br(), shiny::br(),
         shiny::uiOutput(ns("apply_notice"))
       ),
-
       bslib::card(
         bslib::card_header("Validation"),
         shiny::verbatimTextOutput(ns("validation"))
       )
     ),
 
-    shiny::hr(),
-
-    shiny::h4("Map each column to a Darwin Core term"),
-    shiny::uiOutput(ns("mapping_ui")),
-
-    shiny::hr(),
-
-    shiny::h4("Mapping table"),
-    DT::DTOutput(ns("mapping_tbl"))
+    bslib::card(
+      bslib::card_header("Field mapping to Darwin Core"),
+      shiny::h4("Map each column to a Darwin Core term"),
+      shiny::uiOutput(ns("mapping_ui")),
+      shiny::hr(),
+      shiny::h4("Mapping table"),
+      DT::DTOutput(ns("mapping_tbl"))
+    )
   )
 }
+
 
 # ---- internal helpers ------------------------------------------------------
 
