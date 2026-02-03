@@ -1,3 +1,5 @@
+# modules/mod_dwc_mapping.R
+
 #' Darwin Core mapping module UI
 #'
 #' Shiny module UI for mapping user columns to Darwin Core terms (Item 3).
@@ -8,15 +10,14 @@
 mod_dwc_mapping_ui <- function(id) {
   ns <- shiny::NS(id)
 
-  shinydashboard::box(
-    width = 12,
-    title = "Field mapping to Darwin Core",
-    status = "primary",
-    solidHeader = TRUE,
+  bslib::card(
+    bslib::card_header("Field mapping to Darwin Core"),
 
-    shiny::fluidRow(
-      shiny::column(
-        width = 4,
+    bslib::layout_columns(
+      col_widths = c(4, 8),
+
+      bslib::card(
+        bslib::card_header("Actions"),
         shiny::actionButton(
           ns("auto_suggest"),
           "Auto-suggest",
@@ -31,9 +32,9 @@ mod_dwc_mapping_ui <- function(id) {
         shiny::br(), shiny::br(),
         shiny::uiOutput(ns("apply_notice"))
       ),
-      shiny::column(
-        width = 8,
-        shiny::h4("Validation"),
+
+      bslib::card(
+        bslib::card_header("Validation"),
         shiny::verbatimTextOutput(ns("validation"))
       )
     ),
@@ -52,14 +53,14 @@ mod_dwc_mapping_ui <- function(id) {
 
 # ---- internal helpers ------------------------------------------------------
 
+`%||%` <- rlang::`%||%`
+
 .dwc_term_meta_from_corella <- function() {
   if (!requireNamespace("corella", quietly = TRUE)) {
     stop("Package 'corella' is required for DwC term list.")
   }
 
   x <- corella::darwin_core_terms
-  # columns documented in corella.pdf: term, url, definition, comments, examples
-  # :contentReference[oaicite:10]{index=10}
   x <- as.data.frame(x, stringsAsFactors = FALSE)
 
   # ensure uniqueness by term
@@ -178,14 +179,13 @@ mod_dwc_mapping_ui <- function(id) {
 
 .term_tooltip_html <- function(term, meta_row) {
   if (is.null(term) || is.na(term) || term == "") {
-    return("No Darwin Core term selected.")
+    return("Select a term to see definition and examples.")
   }
 
   def <- meta_row$definition %||% ""
   ex <- meta_row$examples %||% ""
   url <- meta_row$url %||% ""
 
-  # HTML curto (tooltip)
   paste0(
     "<b>", term, "</b><br/>",
     if (nzchar(def)) paste0("<b>Definition:</b> ", def, "<br/>") else "",
@@ -201,14 +201,12 @@ mod_dwc_mapping_ui <- function(id) {
     return(c(paste0(label, " failed:"), x$message))
   }
 
-  # resumo conservador e limpo
   c(
     paste0(label, ": OK"),
     paste0("class: ", paste(class(x), collapse = "/")),
     paste0("length: ", length(x))
   )
 }
-
 
 #' Darwin Core mapping module server
 #'
@@ -227,8 +225,8 @@ mod_dwc_mapping_server <- function(id, df_in) {
       corella_suggest = NULL
     )
 
-    if (!requireNamespace("shinyBS", quietly = TRUE)) {
-      stop("Package 'shinyBS' is required for tooltips. Install it first.")
+    if (!requireNamespace("bslib", quietly = TRUE)) {
+      stop("Package 'bslib' is required (app is now Bootstrap 5).")
     }
 
     term_meta <- .dwc_term_meta_from_corella()
@@ -244,7 +242,33 @@ mod_dwc_mapping_server <- function(id, df_in) {
       stats::setNames(cols, keys)
     })
 
-    # aviso Apply (amarelo/verde)
+    mapping_tbl <- shiny::reactive({
+      df <- df_in()
+      shiny::req(df)
+
+      key_map <- col_key_map()
+      keys <- names(key_map)
+
+      dwc_selected <- vapply(
+        keys,
+        function(k) input[[paste0("map__", k)]] %||% "",
+        character(1)
+      )
+
+      map <- data.frame(
+        user_column = unname(key_map),
+        dwc_term = unname(dwc_selected),
+        stringsAsFactors = FALSE
+      )
+
+      map$final_column <- map$dwc_term
+      blank <- is.na(map$final_column) | map$final_column == ""
+      map$final_column[blank] <- map$user_column[blank]
+
+      map
+    })
+
+    # aviso Apply (warning/success)
     output$apply_notice <- shiny::renderUI({
       df <- df_in()
       shiny::req(df)
@@ -279,121 +303,68 @@ mod_dwc_mapping_server <- function(id, df_in) {
       key_map <- col_key_map()
       keys <- names(key_map)
 
-      shiny::tagList(
-        lapply(keys, function(k) {
-          col <- key_map[[k]]
-          tip_id <- ns(paste0("tip__", k))
-
-          shiny::fluidRow(
-            shiny::column(
-              width = 4,
-              shiny::tags$div(
-                style = "padding-top: 7px; font-weight: 600;",
-                col
-              )
-            ),
-            shiny::column(
-              width = 8,
-              shiny::tags$div(
-                style = "display:flex; gap:10px; align-items:center;",
-                shiny::tags$div(
-                  style = "max-width: 520px; flex: 1;",
-                  shiny::selectizeInput(
-                    inputId = ns(paste0("map__", k)),
-                    label = NULL,
-                    choices = dwc_terms,
-                    selected = "",
-                    options = list(
-                      placeholder =
-                        "Select a Darwin Core term (or leave blank)"
-                    )
-                  )
-                ),
-                shiny::tags$span(
-                  id = tip_id,
-                  shiny::icon("circle-info"),
-                  style = "cursor: help; opacity: 0.85;"
-                )
-              )
-            )
-          )
-        })
-      )
-    })
-
-    mapping_tbl <- shiny::reactive({
-      df <- df_in()
-      shiny::req(df)
-
-      key_map <- col_key_map()
-      keys <- names(key_map)
-
-      dwc_selected <- vapply(
-        keys,
-        function(k) input[[paste0("map__", k)]] %||% "",
-        character(1)
-      )
-
-      map <- data.frame(
-        user_column = unname(key_map),
-        dwc_term = unname(dwc_selected),
-        stringsAsFactors = FALSE
-      )
-
-      map$final_column <- map$dwc_term
-      blank <- is.na(map$final_column) | map$final_column == ""
-      map$final_column[blank] <- map$user_column[blank]
-
-      map
-    })
-
-    # tooltips (1 por coluna) - atualiza quando seleção muda
-    shiny::observe({
-      df <- df_in()
-      shiny::req(df)
-
-      key_map <- col_key_map()
-      keys <- names(key_map)
-
-      # força dependência de TODOS os inputs map__*
+      # garante re-render e preserva seleções
       selected <- vapply(
         keys,
         function(k) input[[paste0("map__", k)]] %||% "",
         character(1)
       )
 
-      for (k in keys) {
-        tip_id <- paste0("tip__", k)
+      shiny::tagList(
+        lapply(keys, function(k) {
+          col <- key_map[[k]]
 
-        term <- selected[[k]] %||% ""
-        meta_row <- term_meta[term_meta$term == term, , drop = FALSE]
+          term <- selected[[k]] %||% ""
+          meta_row <- term_meta[term_meta$term == term, , drop = FALSE]
 
-        html <- if (nrow(meta_row) == 0) {
-          if (term == "") {
-            "Select a term to see definition and examples."
+          html <- if (nrow(meta_row) == 0) {
+            if (term == "") {
+              "Select a term to see definition and examples."
+            } else {
+              "No metadata found for this term in corella."
+            }
           } else {
-            "No metadata found for this term in corella."
+            .term_tooltip_html(term, meta_row[1, ])
           }
-        } else {
-          .term_tooltip_html(term, meta_row[1, ])
-        }
 
-        shinyBS::removeTooltip(session, tip_id)
-        shinyBS::addTooltip(
-          session = session,
-          id = tip_id,
-          title = html,
-          placement = "right",
-          trigger = "hover",
-          options = list(
-            html = TRUE,
-            container = "body",
-            delay = list(show = 2000, hide = 100)
+          # trigger do tooltip
+          tip_trigger <- shiny::tags$span(
+            shiny::icon("info-circle"),
+            style = "cursor: help; opacity: 0.85;"
           )
-        )
-      }
-    })
 
+          bslib::layout_columns(
+            col_widths = c(4, 8),
+
+            shiny::tags$div(
+              style = "padding-top: 7px; font-weight: 600;",
+              col
+            ),
+
+            shiny::tags$div(
+              style = "display:flex; gap:10px; align-items:center;",
+              shiny::tags$div(
+                style = "max-width: 520px; flex: 1;",
+                shiny::selectizeInput(
+                  inputId = ns(paste0("map__", k)),
+                  label = NULL,
+                  choices = dwc_terms,
+                  selected = selected[[k]] %||% "",
+                  options = list(
+                    placeholder = "Select a Darwin Core term (or leave blank)"
+                  )
+                )
+              ),
+              bslib::tooltip(
+                trigger = tip_trigger,
+                htmltools::HTML(html),
+                placement = "right"
+              )
+            )
+          )
+        })
+      )
+    })
 
     shiny::observeEvent(input$auto_suggest, {
       df <- df_in()
@@ -422,7 +393,6 @@ mod_dwc_mapping_server <- function(id, df_in) {
       rv$mapping <- map_df
       rv$mapped <- .apply_mapping(df, map_df)
 
-      # corella checks e sugestão de workflow (após já ter nomes DwC)
       if (requireNamespace("corella", quietly = TRUE)) {
         rv$corella_checks <- tryCatch(
           corella::check_dataset(rv$mapped),
@@ -455,7 +425,6 @@ mod_dwc_mapping_server <- function(id, df_in) {
 
       paste(c(basic, extra), collapse = "\n")
     })
-
 
     output$mapping_tbl <- DT::renderDT({
       DT::datatable(

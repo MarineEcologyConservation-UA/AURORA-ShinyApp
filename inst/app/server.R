@@ -1,10 +1,12 @@
 server <- function(input, output, session) {
 
   example_map <- list(
-    "Example (event.csv)" = system.file("extdata", "event.csv",
-                                        package = "shinyRv02"),
-    "Example (occurrence.csv)" = system.file("extdata", "occurrence.csv",
-                                             package = "shinyRv02")
+    "Example (event.csv)" = system.file(
+      "extdata", "event.csv", package = "shinyRv02"
+    ),
+    "Example (occurrence.csv)" = system.file(
+      "extdata", "occurrence.csv", package = "shinyRv02"
+    )
   )
 
   ingest <- mod_ingest_server("ingest", example_map = example_map)

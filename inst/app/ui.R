@@ -1,29 +1,17 @@
-ui <- shinydashboard::dashboardPage(
-  shinydashboard::dashboardHeader(title = "shinyRv02"),
-  shinydashboard::dashboardSidebar(
-    shinydashboard::sidebarMenu(
-      shinydashboard::menuItem(
-        "Ingest",
-        tabName = "ingest",
-        icon = shiny::icon("upload")
-      ),
-      shinydashboard::menuItem(
-        "Mapping",
-        tabName = "mapping",
-        icon = shiny::icon("exchange-alt")
-      )
-    )
+ui <- bslib::page_navbar(
+  title = "shinyRv02",
+
+  theme = bslib::bs_theme(
+    version = 5
   ),
-  shinydashboard::dashboardBody(
-    shinydashboard::tabItems(
-      shinydashboard::tabItem(
-        tabName = "ingest",
-        mod_ingest_ui("ingest")
-      ),
-      shinydashboard::tabItem(
-        tabName = "mapping",
-        mod_dwc_mapping_ui("dwc_map")
-      )
-    )
+
+  bslib::nav_panel(
+    title = "Ingest",
+    mod_ingest_ui("ingest")
+  ),
+
+  bslib::nav_panel(
+    title = "Mapping",
+    mod_dwc_mapping_ui("dwc_map")
   )
 )

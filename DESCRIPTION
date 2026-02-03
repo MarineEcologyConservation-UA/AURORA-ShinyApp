@@ -14,14 +14,15 @@ Roxygen: list(markdown = TRUE)
 RoxygenNote: 7.3.3
 Imports:
     shiny,
-    shinydashboard,
+    bslib,
+    htmltools,
+    rlang,
     DT,
     janitor,
     readr,
     readxl,
     corella,
-    stringdist,
-    shinyBS
+    stringdist
 Suggests:
     testthat (>= 3.0.0)
 Config/testthat/edition: 3
