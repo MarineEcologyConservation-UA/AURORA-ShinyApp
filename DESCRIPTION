@@ -1,0 +1,27 @@
+Package: shinyRv02
+Type: Package
+Title: Shiny R v02 (Package-Style Project)
+Version: 0.0.1
+Authors@R: person("Alvaro", "Somensi",
+    role = c("aut", "cre"),
+    email = "alvaro@example.com"
+    )
+Description: Package-style structure for a Shiny app with reusable helper
+    functions (I/O + tidying) and Shiny modules.
+License: MIT + file LICENSE
+Encoding: UTF-8
+Roxygen: list(markdown = TRUE)
+RoxygenNote: 7.3.3
+Imports:
+    shiny,
+    shinydashboard,
+    DT,
+    janitor,
+    readr,
+    readxl,
+    corella,
+    stringdist,
+    shinyBS
+Suggests:
+    testthat (>= 3.0.0)
+Config/testthat/edition: 3
