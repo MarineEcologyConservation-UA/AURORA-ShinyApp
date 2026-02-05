@@ -298,68 +298,120 @@ mod_dwc_mapping_server <- function(id, df_in) {
       key_map <- col_key_map()
       keys <- names(key_map)
 
-      # garante re-render e preserva seleções
       selected <- vapply(
         keys,
         function(k) input[[paste0("map__", k)]] %||% "",
         character(1)
       )
 
-      shiny::tagList(
-        lapply(keys, function(k) {
-          col <- key_map[[k]]
+      border_col <- "#cbd5e1"
 
-          term <- selected[[k]] %||% ""
-          meta_row <- term_meta[term_meta$term == term, , drop = FALSE]
+      # container com scroll interno (ajuste max-height se quiser)
+      shiny::tags$div(
+        style = paste0(
+          "max-height: 520px;",
+          "overflow-y: auto;",
+          "padding-right: 6px;"  # espaço para scrollbar não colar no conteúdo
+        ),
 
-          html <- if (nrow(meta_row) == 0) {
-            if (term == "") {
-              "Select a term to see definition and examples."
-            } else {
-              "No metadata found for this term in corella."
-            }
-          } else {
-            .term_tooltip_html(term, meta_row[1, ])
-          }
+        shiny::tags$div(
+          style = paste0(
+            "display:grid;",
+            "grid-template-columns: 1fr 2fr;",
+            "gap: 0;",
+            "width: 100%;",
+            "border: 1px solid ", border_col, ";",
+            "border-radius: 10px;",
+            "overflow: hidden;",
+            "background: #fff;"
+          ),
 
-          # trigger do tooltip
-          tip_trigger <- shiny::tags$span(
-            shiny::icon("info-circle"),
-            style = "cursor: help; opacity: 0.85;"
-          )
-
-          bslib::layout_columns(
-            col_widths = c(4, 8),
-
-            shiny::tags$div(
-              style = "padding-top: 7px; font-weight: 600;",
-              col
+          # Header (sticky dentro do container)
+          shiny::tags$div(
+            style = paste0(
+              "padding: 10px 12px;",
+              "font-weight: 700;",
+              "border-right: 1px solid ", border_col, ";",
+              "border-bottom: 1px solid ", border_col, ";",
+              "background: #f8fafc;",
+              "position: sticky; top: 0; z-index: 2;"
             ),
+            "Original"
+          ),
+          shiny::tags$div(
+            style = paste0(
+              "padding: 10px 12px;",
+              "font-weight: 700;",
+              "border-bottom: 1px solid ", border_col, ";",
+              "background: #f8fafc;",
+              "position: sticky; top: 0; z-index: 2;"
+            ),
+            "DwC"
+          ),
 
-            shiny::tags$div(
-              style = "display:flex; gap:10px; align-items:center;",
+          # Rows
+          lapply(keys, function(k) {
+            col <- key_map[[k]]
+            term <- selected[[k]] %||% ""
+
+            meta_row <- term_meta[term_meta$term == term, , drop = FALSE]
+            html <- if (nrow(meta_row) == 0) {
+              if (term == "") "Select a term to see definition and examples."
+              else "No metadata found for this term in corella."
+            } else {
+              .term_tooltip_html(term, meta_row[1, ])
+            }
+
+            tip_trigger <- shiny::tags$span(
+              shiny::icon("info-circle"),
+              style = "cursor: help; opacity: 0.85; margin-left: 10px;"
+            )
+
+            shiny::tagList(
+              # left cell
               shiny::tags$div(
-                style = "max-width: 520px; flex: 1;",
-                shiny::selectizeInput(
-                  inputId = ns(paste0("map__", k)),
-                  label = NULL,
-                  choices = dwc_terms,
-                  selected = selected[[k]] %||% "",
-                  options = list(
-                    placeholder = "Select a Darwin Core term (or leave blank)"
+                style = paste0(
+                  "padding: 12px;",
+                  "font-weight: 600;",
+                  "border-right: 1px solid ", border_col, ";",
+                  "border-bottom: 1px solid ", border_col, ";"
+                ),
+                col
+              ),
+
+              # right cell
+              shiny::tags$div(
+                style = paste0(
+                  "padding: 12px;",
+                  "border-bottom: 1px solid ", border_col, ";"
+                ),
+                shiny::tags$div(
+                  style = "display:flex; align-items:center;",
+                  shiny::tags$div(
+                    style = "flex:1; max-width: 560px;",
+                    shiny::selectizeInput(
+                      inputId = ns(paste0("map__", k)),
+                      label = NULL,
+                      choices = dwc_terms,
+                      selected = term,
+                      options = list(
+                        placeholder = "Select a Darwin Core term (or leave blank)"
+                      )
+                    )
+                  ),
+                  bslib::tooltip(
+                    trigger = tip_trigger,
+                    htmltools::HTML(html),
+                    placement = "right"
                   )
                 )
-              ),
-              bslib::tooltip(
-                trigger = tip_trigger,
-                htmltools::HTML(html),
-                placement = "right"
               )
             )
-          )
-        })
+          })
+        )
       )
     })
+
 
     shiny::observeEvent(input$auto_suggest, {
       df <- df_in()
