@@ -58,7 +58,7 @@ mod_dwc_mapping_ui <- function(id) {
   x <- corella::darwin_core_terms
   x <- as.data.frame(x, stringsAsFactors = FALSE)
 
-  # ensure uniqueness by term
+  # ensure uniqueness by term ## verificar!!
   x <- x[!is.na(x$term) & x$term != "", , drop = FALSE]
   x <- x[!duplicated(x$term), , drop = FALSE]
 
@@ -87,16 +87,110 @@ mod_dwc_mapping_ui <- function(id) {
   gsub("[^a-z0-9]+", "", x)
 }
 
+.clean_col_for_match <- function(x) {
+  x <- tolower(x %||% "")
+
+  # remove conteúdo entre parênteses e colchetes (unidades, notas)
+  x <- gsub("\\([^)]*\\)", " ", x)
+  x <- gsub("\\[[^]]*\\]", " ", x)
+
+  # remove tokens comuns de unidades/formato
+  x <- gsub("\\b(dd|deg|degree|degrees)\\b", " ", x)
+  x <- gsub("\\b(m|meter|meters|metre|metres)\\b", " ", x)
+
+  # normaliza separadores
+  x <- gsub("[/_\\-]+", " ", x)
+  x <- gsub("\\s+", " ", x)
+  trimws(x)
+}
+
+.normalize_key <- function(x) {
+  x <- .clean_col_for_match(x)
+  gsub("[^a-z0-9]+", "", x)
+}
+
+# Tabela de aliases: regex -> termo DwC
+# Pode expandir isto com casos marinhos/ROV sem mudar o resto do código.
+.dwc_alias_rules <- function() {
+  list(
+    # coordenadas
+    list(pattern = "\\b(latitude|^lat$|\\blat\\b)\\b", term = "decimalLatitude"),
+    list(pattern = "\\b(longitude|^lon$|\\blon\\b|\\blng\\b|\\blong\\b)\\b",
+         term = "decimalLongitude"),
+    list(pattern = "\\b(verbatim latitude|raw latitude|original latitude)\\b",
+         term = "verbatimLatitude"),
+    list(pattern = "\\b(verbatim longitude|raw longitude|original longitude)\\b",
+         term = "verbatimLongitude"),
+    list(pattern = "\\b(epsg|crs|coordinate system|coordsystem)\\b",
+         term = "verbatimCoordinateSystem"),
+
+    # datas
+    list(pattern = "\\b(event date|sampling date|sample date|date sampled|^date$)\\b",
+         term = "eventDate"),
+    list(pattern = "\\b(datetime|date time|timestamp)\\b", term = "eventDate"),
+    list(pattern = "\\b(event time|^time$)\\b", term = "eventTime"),
+
+    # IDs comuns
+    list(pattern = "\\b(occurrence id|occ_id|occ id|record id|recordid|^id$)\\b",
+         term = "occurrenceID"),
+    list(pattern = "\\b(event id|eventid|sample id|sampleid|haul id|tow id)\\b",
+         term = "eventID"),
+    list(pattern = "\\b(location id|locationid|station id|stationid|station)\\b",
+         term = "locationID"),
+
+    # taxonomia
+    list(pattern = "\\b(scientific name|scientific_name|taxon name|taxon_name|species)\\b",
+         term = "scientificName"),
+    list(pattern = "\\b(aphia id|aphiaid|worms id|lsid|scientificnameid)\\b",
+         term = "scientificNameID"),
+
+    # país
+    list(pattern = "\\b(country code|countrycode|iso2|iso country)\\b",
+         term = "countryCode"),
+    list(pattern = "\\bcountry\\b", term = "country"),
+
+    # profundidade (genérico)
+    list(pattern = "\\b(min depth|depth min|minimum depth)\\b",
+         term = "minimumDepthInMeters"),
+    list(pattern = "\\b(max depth|depth max|maximum depth)\\b",
+         term = "maximumDepthInMeters"),
+    list(pattern = "\\bdepth\\b", term = "verbatimDepth"),
+
+    # remarks
+    list(pattern = "\\b(remarks|notes|comments|observation|obs)\\b",
+         term = "occurrenceRemarks")
+  )
+}
+
+.apply_alias_rules <- function(col_name, dwc_terms) {
+  col_clean <- .clean_col_for_match(col_name)
+  rules <- .dwc_alias_rules()
+
+  for (r in rules) {
+    if (grepl(r$pattern, col_clean, perl = TRUE)) {
+      if (r$term %in% dwc_terms) return(r$term)
+    }
+  }
+  ""
+}
+
+
 .suggest_term <- function(col_name, dwc_terms) {
   if (is.null(col_name) || is.na(col_name) || col_name == "") return("")
 
+  # 1) match exato
   if (col_name %in% dwc_terms) return(col_name)
 
+  # 2) aliases (semântica simples)
+  ali <- .apply_alias_rules(col_name, dwc_terms)
+  if (nzchar(ali)) return(ali)
+
+  # 3) fuzzy fallback
   key <- .normalize_key(col_name)
   if (key == "") return("")
 
   terms2 <- dwc_terms[dwc_terms != ""]
-  terms_key <- .normalize_key(terms2)
+  terms_key <- vapply(terms2, .normalize_key, character(1))
 
   if (!requireNamespace("stringdist", quietly = TRUE)) {
     return("")
@@ -106,8 +200,10 @@ mod_dwc_mapping_ui <- function(id) {
   i <- which.min(d)
   if (!length(i) || !is.finite(d[i])) return("")
 
-  if (d[i] <= 0.15) terms2[i] else ""
+  # threshold um pouco mais permissivo do que 0.15
+  if (d[i] <= 0.22) terms2[i] else ""
 }
+
 
 .validate_mapping_basic <- function(map_df) {
   req <- .dwc_required_terms()
