@@ -18,6 +18,7 @@
 #' @param encoding Character scalar. Preferred encoding to try first for text
 #'   files (e.g., `"UTF-8"`, `"Windows-1252"`, `"Latin1"`).
 #'
+#' @param is_tidy Logical scalar. If `TRUE`, performs a lightweight, safe cleanup
 #' @return A [data.frame] with the imported data. The returned object includes
 #'   attribute `"encoding_used"` indicating which encoding successfully read the
 #'   file.
@@ -33,7 +34,8 @@ read_any_table <- function(path,
                            ext = NULL,
                            delim = ",",
                            has_header = TRUE,
-                           encoding = "UTF-8") {
+                           encoding = "UTF-8",
+                           is_tidy = TRUE) {
 
   if (is.null(ext)) ext <- tools::file_ext(path)
   ext <- tolower(ext)
