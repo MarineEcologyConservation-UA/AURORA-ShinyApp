@@ -6,6 +6,9 @@ server <- function(input, output, session) {
     ),
     "Example (occurrence.csv)" = system.file(
       "extdata", "occurrence.csv", package = "shinyRv02"
+    ),
+    "Example (aurora.xlsx)" = system.file(
+      "extdata", "aurora_good_quality_data_densitydata_id_corrected.xlsx", package = "shinyRv02"
     )
   )
 
