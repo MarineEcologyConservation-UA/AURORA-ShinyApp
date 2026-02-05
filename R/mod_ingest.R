@@ -65,6 +65,8 @@ mod_ingest_ui <- function(id) {
 
       shiny::checkboxInput(ns("has_header"), "Header row", value = TRUE),
 
+      shiny::checkboxInput(ns("is_tidy"), "Tidy format", value = TRUE),
+
       shiny::actionButton(ns("load"), "Load", icon = shiny::icon("play")),
       shiny::br(),
       shiny::br(),
@@ -161,7 +163,8 @@ mod_ingest_server <- function(id, example_map) {
           path = p$path,
           delim = input$delim,
           has_header = input$has_header,
-          encoding = input$encoding
+          encoding = input$encoding,
+          is_tidy = input$is_tidy,
         )
       }, error = function(e) {
         shiny::showNotification(
