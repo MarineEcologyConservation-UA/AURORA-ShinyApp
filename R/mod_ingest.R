@@ -64,7 +64,6 @@ mod_ingest_ui <- function(id) {
       ),
 
       shiny::checkboxInput(ns("has_header"), "Header row", value = TRUE),
-
       shiny::checkboxInput(ns("is_tidy"), "Tidy format", value = TRUE),
 
       shiny::actionButton(ns("load"), "Load", icon = shiny::icon("play")),
@@ -80,6 +79,7 @@ mod_ingest_ui <- function(id) {
       bslib::navset_card_tab(
         bslib::nav_panel("Raw data", DT::DTOutput(ns("raw_tbl"))),
         bslib::nav_panel("Tidy data", DT::DTOutput(ns("tidy_tbl"))),
+        bslib::nav_panel("Tidy / Pivot", shiny::uiOutput(ns("pivot_ui"))),
         bslib::nav_panel("Column summary", DT::DTOutput(ns("col_stats")))
       )
     )
@@ -98,27 +98,15 @@ mod_ingest_ui <- function(id) {
 
   df[is_chr] <- lapply(df[is_chr], function(x) {
     x <- as.character(x)
-
-    ok_utf8 <- !any(is.na(iconv(x, from = "UTF-8", to = "UTF-8")))
-    if (ok_utf8) return(x)
-
     x2 <- iconv(x, from = enc, to = "UTF-8", sub = "byte")
-
-    if (anyNA(x2)) {
-      x2[is.na(x2)] <- iconv(
-        x[is.na(x2)],
-        from = "Windows-1252",
-        to = "UTF-8",
-        sub = "byte"
-      )
-    }
-
     x2[is.na(x2)] <- ""
     x2
   })
 
   df
 }
+
+`%||%` <- function(x, y) if (is.null(x)) y else x
 
 #' Ingestion module server
 #'
@@ -135,6 +123,40 @@ mod_ingest_server <- function(id, example_map) {
       src_label = NULL,
       encoding_used = NULL
     )
+
+    # --------------------------------------------------
+    # PIVOT STATE
+    # --------------------------------------------------
+    pv <- shiny::reactiveValues(
+      baseline = NULL,
+      data = NULL,
+      history = list(),
+      history_labels = character()
+    )
+
+    # --------------------------------------------------
+    # Popup quando ativar Tidy format
+    # --------------------------------------------------
+    shiny::observeEvent(input$is_tidy, {
+    if (isFALSE(input$is_tidy)) {
+      shiny::showModal(
+        shiny::modalDialog(
+          title = "Tidy format ativado",
+          "Se precisares transformar dados wide → long, utiliza a aba 'Tidy / Pivot'.",
+          easyClose = FALSE,   # não fecha clicando fora
+          footer = shiny::modalButton("OK")
+        )
+      )
+    }
+  }, ignoreInit = TRUE)
+
+    shiny::observeEvent(rv$tidy, {
+      shiny::req(rv$tidy)
+      pv$baseline <- rv$tidy
+      pv$data <- rv$tidy
+      pv$history <- list()
+      pv$history_labels <- character()
+    }, ignoreInit = TRUE)
 
     shiny::observe({
       shiny::updateSelectInput(
@@ -164,7 +186,7 @@ mod_ingest_server <- function(id, example_map) {
           delim = input$delim,
           has_header = input$has_header,
           encoding = input$encoding,
-          is_tidy = input$is_tidy,
+          is_tidy = input$is_tidy
         )
       }, error = function(e) {
         shiny::showNotification(
@@ -183,10 +205,8 @@ mod_ingest_server <- function(id, example_map) {
         return()
       }
 
-      used_enc <- attr(df, "encoding_used")
-      rv$encoding_used <- used_enc
-
-      df_norm <- .normalize_utf8_once(df, used_enc)
+      rv$encoding_used <- attr(df, "encoding_used")
+      df_norm <- .normalize_utf8_once(df, rv$encoding_used)
 
       rv$raw <- df_norm
 
@@ -207,8 +227,8 @@ mod_ingest_server <- function(id, example_map) {
     output$load_info <- shiny::renderText({
       if (is.null(rv$raw)) return("No dataset loaded yet.")
 
-      tidy_rows <- if (is.null(rv$tidy)) 0 else nrow(rv$tidy)
-      tidy_cols <- if (is.null(rv$tidy)) 0 else ncol(rv$tidy)
+      tidy_rows <- if (is.null(pv$data)) 0 else nrow(pv$data)
+      tidy_cols <- if (is.null(pv$data)) 0 else ncol(pv$data)
 
       paste0(
         "Loaded: ", rv$src_label, "\n",
@@ -219,6 +239,9 @@ mod_ingest_server <- function(id, example_map) {
       )
     })
 
+    # --------------------------------------------------
+    # RAW PREVIEW
+    # --------------------------------------------------
     output$raw_tbl <- DT::renderDT({
       shiny::req(rv$raw)
       DT::datatable(
@@ -227,14 +250,20 @@ mod_ingest_server <- function(id, example_map) {
       )
     })
 
+    # --------------------------------------------------
+    # TIDY PREVIEW (dataset final, após pivot)
+    # --------------------------------------------------
     output$tidy_tbl <- DT::renderDT({
-      shiny::req(rv$tidy)
+      shiny::req(pv$data)
       DT::datatable(
-        utils::head(rv$tidy, 200),
+        utils::head(pv$data, 200),
         options = list(scrollX = TRUE, pageLength = 10)
       )
     })
 
+    # --------------------------------------------------
+    # COLUMN SUMMARY (sobre raw)
+    # --------------------------------------------------
     output$col_stats <- DT::renderDT({
       shiny::req(rv$raw)
 
@@ -254,9 +283,142 @@ mod_ingest_server <- function(id, example_map) {
       )
     })
 
+    # --------------------------------------------------
+    # PIVOT UI
+    # --------------------------------------------------
+    output$pivot_ui <- shiny::renderUI({
+      shiny::req(pv$data)
+
+      df <- pv$data
+      cols <- names(df)
+      num_cols <- cols[vapply(df, is.numeric, logical(1))]
+
+      shiny::fluidRow(
+        shiny::column(
+          4,
+          shiny::selectizeInput(
+            session$ns("pivot_id_cols"),
+            "ID columns",
+            choices = cols,
+            multiple = TRUE,
+            options = list(plugins = list("remove_button"))
+          ),
+          shiny::selectizeInput(
+            session$ns("pivot_value_cols"),
+            "Columns to pivot",
+            choices = cols,
+            selected = num_cols,
+            multiple = TRUE,
+            options = list(plugins = list("remove_button"))
+          ),
+          shiny::textInput(session$ns("pivot_names_to"), "names_to", "variable"),
+          shiny::textInput(session$ns("pivot_values_to"), "values_to", "value"),
+          shiny::checkboxInput(session$ns("pivot_drop_na"), "Drop NA", TRUE),
+          shiny::checkboxInput(session$ns("pivot_drop_zero"), "Drop zero", FALSE),
+          shiny::checkboxInput(session$ns("pivot_trim_names"), "Trim names_to", TRUE),
+          shiny::br(),
+          shiny::actionButton(session$ns("pivot_apply"), "Pivotar"),
+          shiny::actionButton(session$ns("pivot_undo"), "Desfazer"),
+          shiny::actionButton(session$ns("pivot_reset"), "Resetar")
+        ),
+        shiny::column(
+          8,
+          shiny::verbatimTextOutput(session$ns("pivot_info")),
+          #shiny::h5("Preview (antes)"),
+          #DT::DTOutput(session$ns("pivot_before")),
+          shiny::h5("Preview (depois)"),
+          DT::DTOutput(session$ns("pivot_after"))
+        )
+      )
+    })
+
+    # --------------------------------------------------
+    # PIVOT INFO (prova que alterou)
+    # --------------------------------------------------
+    output$pivot_info <- shiny::renderText({
+      shiny::req(pv$data)
+
+      before <- if (length(pv$history) > 0) pv$history[[1]] else pv$data
+      after <- pv$data
+
+      paste0(
+        "Antes: ", nrow(before), " linhas x ", ncol(before), " colunas\n",
+        "Depois: ", nrow(after), " linhas x ", ncol(after), " colunas\n",
+        "Passos disponíveis para desfazer: ", length(pv$history)
+      )
+    })
+
+    # --------------------------------------------------
+    # PIVOT APPLY (seguro com tryCatch; só empilha se funcionar)
+    # --------------------------------------------------
+    shiny::observeEvent(input$pivot_apply, {
+      shiny::req(pv$data)
+
+      df_before <- pv$data
+
+      df_after <- tryCatch({
+        apply_pivot_longer(
+          df = df_before,
+          id_cols = input$pivot_id_cols %||% character(),
+          pivot_cols = input$pivot_value_cols %||% character(),
+          names_to = input$pivot_names_to,
+          values_to = input$pivot_values_to,
+          drop_na = isTRUE(input$pivot_drop_na),
+          drop_zero = isTRUE(input$pivot_drop_zero),
+          trim_names = isTRUE(input$pivot_trim_names)
+        )
+      }, error = function(e) {
+        shiny::showNotification(
+          paste("Pivot failed:", conditionMessage(e)),
+          type = "error",
+          duration = 10
+        )
+        NULL
+      })
+
+      if (is.null(df_after)) return()
+
+      pv$history <- c(list(df_before), pv$history)
+      pv$data <- df_after
+    })
+
+    # --------------------------------------------------
+    # UNDO / RESET
+    # --------------------------------------------------
+    shiny::observeEvent(input$pivot_undo, {
+      if (length(pv$history) == 0) {
+        shiny::showNotification("Nada para desfazer.", type = "message", duration = 3)
+        return()
+      }
+      pv$data <- pv$history[[1]]
+      pv$history <- pv$history[-1]
+    })
+
+    shiny::observeEvent(input$pivot_reset, {
+      shiny::req(pv$baseline)
+      pv$data <- pv$baseline
+      pv$history <- list()
+      pv$history_labels <- character()
+    })
+
+    # --------------------------------------------------
+    # PIVOT PREVIEWS (limitados, mas com total mostrado em pivot_info)
+    # --------------------------------------------------
+
+    output$pivot_after <- DT::renderDT({
+      shiny::req(pv$data)
+      DT::datatable(
+        utils::head(pv$data, 50),
+        options = list(scrollX = TRUE, pageLength = 10)
+      )
+    })
+
+    # --------------------------------------------------
+    # Return (mantém API: ingest$raw(), ingest$tidy(), ingest$label())
+    # --------------------------------------------------
     list(
       raw = shiny::reactive(rv$raw),
-      tidy = shiny::reactive(rv$tidy),
+      tidy = shiny::reactive(pv$data),
       label = shiny::reactive(rv$src_label)
     )
   })
