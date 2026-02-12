@@ -22,7 +22,9 @@ Imports:
     readr,
     readxl,
     corella,
-    stringdist
+    stringdist,
+    parzer,
+    sf,
 Suggests:
     testthat (>= 3.0.0)
 Config/testthat/edition: 3
