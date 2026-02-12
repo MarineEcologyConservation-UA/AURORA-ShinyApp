@@ -9,7 +9,8 @@ read_any_table(
   ext = NULL,
   delim = ",",
   has_header = TRUE,
-  encoding = "UTF-8"
+  encoding = "UTF-8",
+  is_tidy = TRUE
 )
 }
 \arguments{
@@ -25,6 +26,8 @@ Ignored for Excel files. If \code{ext == "tsv"}, delimiter is forced to tab.}
 
 \item{encoding}{Character scalar. Preferred encoding to try first for text
 files (e.g., \code{"UTF-8"}, \code{"Windows-1252"}, \code{"Latin1"}).}
+
+\item{is_tidy}{Logical scalar. If \code{TRUE}, performs a lightweight, safe cleanup}
 }
 \value{
 A \link{data.frame} with the imported data. The returned object includes
