@@ -17,14 +17,18 @@ A cleaned \link{data.frame}.
 }
 \description{
 Performs a lightweight, safe cleanup for user-provided tabular data:
-removes empty-name columns, drops common index columns (e.g. \code{Unnamed: 0}),
-normalizes column names with \code{\link[janitor:clean_names]{janitor::clean_names()}}, converts character
-columns to UTF-8 using the provided encoding, trims whitespace, and removes
-fully empty rows.
+removes empty-name columns, drops common index columns (e.g. \code{Unnamed: 0},
+\code{...1}), converts character columns to UTF-8 using the provided encoding,
+trims whitespace, and removes fully empty rows.
+}
+\details{
+Important: this function intentionally DOES NOT normalize column names
+(e.g. it will not turn \code{eventID} into \code{event_id}) to avoid breaking valid
+Darwin Core term names before the mapping step.
 }
 \examples{
 df <- data.frame(bad_col = c("", ""), Unnamed..0 = 1:2, Name = c(" A ", "B"))
-names(df)[1] <- ""  # simula coluna sem nome, como acontece em alguns ficheiros
+names(df)[1] <- ""  # simula coluna sem nome
 tidy_minimal(df, encoding_used = "UTF-8")
 
 }
