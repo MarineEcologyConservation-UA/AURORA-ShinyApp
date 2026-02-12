@@ -28,23 +28,71 @@ mod_dwc_mapping_ui <- function(id) {
         shiny::br(), shiny::br(),
         shiny::uiOutput(ns("apply_notice"))
       ),
+
       bslib::card(
         bslib::card_header("Validation"),
         shiny::verbatimTextOutput(ns("validation"))
+      ),
+
+      bslib::card(
+        bslib::card_header("Coordinate system"),
+        shiny::p(
+          "Informe o CRS (EPSG) do ficheiro de entrada.",
+          "O sistema alvo será sempre EPSG:[4326] (WGS84 lon/lat)."
+        ),
+        shiny::numericInput(
+          ns("coord_epsg_in"),
+          label = "Input CRS EPSG:[ ]",
+          value = 4326,
+          min = 1
+        ),
+        shiny::checkboxInput(
+          ns("coord_cols_are_messy"),
+          label = "Forçar parsing (parzer) mesmo se parecer numérico",
+          value = TRUE
+        ),
+        shiny::tags$hr(),
+        shiny::tags$b("Target CRS EPSG:[4326]"),
+        shiny::p("As coordenadas serão guardadas em decimal degrees.")
+      ),
+
+      bslib::card(
+        bslib::card_header("Data cleaning"),
+        shiny::verbatimTextOutput(ns("cleaning_summary")),
+        shiny::downloadButton(ns("download_issues_csv"), "Download issues (CSV)")
       )
     ),
 
-    bslib::card(
-      bslib::card_header("Field mapping to Darwin Core"),
-      shiny::h4("Map each column to a Darwin Core term"),
-      shiny::uiOutput(ns("mapping_ui")),
-      shiny::hr(),
-      shiny::h4("Mapping table"),
-      DT::DTOutput(ns("mapping_tbl"))
+    # MAIN AREA: tabs
+    bslib::navset_card_tab(
+      id = ns("main_tabs"),
+      title = "Field mapping to Darwin Core",
+
+      bslib::nav_panel(
+        "Mapping",
+        shiny::h4("Map each column to a Darwin Core term"),
+        shiny::uiOutput(ns("mapping_ui"))
+      ),
+
+      bslib::nav_panel(
+        "Preview (mapped)",
+        shiny::p("Preview após aplicar o mapping (primeiras linhas)."),
+        DT::DTOutput(ns("preview_mapped_tbl"))
+      ),
+
+      bslib::nav_panel(
+        "Preview (cleaned)",
+        shiny::p("Preview após cleaning (primeiras linhas)."),
+        DT::DTOutput(ns("preview_cleaned_tbl"))
+      ),
+
+      bslib::nav_panel(
+        "Cleaning issues",
+        DT::DTOutput(ns("issues_tbl"))
+      )
     )
   )
 }
-
 
 # ---- internal helpers ------------------------------------------------------
 
@@ -58,10 +106,8 @@ mod_dwc_mapping_ui <- function(id) {
   x <- corella::darwin_core_terms
   x <- as.data.frame(x, stringsAsFactors = FALSE)
 
-  # ensure uniqueness by term ## verificar!!
   x <- x[!is.na(x$term) & x$term != "", , drop = FALSE]
   x <- x[!duplicated(x$term), , drop = FALSE]
-
   x
 }
 
@@ -82,23 +128,12 @@ mod_dwc_mapping_ui <- function(id) {
   )
 }
 
-.normalize_key <- function(x) {
-  x <- tolower(x)
-  gsub("[^a-z0-9]+", "", x)
-}
-
 .clean_col_for_match <- function(x) {
   x <- tolower(x %||% "")
-
-  # remove conteúdo entre parênteses e colchetes (unidades, notas)
   x <- gsub("\\([^)]*\\)", " ", x)
   x <- gsub("\\[[^]]*\\]", " ", x)
-
-  # remove tokens comuns de unidades/formato
   x <- gsub("\\b(dd|deg|degree|degrees)\\b", " ", x)
   x <- gsub("\\b(m|meter|meters|metre|metres)\\b", " ", x)
-
-  # normaliza separadores
   x <- gsub("[/_\\-]+", " ", x)
   x <- gsub("\\s+", " ", x)
   trimws(x)
@@ -109,56 +144,21 @@ mod_dwc_mapping_ui <- function(id) {
   gsub("[^a-z0-9]+", "", x)
 }
 
-# Tabela de aliases: regex -> termo DwC
-# Pode expandir isto com casos marinhos/ROV sem mudar o resto do código.
 .dwc_alias_rules <- function() {
   list(
-    # coordenadas
     list(pattern = "\\b(latitude|^lat$|\\blat\\b)\\b", term = "decimalLatitude"),
-    list(pattern = "\\b(longitude|^lon$|\\blon\\b|\\blng\\b|\\blong\\b)\\b",
-         term = "decimalLongitude"),
-    list(pattern = "\\b(verbatim latitude|raw latitude|original latitude)\\b",
-         term = "verbatimLatitude"),
-    list(pattern = "\\b(verbatim longitude|raw longitude|original longitude)\\b",
-         term = "verbatimLongitude"),
-    list(pattern = "\\b(epsg|crs|coordinate system|coordsystem)\\b",
-         term = "verbatimCoordinateSystem"),
-
-    # datas
-    list(pattern = "\\b(event date|sampling date|sample date|date sampled|^date$)\\b",
-         term = "eventDate"),
-    list(pattern = "\\b(datetime|date time|timestamp)\\b", term = "eventDate"),
-    list(pattern = "\\b(event time|^time$)\\b", term = "eventTime"),
-
-    # IDs comuns
-    list(pattern = "\\b(occurrence id|occ_id|occ id|record id|recordid|^id$)\\b",
-         term = "occurrenceID"),
-    list(pattern = "\\b(event id|eventid|sample id|sampleid|haul id|tow id)\\b",
-         term = "eventID"),
-    list(pattern = "\\b(location id|locationid|station id|stationid|station)\\b",
-         term = "locationID"),
-
-    # taxonomia
-    list(pattern = "\\b(scientific name|scientific_name|taxon name|taxon_name|species)\\b",
-         term = "scientificName"),
-    list(pattern = "\\b(aphia id|aphiaid|worms id|lsid|scientificnameid)\\b",
-         term = "scientificNameID"),
-
-    # país
-    list(pattern = "\\b(country code|countrycode|iso2|iso country)\\b",
-         term = "countryCode"),
-    list(pattern = "\\bcountry\\b", term = "country"),
-
-    # profundidade (genérico)
-    list(pattern = "\\b(min depth|depth min|minimum depth)\\b",
-         term = "minimumDepthInMeters"),
-    list(pattern = "\\b(max depth|depth max|maximum depth)\\b",
-         term = "maximumDepthInMeters"),
-    list(pattern = "\\bdepth\\b", term = "verbatimDepth"),
-
-    # remarks
-    list(pattern = "\\b(remarks|notes|comments|observation|obs)\\b",
-         term = "occurrenceRemarks")
+    list(
+      pattern = "\\b(longitude|^lon$|\\blon\\b|\\blng\\b|\\blong\\b)\\b",
+      term = "decimalLongitude"
+    ),
+    list(
+      pattern = "\\b(event date|sampling date|sample date|date sampled|^date$)\\b",
+      term = "eventDate"
+    ),
+    list(
+      pattern = "\\b(scientific name|scientific_name|taxon name|taxon_name|species)\\b",
+      term = "scientificName"
+    )
   )
 }
 
@@ -174,36 +174,26 @@ mod_dwc_mapping_ui <- function(id) {
   ""
 }
 
-
 .suggest_term <- function(col_name, dwc_terms) {
   if (is.null(col_name) || is.na(col_name) || col_name == "") return("")
-
-  # 1) match exato
   if (col_name %in% dwc_terms) return(col_name)
 
-  # 2) aliases (semântica simples)
   ali <- .apply_alias_rules(col_name, dwc_terms)
   if (nzchar(ali)) return(ali)
 
-  # 3) fuzzy fallback
   key <- .normalize_key(col_name)
   if (key == "") return("")
 
   terms2 <- dwc_terms[dwc_terms != ""]
   terms_key <- vapply(terms2, .normalize_key, character(1))
 
-  if (!requireNamespace("stringdist", quietly = TRUE)) {
-    return("")
-  }
+  if (!requireNamespace("stringdist", quietly = TRUE)) return("")
 
   d <- stringdist::stringdist(key, terms_key, method = "jw", p = 0.1)
   i <- which.min(d)
   if (!length(i) || !is.finite(d[i])) return("")
-
-  # threshold um pouco mais permissivo do que 0.15
   if (d[i] <= 0.22) terms2[i] else ""
 }
-
 
 .validate_mapping_basic <- function(map_df) {
   req <- .dwc_required_terms()
@@ -237,10 +227,7 @@ mod_dwc_mapping_ui <- function(id) {
     )
   }
 
-  if (length(msgs) == 0) {
-    msgs <- "OK: mapping passes basic validation."
-  }
-
+  if (length(msgs) == 0) msgs <- "OK: mapping passes basic validation."
   msgs
 }
 
@@ -251,7 +238,6 @@ mod_dwc_mapping_ui <- function(id) {
 
   a2 <- a[, c("user_column", "dwc_term"), drop = FALSE]
   b2 <- b[, c("user_column", "dwc_term"), drop = FALSE]
-
   identical(a2, b2)
 }
 
@@ -264,7 +250,6 @@ mod_dwc_mapping_ui <- function(id) {
 
   out <- out[, map_df$user_column, drop = FALSE]
   names(out) <- final_names
-
   out
 }
 
@@ -287,10 +272,7 @@ mod_dwc_mapping_ui <- function(id) {
 
 .corella_summary <- function(x, label) {
   if (is.null(x)) return(character(0))
-
-  if (inherits(x, "error")) {
-    return(c(paste0(label, " failed:"), x$message))
-  }
+  if (inherits(x, "error")) return(c(paste0(label, " failed:"), x$message))
 
   c(
     paste0(label, ": OK"),
@@ -303,15 +285,17 @@ mod_dwc_mapping_ui <- function(id) {
 #'
 #' @param id Module id.
 #' @param df_in Reactive returning a data.frame (use ingest$tidy).
-#' @return A list of reactives: mapping, mapped, validation.
+#' @return A list of reactives: mapping, mapped, cleaned, issues, clean_summary, validation.
 #' @export
 mod_dwc_mapping_server <- function(id, df_in) {
   shiny::moduleServer(id, function(input, output, session) {
-    ns <- session$ns
 
     rv <- shiny::reactiveValues(
       mapping = NULL,
       mapped = NULL,
+      cleaned = NULL,
+      issues = NULL,
+      clean_summary = NULL,
       corella_checks = NULL,
       corella_suggest = NULL
     )
@@ -329,7 +313,6 @@ mod_dwc_mapping_server <- function(id, df_in) {
 
       cols <- names(df)
       keys <- make.names(cols, unique = TRUE)
-
       stats::setNames(cols, keys)
     })
 
@@ -355,11 +338,9 @@ mod_dwc_mapping_server <- function(id, df_in) {
       map$final_column <- map$dwc_term
       blank <- is.na(map$final_column) | map$final_column == ""
       map$final_column[blank] <- map$user_column[blank]
-
       map
     })
 
-    # aviso Apply (warning/success)
     output$apply_notice <- shiny::renderUI({
       df <- df_in()
       shiny::req(df)
@@ -402,14 +383,14 @@ mod_dwc_mapping_server <- function(id, df_in) {
 
       border_col <- "#cbd5e1"
 
-      # container com scroll interno (ajuste max-height se quiser)
       shiny::tags$div(
         style = paste0(
-          "max-height: 520px;",
+          "max-height: 72vh;",
+          "min-height: 520px;",
           "overflow-y: auto;",
-          "padding-right: 6px;"  # espaço para scrollbar não colar no conteúdo
+          "overflow-x: hidden;",
+          "padding-right: 8px;"
         ),
-
         shiny::tags$div(
           style = paste0(
             "display:grid;",
@@ -422,7 +403,6 @@ mod_dwc_mapping_server <- function(id, df_in) {
             "background: #fff;"
           ),
 
-          # Header (sticky dentro do container)
           shiny::tags$div(
             style = paste0(
               "padding: 10px 12px;",
@@ -445,7 +425,6 @@ mod_dwc_mapping_server <- function(id, df_in) {
             "DwC"
           ),
 
-          # Rows
           lapply(keys, function(k) {
             col <- key_map[[k]]
             term <- selected[[k]] %||% ""
@@ -464,7 +443,6 @@ mod_dwc_mapping_server <- function(id, df_in) {
             )
 
             shiny::tagList(
-              # left cell
               shiny::tags$div(
                 style = paste0(
                   "padding: 12px;",
@@ -475,7 +453,6 @@ mod_dwc_mapping_server <- function(id, df_in) {
                 col
               ),
 
-              # right cell
               shiny::tags$div(
                 style = paste0(
                   "padding: 12px;",
@@ -484,9 +461,9 @@ mod_dwc_mapping_server <- function(id, df_in) {
                 shiny::tags$div(
                   style = "display:flex; align-items:center;",
                   shiny::tags$div(
-                    style = "flex:1; max-width: 560px;",
+                    style = "flex:1; max-width: 680px;",
                     shiny::selectizeInput(
-                      inputId = ns(paste0("map__", k)),
+                      inputId = session$ns(paste0("map__", k)),
                       label = NULL,
                       choices = dwc_terms,
                       selected = term,
@@ -507,7 +484,6 @@ mod_dwc_mapping_server <- function(id, df_in) {
         )
       )
     })
-
 
     shiny::observeEvent(input$auto_suggest, {
       df <- df_in()
@@ -536,6 +512,43 @@ mod_dwc_mapping_server <- function(id, df_in) {
       rv$mapping <- map_df
       rv$mapped <- .apply_mapping(df, map_df)
 
+      # --- data cleaning (Etapa 4), com CRS informado pelo utilizador ---
+      if (!exists("clean_dwc_pipeline", mode = "function")) {
+        rv$cleaned <- rv$mapped
+        rv$issues <- data.frame()
+        rv$clean_summary <- data.frame()
+      } else {
+        epsg_in <- input$coord_epsg_in %||% 4326
+        force_parse <- isTRUE(input$coord_cols_are_messy)
+
+        clean_res <- tryCatch(
+          clean_dwc_pipeline(
+            rv$mapped,
+            coord_epsg_in = epsg_in,
+            target_epsg = 4326,
+            force_parzer = force_parse
+          ),
+          error = function(e) e
+        )
+
+        if (inherits(clean_res, "error")) {
+          rv$cleaned <- rv$mapped
+          rv$issues <- data.frame(
+            row = NA_integer_,
+            field = "pipeline",
+            rule = "clean_dwc_pipeline_error",
+            severity = "ERROR",
+            message = clean_res$message,
+            stringsAsFactors = FALSE
+          )
+          rv$clean_summary <- data.frame(severity = "ERROR", n = 1L, stringsAsFactors = FALSE)
+        } else {
+          rv$cleaned <- clean_res$data
+          rv$issues <- clean_res$issues
+          rv$clean_summary <- clean_res$summary
+        }
+      }
+
       if (requireNamespace("corella", quietly = TRUE)) {
         rv$corella_checks <- tryCatch(
           corella::check_dataset(rv$mapped),
@@ -547,6 +560,13 @@ mod_dwc_mapping_server <- function(id, df_in) {
           error = function(e) e
         )
       }
+
+      # --- AUTO SWITCH TAB after Apply mapping ---
+      # vai para "Preview (cleaned)"
+      bslib::nav_select(id = "main_tabs", selected = "Preview (cleaned)")
+
+      # Se preferires ir para "Preview (mapped)", usa:
+      # bslib::nav_select(id = "main_tabs", selected = "Preview (mapped)")
     })
 
     output$validation <- shiny::renderText({
@@ -558,28 +578,95 @@ mod_dwc_mapping_server <- function(id, df_in) {
 
       extra <- character(0)
       if (!is.null(rv$corella_checks)) {
-        extra <- c(extra, "", .corella_summary(rv$corella_checks,
-                                              "corella::check_dataset()"))
+        extra <- c(extra, "", .corella_summary(rv$corella_checks, "corella::check_dataset()"))
       }
       if (!is.null(rv$corella_suggest)) {
-        extra <- c(extra, "", .corella_summary(rv$corella_suggest,
-                                              "corella::suggest_workflow()"))
+        extra <- c(extra, "", .corella_summary(rv$corella_suggest, "corella::suggest_workflow()"))
       }
 
       paste(c(basic, extra), collapse = "\n")
     })
 
-    output$mapping_tbl <- DT::renderDT({
+    output$cleaning_summary <- shiny::renderText({
+      if (is.null(rv$mapped)) {
+        return("Cleaning: not run yet (apply mapping first).")
+      }
+
+      s <- rv$clean_summary
+      if (is.null(s) || !is.data.frame(s) || nrow(s) == 0) {
+        return("Cleaning: no issues detected (or summary unavailable).")
+      }
+
+      lines <- apply(s, 1, function(r) paste0(r[[1]], ": ", r[[2]]))
+      paste(c("Cleaning summary:", lines), collapse = "\n")
+    })
+
+    output$preview_mapped_tbl <- DT::renderDT({
+      shiny::req(rv$mapped)
       DT::datatable(
-        mapping_tbl(),
+        utils::head(rv$mapped, 50),
         rownames = FALSE,
-        options = list(scrollX = TRUE, pageLength = 10)
+        options = list(
+          scrollX = TRUE,
+          pageLength = 10
+        )
       )
     })
+
+    output$preview_cleaned_tbl <- DT::renderDT({
+      shiny::req(rv$cleaned)
+      DT::datatable(
+        utils::head(rv$cleaned, 50),
+        rownames = FALSE,
+        options = list(
+          scrollX = TRUE,
+          pageLength = 10
+        )
+      )
+    })
+
+    output$issues_tbl <- DT::renderDT({
+      iss <- rv$issues
+      if (is.null(iss) || !is.data.frame(iss) || nrow(iss) == 0) {
+        iss <- data.frame(
+          row = integer(),
+          field = character(),
+          rule = character(),
+          severity = character(),
+          message = character(),
+          stringsAsFactors = FALSE
+        )
+      }
+
+      DT::datatable(
+        iss,
+        rownames = FALSE,
+        options = list(
+          scrollX = TRUE,
+          scrollY = "320px",
+          pageLength = 10,
+          order = list(list(0, "asc"))
+        )
+      )
+    })
+
+    output$download_issues_csv <- shiny::downloadHandler(
+      filename = function() {
+        paste0("dwc_cleaning_issues_", format(Sys.Date(), "%Y-%m-%d"), ".csv")
+      },
+      content = function(file) {
+        iss <- rv$issues
+        if (is.null(iss) || !is.data.frame(iss)) iss <- data.frame()
+        utils::write.csv(iss, file, row.names = FALSE, fileEncoding = "UTF-8")
+      }
+    )
 
     list(
       mapping = shiny::reactive(rv$mapping),
       mapped = shiny::reactive(rv$mapped),
+      cleaned = shiny::reactive(rv$cleaned),
+      issues = shiny::reactive(rv$issues),
+      clean_summary = shiny::reactive(rv$clean_summary),
       validation = shiny::reactive(.validate_mapping_basic(mapping_tbl()))
     )
   })
