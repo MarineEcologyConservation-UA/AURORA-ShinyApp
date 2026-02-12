@@ -63,31 +63,34 @@ mod_dwc_mapping_ui <- function(id) {
       )
     ),
 
-    # MAIN AREA: tabs
     bslib::navset_card_tab(
       id = ns("main_tabs"),
       title = "Field mapping to Darwin Core",
 
       bslib::nav_panel(
         "Mapping",
+        value = "mapping",
         shiny::h4("Map each column to a Darwin Core term"),
         shiny::uiOutput(ns("mapping_ui"))
       ),
 
       bslib::nav_panel(
         "Preview (mapped)",
+        value = "preview_mapped",
         shiny::p("Preview após aplicar o mapping (primeiras linhas)."),
         DT::DTOutput(ns("preview_mapped_tbl"))
       ),
 
       bslib::nav_panel(
         "Preview (cleaned)",
+        value = "preview_cleaned",
         shiny::p("Preview após cleaning (primeiras linhas)."),
         DT::DTOutput(ns("preview_cleaned_tbl"))
       ),
 
       bslib::nav_panel(
         "Cleaning issues",
+        value = "issues",
         DT::DTOutput(ns("issues_tbl"))
       )
     )
@@ -316,6 +319,7 @@ mod_dwc_mapping_server <- function(id, df_in) {
       stats::setNames(cols, keys)
     })
 
+    # --- mapping table from inputs (OK to depend on input; do NOT use this inside mapping_ui) ---
     mapping_tbl <- shiny::reactive({
       df <- df_in()
       shiny::req(df)
@@ -340,6 +344,37 @@ mod_dwc_mapping_server <- function(id, df_in) {
       map$final_column[blank] <- map$user_column[blank]
       map
     })
+
+    # --- tooltip outputs per row: updates when the corresponding select changes ---
+    shiny::observeEvent(df_in(), {
+      df <- df_in()
+      shiny::req(df)
+
+      key_map <- col_key_map()
+      keys <- names(key_map)
+
+      for (k in keys) {
+        local({
+          kk <- k
+          tip_id <- paste0("tip__", kk)
+          input_id <- paste0("map__", kk)
+
+          output[[tip_id]] <- shiny::renderUI({
+            term <- input[[input_id]] %||% ""
+
+            meta_row <- term_meta[term_meta$term == term, , drop = FALSE]
+            html <- if (nrow(meta_row) == 0) {
+              if (term == "") "Select a term to see definition and examples."
+              else "No metadata found for this term in corella."
+            } else {
+              .term_tooltip_html(term, meta_row[1, ])
+            }
+
+            htmltools::HTML(html)
+          })
+        })
+      }
+    }, ignoreInit = FALSE)
 
     output$apply_notice <- shiny::renderUI({
       df <- df_in()
@@ -368,18 +403,13 @@ mod_dwc_mapping_server <- function(id, df_in) {
       }
     })
 
+    # --- UI is built ONLY from df_in() + rv$mapping (NOT from input$map__*) ---
     output$mapping_ui <- shiny::renderUI({
       df <- df_in()
       shiny::req(df)
 
       key_map <- col_key_map()
       keys <- names(key_map)
-
-      selected <- vapply(
-        keys,
-        function(k) input[[paste0("map__", k)]] %||% "",
-        character(1)
-      )
 
       border_col <- "#cbd5e1"
 
@@ -427,14 +457,13 @@ mod_dwc_mapping_server <- function(id, df_in) {
 
           lapply(keys, function(k) {
             col <- key_map[[k]]
-            term <- selected[[k]] %||% ""
 
-            meta_row <- term_meta[term_meta$term == term, , drop = FALSE]
-            html <- if (nrow(meta_row) == 0) {
-              if (term == "") "Select a term to see definition and examples."
-              else "No metadata found for this term in corella."
-            } else {
-              .term_tooltip_html(term, meta_row[1, ])
+            init_term <- ""
+            if (!is.null(rv$mapping) &&
+              is.data.frame(rv$mapping) &&
+              all(c("user_column", "dwc_term") %in% names(rv$mapping))) {
+              i <- match(col, rv$mapping$user_column)
+              if (!is.na(i)) init_term <- rv$mapping$dwc_term[i] %||% ""
             }
 
             tip_trigger <- shiny::tags$span(
@@ -466,7 +495,7 @@ mod_dwc_mapping_server <- function(id, df_in) {
                       inputId = session$ns(paste0("map__", k)),
                       label = NULL,
                       choices = dwc_terms,
-                      selected = term,
+                      selected = init_term,
                       options = list(
                         placeholder = "Select a Darwin Core term (or leave blank)"
                       )
@@ -474,7 +503,7 @@ mod_dwc_mapping_server <- function(id, df_in) {
                   ),
                   bslib::tooltip(
                     trigger = tip_trigger,
-                    htmltools::HTML(html),
+                    shiny::uiOutput(session$ns(paste0("tip__", k))),
                     placement = "right"
                   )
                 )
@@ -512,7 +541,6 @@ mod_dwc_mapping_server <- function(id, df_in) {
       rv$mapping <- map_df
       rv$mapped <- .apply_mapping(df, map_df)
 
-      # --- data cleaning (Etapa 4), com CRS informado pelo utilizador ---
       if (!exists("clean_dwc_pipeline", mode = "function")) {
         rv$cleaned <- rv$mapped
         rv$issues <- data.frame()
@@ -541,7 +569,11 @@ mod_dwc_mapping_server <- function(id, df_in) {
             message = clean_res$message,
             stringsAsFactors = FALSE
           )
-          rv$clean_summary <- data.frame(severity = "ERROR", n = 1L, stringsAsFactors = FALSE)
+          rv$clean_summary <- data.frame(
+            severity = "ERROR",
+            n = 1L,
+            stringsAsFactors = FALSE
+          )
         } else {
           rv$cleaned <- clean_res$data
           rv$issues <- clean_res$issues
@@ -560,13 +592,18 @@ mod_dwc_mapping_server <- function(id, df_in) {
           error = function(e) e
         )
       }
+      shiny::isolate(cat("tab atual (antes):", input$main_tabs, "\n"))
 
-      # --- AUTO SWITCH TAB after Apply mapping ---
-      # vai para "Preview (cleaned)"
-      bslib::nav_select(id = "main_tabs", selected = "Preview (cleaned)")
+      session$onFlushed(function() {
+        bslib::nav_select(
+          id = "main_tabs",
+          selected = "preview_cleaned",
+          session = session
+        )
 
-      # Se preferires ir para "Preview (mapped)", usa:
-      # bslib::nav_select(id = "main_tabs", selected = "Preview (mapped)")
+        shiny::isolate(cat("tab atual (depois):", input$main_tabs, "\n"))
+      }, once = TRUE)
+
     })
 
     output$validation <- shiny::renderText({
