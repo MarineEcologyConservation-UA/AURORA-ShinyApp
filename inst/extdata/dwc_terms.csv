@@ -1,0 +1,425 @@
+﻿Term,Class,Table,OBIS,GBIF,EMODnet,OBIS.manual,SMBD.workshop
+eventDate,event,Event,required,required,required,required,NA
+eventDate,event,Occurrence.Core,required,required,NA,required,NA
+eventID,event,Event,required,required,required,NA,NA
+eventID,event,Occurrence,required,NA,required,NA,NA
+eventID,event,eMoF,required,NA,required,NA,NA
+decimalLatitude,location,Event,required,strongly recommended,required,required,NA
+decimalLatitude,location,Occurrence.Core,required,strongly recommended,NA,required,NA
+decimalLongitude,location,Event,required,strongly recommended,required,required,NA
+decimalLongitude,location,Occurrence.Core,required,strongly recommended,NA,required,NA
+occurrenceID,occurrence,Occurrence.Core,required,required,NA,required,NA
+occurrenceID,occurrence,Occurrence,required,required,required,required,NA
+occurrenceID,occurrence,eMoF,required,NA,recommended,required,NA
+occurrenceID,occurrence,DNA,required,NA,NA,required,NA
+occurrenceStatus,occurrence,Occurrence.Core,required,NA,NA,required,NA
+occurrenceStatus,occurrence,Occurrence,required,NA,required,required,NA
+basisOfRecord,record,Occurrence.Core,required,required,NA,required,NA
+basisOfRecord,record,Occurrence,required,required,required,required,NA
+scientificName,taxon,Occurrence.Core,required,required,NA,required,NA
+scientificName,taxon,Occurrence,required,required,required,required,NA
+scientificNameID,taxon,Occurrence.Core,strongly recommended,NA,NA,required,NA
+scientificNameID,taxon,Occurrence,strongly recommended,NA,required,required,NA
+DNA_sequence,dna,DNA,strongly recommended,NA,NA,NA,NA
+env_broad_scale,dna,DNA,strongly recommended,NA,NA,NA,NA
+env_local scale,dna,DNA,recommended,NA,NA,NA,NA
+env_medium,dna,DNA,strongly recommended,NA,NA,NA,NA
+lib_layout,dna,DNA,recommended,NA,NA,NA,NA
+nucl_acid_amp,dna,DNA,recommended,NA,NA,NA,NA
+nucl_acid_ext,dna,DNA,recommended,NA,NA,NA,NA
+otu_class_appr,dna,DNA,recommended,NA,NA,NA,NA
+otu_db,dna,DNA,recommended,NA,NA,NA,NA
+otu_seq_comp_appr,dna,DNA,recommended,NA,NA,NA,NA
+pcr_primer_forward,dna,DNA,strongly recommended,NA,NA,NA,NA
+pcr_primer_name_forward,dna,DNA,strongly recommended,NA,NA,NA,NA
+pcr_primer_name_reverse,dna,DNA,strongly recommended,NA,NA,NA,NA
+pcr_primer_reference,dna,DNA,strongly recommended,NA,NA,NA,NA
+pcr_primer_reverse,dna,DNA,strongly recommended,NA,NA,NA,NA
+samp_name,dna,DNA,recommended,NA,NA,NA,NA
+samp_vol_we_dna_ext,dna,DNA,recommended,NA,NA,NA,NA
+seq_meth,dna,DNA,recommended,NA,NA,NA,NA
+sop,dna,DNA,recommended,NA,NA,NA,NA
+target_gene,dna,DNA,strongly recommended,NA,NA,NA,NA
+target_subfragment,dna,DNA,strongly recommended,NA,NA,NA,NA
+day,event,Event,recommended,NA,NA,NA,NA
+day,event,Occurrence.Core,recommended,NA,NA,NA,NA
+endDayOfYear,event,Event,recommended,NA,NA,NA,NA
+endDayOfYear,event,Occurrence.Core,recommended,NA,NA,NA,NA
+eventType,event,Event,strongly recommended,NA,NA,NA,NA
+eventRemarks,event,Event,optional,NA,NA,NA,NA
+eventRemarks,event,Occurrence.Core,optional,NA,NA,NA,NA
+eventTime,event,Event,recommended,NA,NA,NA,NA
+eventTime,event,Occurrence.Core,recommended,NA,NA,NA,NA
+fieldNotes,event,Event,optional,NA,NA,NA,NA
+fieldNotes,event,Occurrence.Core,optional,NA,NA,NA,NA
+fieldNumber,event,Event,optional,NA,NA,NA,NA
+fieldNumber,event,Occurrence.Core,optional,NA,NA,NA,NA
+habitat,event,Event,recommended,NA,NA,NA,NA
+habitat,event,Occurrence.Core,recommended,NA,NA,NA,NA
+habitat,event,eMoF,recommended,NA,NA,NA,NA
+month,event,Event,strongly recommended,NA,NA,NA,NA
+month,event,Occurrence.Core,strongly recommended,NA,NA,NA,NA
+parentEventID,event,Event,required (if exists),strongly recommended,recommended,NA,NA
+sampleSizeUnit,event,Event,strongly recommended,strongly recommended,NA,NA,NA
+sampleSizeUnit,event,Occurrence.Core,strongly recommended,NA,NA,NA,NA
+sampleSizeUnit,event,eMoF,strongly recommended,NA,NA,NA,NA
+sampleSizeValue,event,Event,strongly recommended,strongly recommended,NA,NA,NA
+sampleSizeValue,event,Occurrence.Core,strongly recommended,NA,NA,NA,NA
+sampleSizeValue,event,eMoF,strongly recommended,NA,NA,NA,NA
+samplingEffort,event,Event,strongly recommended,strongly recommended,NA,NA,NA
+samplingEffort,event,Occurrence.Core,strongly recommended,NA,NA,NA,NA
+samplingEffort,event,eMoF,strongly recommended,NA,NA,NA,NA
+samplingProtocol,event,Event,strongly recommended,required,NA,NA,recommended
+samplingProtocol,event,Occurrence.Core,strongly recommended,NA,NA,NA,recommended
+samplingProtocol,event,eMoF,strongly recommended,NA,NA,NA,recommended
+startDayOfYear,event,Event,recommended,NA,NA,NA,NA
+startDayOfYear,event,Occurrence.Core,recommended,NA,NA,NA,NA
+verbatimEventDate,event,Event,recommended,NA,NA,NA,NA
+verbatimEventDate,event,Occurrence.Core,recommended,NA,NA,NA,NA
+year,event,Event,strongly recommended,NA,NA,NA,NA
+year,event,Occurrence.Core,strongly recommended,NA,NA,NA,NA
+bed,geologicalContext,Event,optional,NA,NA,NA,NA
+bed,geologicalContext,Occurrence.Core,optional,NA,NA,NA,NA
+bed,geologicalContext,Occurrence,optional,NA,NA,NA,NA
+earliestAgeOrLowestStage,geologicalContext,Event,optional,NA,NA,NA,NA
+earliestAgeOrLowestStage,geologicalContext,Occurrence.Core,optional,NA,NA,NA,NA
+earliestAgeOrLowestStage,geologicalContext,Occurrence,optional,NA,NA,NA,NA
+earliestEonOrLowestEonothem,geologicalContext,Event,optional,NA,NA,NA,NA
+earliestEonOrLowestEonothem,geologicalContext,Occurrence.Core,optional,NA,NA,NA,NA
+earliestEonOrLowestEonothem,geologicalContext,Occurrence,optional,NA,NA,NA,NA
+earliestEpochOrLowestSeries,geologicalContext,Event,optional,NA,NA,NA,NA
+earliestEpochOrLowestSeries,geologicalContext,Occurrence.Core,optional,NA,NA,NA,NA
+earliestEpochOrLowestSeries,geologicalContext,Occurrence,optional,NA,NA,NA,NA
+earliestEraOrLowestErathem,geologicalContext,Event,optional,NA,NA,NA,NA
+earliestEraOrLowestErathem,geologicalContext,Occurrence.Core,optional,NA,NA,NA,NA
+earliestEraOrLowestErathem,geologicalContext,Occurrence,optional,NA,NA,NA,NA
+earliestPeriodOrLowestSystem,geologicalContext,Event,optional,NA,NA,NA,NA
+earliestPeriodOrLowestSystem,geologicalContext,Occurrence.Core,optional,NA,NA,NA,NA
+earliestPeriodOrLowestSystem,geologicalContext,Occurrence,optional,NA,NA,NA,NA
+formation,geologicalContext,Event,optional,NA,NA,NA,NA
+formation,geologicalContext,Occurrence.Core,optional,NA,NA,NA,NA
+formation,geologicalContext,Occurrence,optional,NA,NA,NA,NA
+group,geologicalContext,Event,optional,NA,NA,NA,NA
+group,geologicalContext,Occurrence.Core,optional,NA,NA,NA,NA
+group,geologicalContext,Occurrence,optional,NA,NA,NA,NA
+highestBiostratigraphicZone,geologicalContext,Event,optional,NA,NA,NA,NA
+highestBiostratigraphicZone,geologicalContext,Occurrence.Core,optional,NA,NA,NA,NA
+highestBiostratigraphicZone,geologicalContext,Occurrence,optional,NA,NA,NA,NA
+latestAgeOrHighestStage,geologicalContext,Event,optional,NA,NA,NA,NA
+latestAgeOrHighestStage,geologicalContext,Occurrence.Core,optional,NA,NA,NA,NA
+latestAgeOrHighestStage,geologicalContext,Occurrence,optional,NA,NA,NA,NA
+latestEonOrHighestEonothem,geologicalContext,Event,optional,NA,NA,NA,NA
+latestEonOrHighestEonothem,geologicalContext,Occurrence.Core,optional,NA,NA,NA,NA
+latestEonOrHighestEonothem,geologicalContext,Occurrence,optional,NA,NA,NA,NA
+latestEpochOrHighestSeries,geologicalContext,Event,optional,NA,NA,NA,NA
+latestEpochOrHighestSeries,geologicalContext,Occurrence.Core,optional,NA,NA,NA,NA
+latestEpochOrHighestSeries,geologicalContext,Occurrence,optional,NA,NA,NA,NA
+latestEraOrHighestErathem,geologicalContext,Event,optional,NA,NA,NA,NA
+latestEraOrHighestErathem,geologicalContext,Occurrence.Core,optional,NA,NA,NA,NA
+latestEraOrHighestErathem,geologicalContext,Occurrence,optional,NA,NA,NA,NA
+latestPeriodOrHighestSystem,geologicalContext,Event,optional,NA,NA,NA,NA
+latestPeriodOrHighestSystem,geologicalContext,Occurrence.Core,optional,NA,NA,NA,NA
+latestPeriodOrHighestSystem,geologicalContext,Occurrence,optional,NA,NA,NA,NA
+lithostratigraphicTerms,geologicalContext,Event,optional,NA,NA,NA,NA
+lithostratigraphicTerms,geologicalContext,Occurrence.Core,optional,NA,NA,NA,NA
+lithostratigraphicTerms,geologicalContext,Occurrence,optional,NA,NA,NA,NA
+lowestBiostratigraphicZone,geologicalContext,Event,optional,NA,NA,NA,NA
+lowestBiostratigraphicZone,geologicalContext,Occurrence.Core,optional,NA,NA,NA,NA
+lowestBiostratigraphicZone,geologicalContext,Occurrence,optional,NA,NA,NA,NA
+member,geologicalContext,Event,optional,NA,NA,NA,NA
+member,geologicalContext,Occurrence.Core,optional,NA,NA,NA,NA
+member,geologicalContext,Occurrence,optional,NA,NA,NA,NA
+dateIdentified,identification,Occurrence.Core,optional,NA,NA,NA,NA
+dateIdentified,identification,Occurrence,optional,NA,NA,NA,NA
+identificationID,identification,Occurrence.Core,optional,NA,NA,NA,NA
+identificationID,identification,Occurrence,optional,NA,NA,NA,NA
+identificationQualifier,identification,Occurrence.Core,recommended,NA,NA,NA,NA
+identificationQualifier,identification,Occurrence,recommended,NA,recommended,NA,NA
+identificationReferences,identification,Occurrence.Core,optional (required for imaging data),NA,NA,NA,NA
+identificationReferences,identification,Occurrence,optional (required for imaging data),NA,NA,NA,NA
+identificationRemarks,identification,Occurrence.Core,recommended,NA,NA,NA,NA
+identificationRemarks,identification,Occurrence,recommended,NA,NA,NA,NA
+identificationVerificationStatus,identification,Occurrence.Core,optional (required for imaging data),NA,NA,NA,NA
+identificationVerificationStatus,identification,Occurrence,optional (required for imaging data),NA,NA,NA,NA
+identifiedBy,identification,Occurrence.Core,optional (required for imaging data),NA,NA,NA,NA
+identifiedBy,identification,Occurrence,optional (required for imaging data),NA,NA,NA,NA
+identifiedByID,identification,Occurrence.Core,optional,NA,NA,NA,NA
+identifiedByID,identification,Occurrence,optional,NA,NA,NA,NA
+typeStatus,identification,Occurrence.Core,optional,NA,NA,NA,NA
+typeStatus,identification,Occurrence,optional,NA,NA,NA,NA
+continent,location,Event,strongly recommended,NA,NA,NA,NA
+continent,location,Occurrence.Core,strongly recommended,NA,NA,NA,NA
+coordinatePrecision,location,Event,strongly recommended,NA,NA,NA,NA
+coordinatePrecision,location,Occurrence.Core,strongly recommended,NA,NA,NA,NA
+coordinateUncertaintyInMeters,location,Event,strongly recommended,NA,recommended,NA,recommended
+coordinateUncertaintyInMeters,location,Occurrence.Core,strongly recommended,NA,NA,NA,recommended
+country,location,Event,recommended,NA,NA,NA,NA
+country,location,Occurrence.Core,recommended,NA,NA,NA,NA
+countryCode,location,Event,optional,strongly recommended,NA,required,NA
+countryCode,location,Occurrence.Core,optional,strongly recommended,NA,required,NA
+county,location,Event,optional,NA,NA,NA,NA
+county,location,Occurrence.Core,optional,NA,NA,NA,NA
+footprintSpatialFit,location,Event,optional,NA,NA,NA,NA
+footprintSpatialFit,location,Occurrence.Core,optional,NA,NA,NA,NA
+footprintSRS,location,Event,optional,strongly recommended,NA,NA,NA
+footprintSRS,location,Occurrence.Core,optional,NA,NA,NA,NA
+footprintWKT,location,Event,recommended,strongly recommended,recommended,NA,NA
+footprintWKT,location,Occurrence.Core,recommended,NA,NA,NA,NA
+geodeticDatum,location,Event,recommended,strongly recommended,NA,required,NA
+geodeticDatum,location,Occurrence.Core,recommended,strongly recommended,NA,required,NA
+georeferencedBy,location,Event,optional,NA,NA,NA,NA
+georeferencedBy,location,Occurrence.Core,optional,NA,NA,NA,NA
+georeferencedDate,location,Event,optional,NA,NA,NA,NA
+georeferencedDate,location,Occurrence.Core,optional,NA,NA,NA,NA
+georeferenceProtocol,location,Event,optional,NA,NA,NA,NA
+georeferenceProtocol,location,Occurrence.Core,optional,NA,NA,NA,NA
+georeferenceSources,location,Event,optional,NA,NA,NA,NA
+georeferenceSources,location,Occurrence.Core,optional,NA,NA,NA,NA
+higherGeography,location,Event,optional,NA,NA,NA,NA
+higherGeography,location,Occurrence.Core,optional,NA,NA,NA,NA
+higherGeographyID,location,Event,optional,NA,NA,NA,NA
+higherGeographyID,location,Occurrence.Core,optional,NA,NA,NA,NA
+island,location,Event,optional,NA,NA,NA,NA
+island,location,Occurrence.Core,optional,NA,NA,NA,NA
+islandGroup,location,Event,optional,NA,NA,NA,NA
+islandGroup,location,Occurrence.Core,optional,NA,NA,NA,NA
+locality,location,Event,recommended,NA,NA,NA,NA
+locality,location,Occurrence.Core,recommended,NA,NA,NA,NA
+locationAccordingTo,location,Event,recommended,NA,NA,NA,NA
+locationAccordingTo,location,Occurrence.Core,recommended,NA,NA,NA,NA
+locationID,location,Event,strongly recommended,strongly recommended,NA,NA,NA
+locationID,location,Occurrence.Core,strongly recommended,NA,NA,NA,NA
+locationRemarks,location,Event,recommended,NA,NA,NA,NA
+locationRemarks,location,Occurrence.Core,recommended,NA,NA,NA,NA
+maximumDepthInMeters,location,Event,strongly recommended,NA,recommended,NA,recommended
+maximumDepthInMeters,location,Occurrence.Core,strongly recommended,NA,NA,NA,recommended
+maximumDistanceAboveSurfaceInMeters,location,Event,optional,NA,NA,NA,NA
+maximumDistanceAboveSurfaceInMeters,location,Occurrence.Core,optional,NA,NA,NA,NA
+maximumElevationInMeters,location,Event,optional,NA,NA,NA,NA
+maximumElevationInMeters,location,Occurrence.Core,optional,NA,NA,NA,NA
+minimumDepthInMeters,location,Event,strongly recommended,NA,recommended,NA,recommended
+minimumDepthInMeters,location,Occurrence.Core,strongly recommended,NA,NA,NA,recommended
+minimumDistanceAboveSurfaceInMeters,location,Event,optional,NA,NA,NA,NA
+minimumDistanceAboveSurfaceInMeters,location,Occurrence.Core,optional,NA,NA,NA,NA
+minimumElevationInMeters,location,Event,optional,NA,NA,NA,NA
+minimumElevationInMeters,location,Occurrence.Core,optional,NA,NA,NA,NA
+municipality,location,Event,optional,NA,NA,NA,NA
+municipality,location,Occurrence.Core,optional,NA,NA,NA,NA
+pointRadiusSpatialFit,location,Event,optional,NA,NA,NA,NA
+pointRadiusSpatialFit,location,Occurrence.Core,optional,NA,NA,NA,NA
+stateProvince,location,Event,optional,NA,NA,NA,NA
+stateProvince,location,Occurrence.Core,optional,NA,NA,NA,NA
+verbatimCoordinates,location,Event,optional,NA,NA,NA,NA
+verbatimCoordinates,location,Occurrence.Core,optional,NA,NA,NA,NA
+verbatimCoordinateSystem,location,Event,optional,NA,NA,NA,NA
+verbatimCoordinateSystem,location,Occurrence.Core,optional,NA,NA,NA,NA
+verbatimDepth,location,Event,optional,NA,NA,NA,NA
+verbatimDepth,location,Occurrence.Core,optional,NA,NA,NA,NA
+verbatimElevation,location,Event,optional,NA,NA,NA,NA
+verbatimElevation,location,Occurrence.Core,optional,NA,NA,NA,NA
+verbatimLatitude,location,Event,optional,NA,NA,NA,NA
+verbatimLatitude,location,Occurrence.Core,optional,NA,NA,NA,NA
+verbatimLocality,location,Event,optional,NA,NA,NA,NA
+verbatimLocality,location,Occurrence.Core,optional,NA,NA,NA,NA
+verbatimLongitude,location,Event,optional,NA,NA,NA,NA
+verbatimLongitude,location,Occurrence.Core,optional,NA,NA,NA,NA
+verbatimSRS,location,Event,optional,NA,NA,NA,NA
+verbatimSRS,location,Occurrence.Core,optional,NA,NA,NA,NA
+waterBody,location,Event,recommended,NA,NA,NA,NA
+waterBody,location,Occurrence.Core,recommended,NA,NA,NA,NA
+materialSampleID,materialSample,Occurrence.Core,recommended,NA,NA,NA,NA
+materialSampleID,materialSample,Occurrence,recommended,NA,NA,NA,NA
+measurementAccuracy,measurementOrFact,eMoF,recommended,NA,recommended,NA,NA
+measurementDeterminedBy,measurementOrFact,eMoF,optional,NA,NA,NA,NA
+measurementDeterminedDate,measurementOrFact,eMoF,optional,NA,NA,NA,NA
+measurementID,measurementOrFact,eMoF,recommended,NA,recommended,NA,NA
+measurementMethod,measurementOrFact,eMoF,recommended,NA,NA,NA,NA
+measurementRemarks,measurementOrFact,eMoF,recommended,NA,recommended,NA,NA
+measurementType,measurementOrFact,eMoF,strongly recommended,NA,required,NA,NA
+measurementTypeID,measurementOrFact,eMoF,strongly recommended,NA,required,NA,NA
+measurementUnit,measurementOrFact,eMoF,strongly recommended,NA,required,NA,NA
+measurementUnitID,measurementOrFact,eMoF,strongly recommended,NA,recommended,NA,NA
+measurementValue,measurementOrFact,eMoF,strongly recommended,NA,required,NA,NA
+measurementValueID,measurementOrFact,eMoF,strongly recommended,NA,recommended,NA,NA
+associatedMedia,occurrence,Occurrence.Core,recommended,NA,NA,NA,NA
+associatedMedia,occurrence,Occurrence,recommended,NA,NA,NA,NA
+associatedReferences,occurrence,Occurrence.Core,optional,NA,NA,NA,NA
+associatedReferences,occurrence,Occurrence,optional,NA,NA,NA,NA
+associatedSequences,occurrence,Occurrence.Core,recommended,NA,NA,NA,NA
+associatedSequences,occurrence,Occurrence,recommended,NA,NA,NA,NA
+associatedTaxa,occurrence,Occurrence.Core,optional,NA,NA,NA,NA
+associatedTaxa,occurrence,Occurrence,optional,NA,NA,NA,NA
+behavior,occurrence,Occurrence.Core,optional,NA,NA,NA,NA
+behavior,occurrence,Occurrence,optional,NA,NA,NA,NA
+behavior,occurrence,eMoF,optional,NA,NA,NA,NA
+catalogNumber,occurrence,Occurrence.Core,recommended,NA,NA,NA,NA
+catalogNumber,occurrence,Occurrence,recommended,NA,recommended,NA,NA
+disposition,occurrence,Occurrence.Core,optional,NA,NA,NA,NA
+disposition,occurrence,Occurrence,optional,NA,NA,NA,NA
+establishmentMeans,occurrence,Occurrence.Core,optional,NA,NA,NA,NA
+establishmentMeans,occurrence,Occurrence,optional,NA,NA,NA,NA
+georeferenceVerificationStatus,occurrence,Event,recommended,NA,NA,NA,NA
+georeferenceVerificationStatus,occurrence,Occurrence.Core,recommended,NA,NA,NA,NA
+organismQuantity,occurrence,Occurrence.Core,strongly recommended,strongly recommended,NA,NA,recommended
+organismQuantity,occurrence,Occurrence,strongly recommended,strongly recommended,NA,NA,recommended
+organismQuantity,occurrence,eMoF,strongly recommended,NA,NA,NA,recommended
+organismQuantityType,occurrence,Occurrence.Core,strongly recommended,strongly recommended,NA,NA,recommended
+organismQuantityType,occurrence,Occurrence,strongly recommended,strongly recommended,NA,NA,recommended
+organismQuantityType,occurrence,eMoF,strongly recommended,NA,NA,NA,recommended
+individualCount,occurrence,Occurrence.Core,recommended,strongly recommended,NA,NA,NA
+individualCount,occurrence,Occurrence,recommended,strongly recommended,NA,NA,NA
+individualCount,occurrence,eMoF,recommended,NA,NA,NA,NA
+lifeStage,occurrence,Occurrence.Core,optional,NA,NA,NA,NA
+lifeStage,occurrence,Occurrence,optional,NA,NA,NA,NA
+lifeStage,occurrence,eMoF,optional,NA,NA,NA,NA
+occurrenceRemarks,occurrence,Occurrence.Core,recommended,NA,NA,NA,NA
+occurrenceRemarks,occurrence,Occurrence,recommended,NA,NA,NA,NA
+otherCatalogNumbers,occurrence,Occurrence.Core,optional,NA,NA,NA,NA
+otherCatalogNumbers,occurrence,Occurrence,optional,NA,NA,NA,NA
+preparations,occurrence,Occurrence.Core,optional,NA,NA,NA,NA
+preparations,occurrence,Occurrence,optional,NA,NA,NA,NA
+recordedBy,occurrence,Occurrence.Core,recommended,NA,NA,NA,NA
+recordedBy,occurrence,Occurrence,recommended,NA,NA,NA,NA
+recordedByID,occurrence,Occurrence.Core,recommended,NA,NA,NA,NA
+recordedByID,occurrence,Occurrence,recommended,NA,NA,NA,NA
+recordNumber,occurrence,Occurrence.Core,recommended,NA,NA,NA,NA
+recordNumber,occurrence,Occurrence,recommended,NA,NA,NA,NA
+reproductiveCondition,occurrence,Occurrence.Core,optional,NA,NA,NA,NA
+reproductiveCondition,occurrence,Occurrence,optional,NA,NA,NA,NA
+reproductiveCondition,occurrence,eMoF,optional,NA,NA,NA,NA
+sex,occurrence,Occurrence.Core,optional,NA,NA,NA,NA
+sex,occurrence,Occurrence,optional,NA,NA,NA,NA
+sex,occurrence,eMoF,optional,NA,NA,NA,NA
+associatedOccurrences,organsim,Occurrence.Core,optional,NA,NA,NA,NA
+associatedOccurrences,organsim,Occurrence,optional,NA,NA,NA,NA
+associatedOrganisms,organsim,Occurrence.Core,optional,NA,NA,NA,NA
+associatedOrganisms,organsim,Occurrence,optional,NA,NA,NA,NA
+organismID,organsim,Occurrence.Core,recommended,NA,NA,NA,NA
+organismID,organsim,Occurrence,recommended,NA,NA,NA,NA
+organismName,organsim,Occurrence.Core,optional,NA,NA,NA,NA
+organismName,organsim,Occurrence,optional,NA,NA,NA,NA
+organismRemarks,organsim,Occurrence.Core,optional,NA,NA,NA,NA
+organismRemarks,organsim,Occurrence,optional,NA,NA,NA,NA
+organismScope,organsim,Occurrence.Core,optional,NA,NA,NA,NA
+organismScope,organsim,Occurrence,optional,NA,NA,NA,NA
+previousIdentifications,organsim,Occurrence.Core,recommended,NA,NA,NA,NA
+previousIdentifications,organsim,Occurrence,recommended,NA,NA,NA,NA
+accessRights,record,Event,recommended,NA,NA,NA,NA
+accessRights,record,Occurrence.Core,recommended,NA,NA,NA,NA
+bibliographicCitation,record,Event,recommended,NA,NA,NA,NA
+bibliographicCitation,record,Occurrence.Core,recommended,NA,NA,NA,NA
+collectionCode,record,Event,optional,NA,NA,NA,NA
+collectionCode,record,Occurrence.Core,optional,NA,NA,NA,NA
+collectionCode,record,Occurrence,optional,NA,recommended,NA,NA
+collectionID,record,Event,optional,NA,NA,NA,NA
+collectionID,record,Occurrence.Core,optional,NA,NA,NA,NA
+collectionID,record,Occurrence,optional,NA,NA,NA,NA
+dataGeneralizations,record,Event,optional,NA,NA,NA,recommended
+dataGeneralizations,record,Occurrence.Core,optional,NA,NA,NA,recommended
+dataGeneralizations,record,Occurrence,optional,NA,NA,NA,recommended
+datasetID,record,Event,recommended,NA,NA,NA,NA
+datasetID,record,Occurrence.Core,recommended,NA,NA,NA,NA
+datasetID,record,Occurrence,recommended,NA,NA,NA,NA
+datasetName,record,Event,recommended,NA,required,NA,recommended
+datasetName,record,Occurrence.Core,recommended,NA,NA,NA,recommended
+datasetName,record,Occurrence,recommended,NA,NA,NA,recommended
+dynamicProperties,record,Event,recommended,NA,NA,NA,NA
+dynamicProperties,record,Occurrence.Core,recommended,NA,NA,NA,NA
+dynamicProperties,record,Occurrence,recommended,NA,NA,NA,NA
+informationWithheld,record,Event,optional,NA,NA,NA,recommended
+informationWithheld,record,Occurrence.Core,optional,NA,NA,NA,recommended
+informationWithheld,record,Occurrence,optional,NA,NA,NA,recommended
+institutionCode,record,Event,optional,NA,required,NA,recommended
+institutionCode,record,Occurrence.Core,optional,NA,NA,NA,recommended
+institutionCode,record,Occurrence,optional,NA,NA,NA,recommended
+institutionID,record,Event,optional,NA,NA,NA,NA
+institutionID,record,Occurrence.Core,optional,NA,NA,NA,NA
+institutionID,record,Occurrence,optional,NA,NA,NA,NA
+language,record,Event,recommended,NA,NA,NA,NA
+language,record,Occurrence.Core,recommended,NA,NA,NA,NA
+language,record,Occurrence,recommended,NA,NA,NA,NA
+license,record,Event,strongly recommended,NA,NA,NA,NA
+license,record,Occurrence.Core,strongly recommended,NA,NA,NA,NA
+license,record,Occurrence,strongly recommended,NA,NA,NA,NA
+modified,record,Event,recommended,NA,recommended,NA,NA
+modified,record,Occurrence.Core,recommended,NA,NA,NA,NA
+modified,record,Occurrence,recommended,NA,recommended,NA,NA
+ownerInstitutionCode,record,Event,optional,NA,NA,NA,NA
+ownerInstitutionCode,record,Occurrence.Core,optional,NA,NA,NA,NA
+ownerInstitutionCode,record,Occurrence,optional,NA,NA,NA,NA
+references,record,Event,recommended,NA,NA,NA,NA
+references,record,Occurrence.Core,recommended,NA,NA,NA,NA
+references,record,Occurrence,recommended,NA,NA,NA,NA
+rightsHolder,record,Event,recommended,NA,NA,NA,NA
+rightsHolder,record,Occurrence.Core,recommended,NA,NA,NA,NA
+rightsHolder,record,Occurrence,recommended,NA,NA,NA,NA
+type,record,Event,strongly recommended,NA,recommended,NA,NA
+type,record,Occurrence.Core,strongly recommended,NA,NA,NA,NA
+type,record,Occurrence,strongly recommended,NA,NA,NA,NA
+type,record,eMoF,strongly recommended,NA,NA,NA,NA
+acceptedNameUsage,taxon,Occurrence.Core,recommended,NA,NA,NA,NA
+acceptedNameUsage,taxon,Occurrence,recommended,NA,NA,NA,NA
+acceptedNameUsageID,taxon,Occurrence.Core,recommended,NA,NA,NA,NA
+acceptedNameUsageID,taxon,Occurrence,recommended,NA,NA,NA,NA
+higherClassification,taxon,Occurrence.Core,recommended,NA,NA,NA,NA
+higherClassification,taxon,Occurrence,recommended,NA,NA,NA,NA
+infraspecificEpithet,taxon,Occurrence.Core,recommended,NA,NA,NA,NA
+infraspecificEpithet,taxon,Occurrence,recommended,NA,NA,NA,NA
+nameAccordingToID,taxon,Occurrence.Core,recommended,NA,NA,NA,NA
+nameAccordingToID,taxon,Occurrence,recommended,NA,NA,NA,NA
+namePublishedInID,taxon,Occurrence.Core,optional,NA,NA,NA,NA
+namePublishedInID,taxon,Occurrence,optional,NA,NA,NA,NA
+namePublishedInYear,taxon,Occurrence.Core,optional,NA,NA,NA,NA
+namePublishedInYear,taxon,Occurrence,optional,NA,NA,NA,NA
+nomenclaturalCode,taxon,Occurrence.Core,optional,NA,NA,NA,NA
+nomenclaturalCode,taxon,Occurrence,optional,NA,NA,NA,NA
+nomenclaturalStatus,taxon,Occurrence.Core,optional,NA,NA,NA,NA
+nomenclaturalStatus,taxon,Occurrence,optional,NA,NA,NA,NA
+verbatimIdentification,identification,Occurrence.Core,recommended,NA,NA,NA,NA
+verbatimIdentification,identification,Occurrence,recommended,NA,NA,NA,NA
+originalNameUsage,taxon,Occurrence.Core,recommended,NA,NA,NA,NA
+originalNameUsage,taxon,Occurrence,recommended,NA,NA,NA,NA
+originalNameUsageID,taxon,Occurrence.Core,recommended,NA,NA,NA,NA
+originalNameUsageID,taxon,Occurrence,recommended,NA,NA,NA,NA
+parentNameUsage,taxon,Occurrence.Core,recommended,NA,NA,NA,NA
+parentNameUsage,taxon,Occurrence,recommended,NA,NA,NA,NA
+parentNameUsageID,taxon,Occurrence.Core,recommended,NA,NA,NA,NA
+parentNameUsageID,taxon,Occurrence,recommended,NA,NA,NA,NA
+phylum,taxon,Occurrence.Core,recommended,NA,NA,NA,NA
+phylum,taxon,Occurrence,recommended,NA,NA,NA,NA
+scientificNameAuthorship,taxon,Occurrence.Core,recommended,NA,NA,NA,NA
+scientificNameAuthorship,taxon,Occurrence,recommended,NA,recommended,NA,NA
+specificEpithet,taxon,Occurrence.Core,recommended,NA,NA,NA,NA
+specificEpithet,taxon,Occurrence,recommended,NA,NA,NA,NA
+subgenus,taxon,Occurrence.Core,recommended,NA,NA,NA,NA
+subgenus,taxon,Occurrence,recommended,NA,NA,NA,NA
+taxonConceptID,taxon,Occurrence.Core,optional,NA,NA,NA,NA
+taxonConceptID,taxon,Occurrence,optional,NA,NA,NA,NA
+taxonID,taxon,Occurrence.Core,optional,NA,NA,NA,NA
+taxonID,taxon,Occurrence,optional,NA,NA,NA,NA
+taxonomicStatus,taxon,Occurrence.Core,optional,NA,NA,NA,NA
+taxonomicStatus,taxon,Occurrence,optional,NA,NA,NA,NA
+taxonRank,taxon,Occurrence.Core,strongly recommended,strongly recommended,NA,NA,recommended
+taxonRank,taxon,Occurrence,strongly recommended,strongly recommended,recommended,NA,recommended
+taxonRemarks,taxon,Occurrence.Core,recommended,NA,NA,NA,NA
+taxonRemarks,taxon,Occurrence,recommended,NA,NA,NA,NA
+verbatimTaxonRank,taxon,Occurrence.Core,recommended,NA,NA,NA,NA
+verbatimTaxonRank,taxon,Occurrence,recommended,NA,NA,NA,NA
+vernacularName,taxon,Occurrence.Core,recommended,NA,NA,NA,NA
+vernacularName,taxon,Occurrence,recommended,NA,NA,NA,NA
+class,taxon,Occurrence.Core,recommended,NA,NA,NA,NA
+class,taxon,Occurrence,recommended,NA,NA,NA,NA
+family,taxon,Occurrence.Core,recommended,NA,NA,NA,NA
+family,taxon,Occurrence,recommended,NA,NA,NA,NA
+genus,taxon,Occurrence.Core,strongly recommended,NA,NA,NA,NA
+genus,taxon,Occurrence,strongly recommended,NA,NA,NA,NA
+kingdom,taxon,Occurrence.Core,strongly recommended,strongly recommended,NA,required,NA
+kingdom,taxon,Occurrence,strongly recommended,strongly recommended,recommended,required,NA
+order,taxon,Occurrence.Core,strongly recommended,NA,NA,NA,NA
+order,taxon,Occurrence,strongly recommended,NA,NA,NA,NA
+taxonID,taxon,Taxon.Core,NA,required,NA,NA,NA
+scientificName,taxon,Taxon.Core,NA,required,NA,required,NA
+taxonRank,taxon,Taxon.Core,NA,required,NA,NA,recommended
+parentNameUsageID,taxon,Taxon.Core,NA,strongly recommended,NA,NA,NA
+acceptedNameUsageID,taxon,Taxon.Core,NA,strongly recommended,NA,NA,NA
+kingdom,taxon,Taxon.Core,NA,strongly recommended,NA,required,NA
