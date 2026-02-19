@@ -219,7 +219,7 @@ build_dwca_tables <- function(df,
     dplyr::select(dplyr::any_of(occ_terms))
 
   # -------------------------------------------------------
-  # 6) EMOF BUILD
+  # 6) EMOF BUILD (LEVEL PER COLUMN)
   # -------------------------------------------------------
   emof_table <- NULL
 
@@ -239,8 +239,25 @@ build_dwca_tables <- function(df,
     }
 
     cols_ok <- intersect(emof_spec$columns, names(df_work))
+
     if (length(cols_ok) > 0) {
 
+      # levels must be provided as named list col -> level
+      levels <- emof_spec$levels
+      if (is.null(levels) || length(levels) == 0) {
+        stop("emof_spec$levels must be a named list mapping column -> level.")
+      }
+
+      # validate levels for selected columns
+      bad <- cols_ok[!cols_ok %in% names(levels)]
+      if (length(bad) > 0) {
+        stop(paste0(
+          "Missing eMoF levels for columns: ",
+          paste(bad, collapse = ", ")
+        ))
+      }
+
+      # build long table
       emof_table <- df_work |>
         dplyr::select(
           .data$eventID,
@@ -255,9 +272,13 @@ build_dwca_tables <- function(df,
         ) |>
         dplyr::filter(!is.na(.data$measurementValue) & .data$measurementValue != "")
 
-      if (!is.null(emof_spec$level) && emof_spec$level == "event") {
-        emof_table$occurrenceID <- ""
-      }
+      # apply per-column level rule: if measurementType is event-level -> blank occurrenceID
+      is_event_level <- vapply(
+        emof_table$measurementType,
+        function(mt) identical(levels[[mt]], "event"),
+        logical(1)
+      )
+      emof_table$occurrenceID[is_event_level] <- ""
 
       for (nm in c("measurementTypeID", "measurementValueID",
                    "measurementUnit", "measurementUnitID")) {

@@ -18,10 +18,7 @@ mod_build_dwca_ui <- function(id) {
           choices = c("use", "concat", "auto_row")
         ),
 
-        # use -> escolhe coluna
         shiny::uiOutput(ns("event_column_ui")),
-
-        # concat -> escolhe colunas
         shiny::uiOutput(ns("event_concat_ui")),
 
         shiny::checkboxInput(
@@ -42,17 +39,32 @@ mod_build_dwca_ui <- function(id) {
 
         shiny::uiOutput(ns("occ_use_ui")),
 
+        shiny::hr(),
+
+        shiny::h4("eMoF columns"),
+
         shiny::selectizeInput(
-          ns("emof_cols"),
-          "Columns to move to eMoF",
+          ns("emof_cols_event"),
+          "Columns to move to eMoF (event level)",
           choices = NULL,
           multiple = TRUE
         ),
-        shiny::selectInput(
-          ns("emof_level"),
-          "eMoF level",
-          choices = c("occurrence", "event")
-        )
+
+        shiny::selectizeInput(
+          ns("emof_cols_occ"),
+          "Columns to move to eMoF (occurrence level)",
+          choices = NULL,
+          multiple = TRUE
+        ),
+
+        shiny::hr(),
+
+        shiny::checkboxInput(
+          ns("enable_remarks"),
+          "Create remarks column (join with '|')",
+          FALSE
+        ),
+        shiny::uiOutput(ns("remarks_ui"))
       ),
 
       shiny::column(
@@ -98,12 +110,26 @@ mod_build_dwca_server <- function(id, df_in, dwc_terms) {
 
     ns <- session$ns
 
-    sshiny::observe({
+    shiny::observe({
       shiny::req(df_in())
+      cols <- names(df_in())
+
       shiny::updateSelectizeInput(
         session,
-        "emof_cols",
-        choices = names(df_in())
+        "emof_cols_event",
+        choices = cols
+      )
+
+      shiny::updateSelectizeInput(
+        session,
+        "emof_cols_occ",
+        choices = cols
+      )
+
+      shiny::updateSelectizeInput(
+        session,
+        "remarks_cols",
+        choices = cols
       )
     })
 
@@ -158,10 +184,54 @@ mod_build_dwca_server <- function(id, df_in, dwc_terms) {
       }
     })
 
+    output$remarks_ui <- shiny::renderUI({
+      shiny::req(df_in())
+
+      if (!isTRUE(input$enable_remarks)) {
+        return(NULL)
+      }
+
+      shiny::tagList(
+        shiny::selectizeInput(
+          ns("remarks_cols"),
+          "Columns to join into remarks",
+          choices = names(df_in()),
+          multiple = TRUE
+        ),
+        shiny::textInput(
+          ns("remarks_target"),
+          "Target remarks column name",
+          value = "occurrenceRemarks"
+        )
+      )
+    })
+
+    # helper: build named list mapping column -> level
+    emof_levels <- shiny::reactive({
+      ev <- input$emof_cols_event
+      oc <- input$emof_cols_occ
+
+      if (is.null(ev)) ev <- character(0)
+      if (is.null(oc)) oc <- character(0)
+
+      # remove duplicates and keep explicit assignment
+      ev <- unique(as.character(ev))
+      oc <- unique(as.character(oc))
+
+      # If a column is in both, that is ambiguous -> handled by validation
+      levs <- c(setNames(as.list(rep("event", length(ev))), ev),
+                setNames(as.list(rep("occurrence", length(oc))), oc))
+
+      if (length(levs) == 0) {
+        return(NULL)
+      }
+
+      levs
+    })
+
     result <- shiny::eventReactive(input$build, {
       shiny::req(df_in())
 
-      # validações mínimas para evitar "falhas silenciosas"
       if (input$event_mode == "concat") {
         if (is.null(input$event_concat_cols) || length(input$event_concat_cols) == 0) {
           stop("Select at least 1 column to build eventID by concat.")
@@ -177,6 +247,32 @@ mod_build_dwca_server <- function(id, df_in, dwc_terms) {
           stop("Select the occurrenceID column (or use event_seq).")
         }
       }
+
+      if (isTRUE(input$enable_remarks)) {
+        if (is.null(input$remarks_cols) || length(input$remarks_cols) == 0) {
+          stop("Select at least 1 column for remarks (or disable remarks).")
+        }
+        if (is.null(input$remarks_target) || !nzchar(input$remarks_target)) {
+          stop("Provide a target column name for remarks.")
+        }
+      }
+
+      # validate eMoF selection
+      ev <- input$emof_cols_event
+      oc <- input$emof_cols_occ
+      if (is.null(ev)) ev <- character(0)
+      if (is.null(oc)) oc <- character(0)
+
+      both <- intersect(ev, oc)
+      if (length(both) > 0) {
+        stop(paste0(
+          "These columns were selected in BOTH eMoF lists (choose only one level): ",
+          paste(both, collapse = ", ")
+        ))
+      }
+
+      emof_cols_all <- unique(c(ev, oc))
+      levs <- emof_levels()
 
       build_dwca_tables(
         df = df_in(),
@@ -196,9 +292,18 @@ mod_build_dwca_server <- function(id, df_in, dwc_terms) {
         ),
 
         emof_spec = list(
-          columns = input$emof_cols,
-          level = input$emof_level
-        )
+          columns = emof_cols_all,
+          levels = levs
+        ),
+
+        remarks_spec = if (isTRUE(input$enable_remarks)) {
+          list(
+            columns = input$remarks_cols,
+            target = input$remarks_target
+          )
+        } else {
+          NULL
+        }
       )
     })
 
