@@ -10,6 +10,22 @@
 mod_dwc_mapping_ui <- function(id) {
   ns <- shiny::NS(id)
 
+
+  # --- NEW: CSS to fix selectize dropdown clipping + stacking ---
+  shiny::tags$head(
+    shiny::tags$style(shiny::HTML("
+      /* selectize dropdown must appear above cards/tables/scroll areas */
+      .selectize-dropdown, .selectize-dropdown.form-control {
+        z-index: 3000 !important;
+      }
+
+      /* avoid clipping in common bootstrap/bslib containers */
+      .bslib-card, .card, .card-body {
+        overflow: visible !important;
+      }
+    "))
+  )
+
   bslib::layout_sidebar(
     sidebar = bslib::sidebar(
       bslib::card(
@@ -414,13 +430,8 @@ mod_dwc_mapping_server <- function(id, df_in) {
       border_col <- "#cbd5e1"
 
       shiny::tags$div(
-        style = paste0(
-          "max-height: 72vh;",
-          "min-height: 520px;",
-          "overflow-y: auto;",
-          "overflow-x: hidden;",
-          "padding-right: 8px;"
-        ),
+        # --- CHANGED: remove internal scroll to avoid "scroll inside scroll"
+        style = "padding-right: 8px;",
         shiny::tags$div(
           style = paste0(
             "display:grid;",
@@ -429,6 +440,7 @@ mod_dwc_mapping_server <- function(id, df_in) {
             "width: 100%;",
             "border: 1px solid ", border_col, ";",
             "border-radius: 10px;",
+            # mantém para arredondar, mas dropdown vai para o body (não fica recortado)
             "overflow: hidden;",
             "background: #fff;"
           ),
@@ -497,7 +509,8 @@ mod_dwc_mapping_server <- function(id, df_in) {
                       choices = dwc_terms,
                       selected = init_term,
                       options = list(
-                        placeholder = "Select a Darwin Core term (or leave blank)"
+                        placeholder = "Select a Darwin Core term (or leave blank)",
+                        dropdownParent = "body"
                       )
                     )
                   ),
