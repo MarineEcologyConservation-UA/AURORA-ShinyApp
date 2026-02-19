@@ -6,6 +6,24 @@ mod_build_dwca_ui <- function(id) {
   ns <- shiny::NS(id)
 
   shiny::fluidPage(
+    shiny::tags$head(
+      shiny::tags$style(shiny::HTML("
+        /* Espaço e alinhamento para o 'footer' abaixo de cada DT */
+        .dwca-tab-footer {
+          margin-top: 12px;
+          margin-bottom: 6px;
+          display: flex;
+          gap: 10px;
+          justify-content: flex-start;
+          align-items: center;
+        }
+
+        /* Garante que o DT não 'cola' no footer */
+        .dwca-dt-wrap {
+          padding-bottom: 8px;
+        }
+      "))
+    ),
 
     shiny::h3("Build Darwin Core Archive"),
 
@@ -85,27 +103,46 @@ mod_build_dwca_ui <- function(id) {
     shiny::hr(),
 
     shiny::tabsetPanel(
-      shiny::tabPanel("Event",
-        DT::DTOutput(ns("event_preview"))
+      shiny::tabPanel(
+        "Event",
+        shiny::div(
+          class = "dwca-dt-wrap",
+          DT::DTOutput(ns("event_preview"))
+        ),
+        shiny::div(
+          class = "dwca-tab-footer",
+          shiny::downloadButton(ns("download_event"), "Download Event CSV")
+        )
       ),
-      shiny::tabPanel("Occurrence",
-        DT::DTOutput(ns("occ_preview"))
+
+      shiny::tabPanel(
+        "Occurrence",
+        shiny::div(
+          class = "dwca-dt-wrap",
+          DT::DTOutput(ns("occ_preview"))
+        ),
+        shiny::div(
+          class = "dwca-tab-footer",
+          shiny::downloadButton(ns("download_occ"), "Download Occurrence CSV")
+        )
       ),
-      shiny::tabPanel("eMoF",
-        DT::DTOutput(ns("emof_preview"))
+
+      shiny::tabPanel(
+        "eMoF",
+        shiny::div(
+          class = "dwca-dt-wrap",
+          DT::DTOutput(ns("emof_preview"))
+        ),
+        shiny::div(
+          class = "dwca-tab-footer",
+          shiny::downloadButton(ns("download_emof"), "Download eMoF CSV")
+        )
       )
-    ),
-
-    shiny::hr(),
-
-    shiny::downloadButton(ns("download_event"), "Download Event CSV"),
-    shiny::downloadButton(ns("download_occ"), "Download Occurrence CSV"),
-    shiny::downloadButton(ns("download_emof"), "Download eMoF CSV")
+    )
   )
 }
 
 mod_build_dwca_server <- function(id, df_in, dwc_terms) {
-
   shiny::moduleServer(id, function(input, output, session) {
 
     ns <- session$ns
@@ -114,28 +151,13 @@ mod_build_dwca_server <- function(id, df_in, dwc_terms) {
       shiny::req(df_in())
       cols <- names(df_in())
 
-      shiny::updateSelectizeInput(
-        session,
-        "emof_cols_event",
-        choices = cols
-      )
-
-      shiny::updateSelectizeInput(
-        session,
-        "emof_cols_occ",
-        choices = cols
-      )
-
-      shiny::updateSelectizeInput(
-        session,
-        "remarks_cols",
-        choices = cols
-      )
+      shiny::updateSelectizeInput(session, "emof_cols_event", choices = cols)
+      shiny::updateSelectizeInput(session, "emof_cols_occ", choices = cols)
+      shiny::updateSelectizeInput(session, "remarks_cols", choices = cols)
     })
 
     output$event_column_ui <- shiny::renderUI({
       shiny::req(df_in())
-
       if (input$event_mode == "use") {
         shiny::selectInput(
           ns("event_column"),
@@ -147,7 +169,6 @@ mod_build_dwca_server <- function(id, df_in, dwc_terms) {
 
     output$event_concat_ui <- shiny::renderUI({
       shiny::req(df_in())
-
       if (input$event_mode == "concat") {
         shiny::selectizeInput(
           ns("event_concat_cols"),
@@ -160,7 +181,6 @@ mod_build_dwca_server <- function(id, df_in, dwc_terms) {
 
     output$parent_cols_ui <- shiny::renderUI({
       shiny::req(df_in())
-
       if (isTRUE(input$enable_parent)) {
         shiny::selectizeInput(
           ns("parent_cols"),
@@ -173,7 +193,6 @@ mod_build_dwca_server <- function(id, df_in, dwc_terms) {
 
     output$occ_use_ui <- shiny::renderUI({
       shiny::req(df_in())
-
       if (input$occ_mode == "use") {
         shiny::selectInput(
           ns("occ_column"),
@@ -186,10 +205,7 @@ mod_build_dwca_server <- function(id, df_in, dwc_terms) {
 
     output$remarks_ui <- shiny::renderUI({
       shiny::req(df_in())
-
-      if (!isTRUE(input$enable_remarks)) {
-        return(NULL)
-      }
+      if (!isTRUE(input$enable_remarks)) return(NULL)
 
       shiny::tagList(
         shiny::selectizeInput(
@@ -206,26 +222,21 @@ mod_build_dwca_server <- function(id, df_in, dwc_terms) {
       )
     })
 
-    # helper: build named list mapping column -> level
     emof_levels <- shiny::reactive({
       ev <- input$emof_cols_event
       oc <- input$emof_cols_occ
-
       if (is.null(ev)) ev <- character(0)
       if (is.null(oc)) oc <- character(0)
 
-      # remove duplicates and keep explicit assignment
       ev <- unique(as.character(ev))
       oc <- unique(as.character(oc))
 
-      # If a column is in both, that is ambiguous -> handled by validation
-      levs <- c(setNames(as.list(rep("event", length(ev))), ev),
-                setNames(as.list(rep("occurrence", length(oc))), oc))
+      levs <- c(
+        setNames(as.list(rep("event", length(ev))), ev),
+        setNames(as.list(rep("occurrence", length(oc))), oc)
+      )
 
-      if (length(levs) == 0) {
-        return(NULL)
-      }
-
+      if (length(levs) == 0) return(NULL)
       levs
     })
 
@@ -257,7 +268,6 @@ mod_build_dwca_server <- function(id, df_in, dwc_terms) {
         }
       }
 
-      # validate eMoF selection
       ev <- input$emof_cols_event
       oc <- input$emof_cols_occ
       if (is.null(ev)) ev <- character(0)
@@ -297,10 +307,7 @@ mod_build_dwca_server <- function(id, df_in, dwc_terms) {
         ),
 
         remarks_spec = if (isTRUE(input$enable_remarks)) {
-          list(
-            columns = input$remarks_cols,
-            target = input$remarks_target
-          )
+          list(columns = input$remarks_cols, target = input$remarks_target)
         } else {
           NULL
         }
