@@ -134,7 +134,11 @@ mod_qc_ui <- function(id) {
         shiny::hr(),
 
         shiny::h4("Overview of measurement or fact records (types and units)"),
-        DT::DTOutput(ns("overview_emof_types_tbl")),
+        shiny::div(
+          style = "max-width: 1100px; margin: 0 auto;",
+          class = "qc-dt-report",
+          DT::DTOutput(ns("overview_emof_types_tbl"))
+        ),
 
         shiny::hr(),
 
@@ -1136,6 +1140,8 @@ mod_qc_server <- function(id, event_in, occ_in,
     session$onFlushed(function() {
       shiny::outputOptions(output, "debug_cols", suspendWhenHidden = FALSE)
 
+      shiny::outputOptions(output, "overview_emof_types_tbl", suspendWhenHidden = FALSE)
+
       # opcional, mas útil para evitar “vazio” em KPIs por suspensão
       shiny::outputOptions(output, "export_status_ui", suspendWhenHidden = FALSE)
       shiny::outputOptions(output, "kpi_errors", suspendWhenHidden = FALSE)
@@ -1317,8 +1323,38 @@ mod_qc_server <- function(id, event_in, occ_in,
 
     output$overview_emof_types_tbl <- DT::renderDT({
       x <- qc_res()$overview$emof_types
-      if (!is.data.frame(x) || nrow(x) == 0) x <- data.frame()
-      DT::datatable(x, rownames = FALSE, options = list(scrollX = TRUE, pageLength = 10))
+
+      if (!is.data.frame(x) || nrow(x) == 0) {
+        x <- data.frame(
+          IDlink = character(),
+          measurementType = character(),
+          measurementUnit = character(),
+          count = integer(),
+          minValue = numeric(),
+          maxValue = numeric(),
+          stringsAsFactors = FALSE
+        )
+      }
+
+      # opcional: ordenar para ficar “relatório”
+      if ("count" %in% names(x)) {
+        x <- x[order(x$count, decreasing = TRUE), , drop = FALSE]
+      }
+
+
+      DT::datatable(
+        x,
+        rownames = FALSE,
+        options = list(
+          dom = "t",
+          paging = FALSE,
+          searching = FALSE,
+          info = FALSE,
+          ordering = FALSE,
+          autoWidth = TRUE
+        ),
+        width = "auto"
+      )
     })
 
     output$overview_map <- leaflet::renderLeaflet({
