@@ -37,7 +37,7 @@ mod_qc_ui <- function(id) {
 
       .qc-dt-report table.dataTable {
         border-collapse: collapse !important;
-        width: 100% !important;          /* ocupa a largura do container */
+        width: auto !important;          /* ocupa a largura do container */
       }
 
       .qc-dt-report table.dataTable thead th {
@@ -87,6 +87,10 @@ mod_qc_ui <- function(id) {
         shiny::verbatimTextOutput(ns("debug_cols")),
         shiny::hr(),
 
+        shiny::h5("DEBUG: overview_event_occ"),
+        shiny::verbatimTextOutput(ns("debug_overview_event_occ")),
+        shiny::hr(),
+
         shiny::fluidRow(
           shiny::column(
             3,
@@ -125,7 +129,7 @@ mod_qc_ui <- function(id) {
         shiny::hr(),
 
         shiny::h4("Overview of event and occurrence records"),
-        DT::DTOutput(ns("overview_event_occ_tbl")),
+        shiny::div(class = "qc-dt-report", DT::DTOutput(ns("overview_event_occ_tbl"))),
 
         shiny::hr(),
 
@@ -280,9 +284,17 @@ mod_qc_ui <- function(id) {
 }
 
 .qc_is_blank <- function(x) {
-  is.na(x) |
-    (is.character(x) && trimws(x) == "") |
-    (is.factor(x) && trimws(as.character(x)) == "")
+  if (is.null(x)) return(TRUE)
+
+  # trabalha sempre em vetor de caracteres quando for character/factor
+  if (is.factor(x)) x <- as.character(x)
+
+  if (is.character(x)) {
+    return(is.na(x) | trimws(x) == "")
+  }
+
+  # para outros tipos (numeric, Date, etc.)
+  is.na(x)
 }
 
 .qc_num <- function(x) suppressWarnings(as.numeric(x))
@@ -433,7 +445,7 @@ mod_qc_ui <- function(id) {
   x <- trimws(as.character(event[[field]]))
   out <- list()
 
-  ok <- grepl("^\\d{4}($|-\\d{2}($|-\\d{2}$))", x) ||
+  ok <- grepl("^\\d{4}($|-\\d{2}($|-\\d{2}$))", x) |
     grepl("^\\d{4}.*\\/\\d{4}", x)
   ok[.qc_is_blank(x)] <- TRUE
 
@@ -1130,6 +1142,10 @@ mod_qc_server <- function(id, event_in, occ_in,
       shiny::outputOptions(output, "kpi_warnings", suspendWhenHidden = FALSE)
       shiny::outputOptions(output, "kpi_n_occ", suspendWhenHidden = FALSE)
 
+      shiny::outputOptions(output, "overview_event_occ_tbl", suspendWhenHidden = FALSE)
+
+      shiny::outputOptions(output, "debug_overview_event_occ", suspendWhenHidden = FALSE)
+
       # plot pode continuar suspenso para performance
       shiny::outputOptions(output, "overview_tax_plot", suspendWhenHidden = TRUE)
     }, once = TRUE)
@@ -1214,6 +1230,17 @@ mod_qc_server <- function(id, event_in, occ_in,
       )
     })
 
+    output$debug_overview_event_occ <- shiny::renderPrint({
+      x <- qc_res()$overview$event_occ
+
+      list(
+        is_df = is.data.frame(x),
+        dim = if (is.data.frame(x)) dim(x) else NULL,
+        cols = if (is.data.frame(x)) names(x) else NULL,
+        head = if (is.data.frame(x)) utils::head(x, 5) else NULL
+      )
+    })
+
     # ---------------------------------------------------------
     # Console debug (só quando o tab muda, para evitar spam)
     # ---------------------------------------------------------
@@ -1256,6 +1283,11 @@ mod_qc_server <- function(id, event_in, occ_in,
     # Tables / plots (igual ao teu)
     # ---------------------------------------------------------
     output$overview_event_occ_tbl <- DT::renderDT({
+      # ev <- event_in()
+      # shiny::req(is.data.frame(ev))
+
+      # x <- utils::head(ev, 50)
+      
       x <- qc_res()$overview$event_occ
       if (!is.data.frame(x) || nrow(x) == 0) {
         x <- data.frame(
@@ -1268,22 +1300,19 @@ mod_qc_server <- function(id, event_in, occ_in,
         )
       }
 
-      dt <- DT::datatable(
+      DT::datatable(
         x,
         rownames = FALSE,
-        options = list(scrollX = TRUE, pageLength = 10)
+        options = list(
+          dom = "t",        # só a tabela (estilo “report”)
+          paging = FALSE,
+          searching = FALSE,
+          info = FALSE,
+          ordering = FALSE,
+          autoWidth = TRUE
+        ),
+        width = "auto"
       )
-
-      # Só aplicar estilos se a coluna existir
-      if ("event_type" %in% names(x)) {
-        dt <- DT::formatStyle(
-          dt,
-          columns = "event_type",
-          fontWeight = "bold"
-        )
-      }
-
-      dt
     })
 
     output$overview_emof_types_tbl <- DT::renderDT({
