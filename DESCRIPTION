@@ -25,6 +25,9 @@ Imports:
     stringdist,
     parzer,
     sf,
+    leaflet,
+    worrms,
+    httr,
 Suggests:
     testthat (>= 3.0.0)
 Config/testthat/edition: 3

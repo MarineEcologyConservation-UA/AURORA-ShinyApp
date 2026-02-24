@@ -370,5 +370,30 @@ mod_build_dwca_server <- function(id, df_in, dwc_terms) {
         utils::write.csv(x, file, row.names = FALSE, na = "")
       }
     )
+
+    # -----------------------------------------------------
+    # Return reactives so other pages (QC/Export) can consume
+    # -----------------------------------------------------
+    list(
+      result = result,
+      event = shiny::reactive({
+        shiny::req(result())
+        result()$event
+      }),
+      occurrence = shiny::reactive({
+        shiny::req(result())
+        result()$occurrence
+      }),
+      emof = shiny::reactive({
+        shiny::req(result())
+        x <- result()$emof
+        if (is.null(x)) x <- data.frame()
+        x
+      }),
+      qc_report = shiny::reactive({
+        shiny::req(result())
+        result()$qc
+      })
+    )
   })
 }

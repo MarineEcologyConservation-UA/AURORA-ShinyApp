@@ -62,5 +62,10 @@ ui <- bslib::page_navbar(
   bslib::nav_panel(
     title = "Build DwC-A",
     mod_build_dwca_ui("dwca")
-  )
+  ),
+
+  # -------------------------------------------------------
+  # 4 QC & DIAGNOSTICS
+  # -------------------------------------------------------
+  mod_qc_ui("qc")
 )
