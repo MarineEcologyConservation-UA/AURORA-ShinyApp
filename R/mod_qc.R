@@ -1187,6 +1187,9 @@ mod_qc_server <- function(id, event_in, occ_in,
     }, once = TRUE)
 
     map_ready <- shiny::reactiveVal(FALSE)
+    last_coords <- shiny::reactiveVal(NULL)
+    last_coords_src <- shiny::reactiveVal(NULL)
+    last_issues <- shiny::reactiveVal(NULL)
 
     shiny::observe({
       cat("\nmap_ready:", map_ready(), " tab:", input$qc_tabs, "\n")
@@ -1466,25 +1469,75 @@ mod_qc_server <- function(id, event_in, occ_in,
     shiny::observeEvent(
       list(map_ready(), qc_res(), input$qc_tabs),
       {
-        if (!requireNamespace("leaflet", quietly = TRUE)) return(NULL)
+        cat("\n==============================\n")
+        cat("[OBS] DISPAROU\n")
+        cat("[OBS] map_ready=", map_ready(), "\n")
+        cat("[OBS] qc_tabs=", if (is.null(input$qc_tabs)) "NULL" else paste0("'", input$qc_tabs, "'"), "\n")
 
-        shiny::req(isTRUE(map_ready()))
-        shiny::req(!is.null(input$qc_tabs))
-        shiny::req(nzchar(input$qc_tabs))
-        shiny::req(identical(input$qc_tabs, "data_overview"))
+        if (!requireNamespace("leaflet", quietly = TRUE)) {
+          cat("[OBS] RETURN: leaflet NAO instalado\n")
+          return(NULL)
+        }
 
-        ev <- tryCatch(event_in(), error = function(e) NULL)
-        oc <- tryCatch(occ_in(),   error = function(e) NULL)
-        mi <- tryCatch(qc_res()$map_issues, error = function(e) data.frame())
+        if (!isTRUE(map_ready())) {
+          cat("[OBS] RETURN: map_ready ainda FALSE\n")
+          return(NULL)
+        }
 
-        get_coords <- function(df, id_field) {
-          if (!is.data.frame(df) || nrow(df) == 0) return(NULL)
-          if (!all(c("decimalLatitude", "decimalLongitude") %in% names(df))) return(NULL)
-          if (!id_field %in% names(df)) return(NULL)
+        # tab_ok: só para operações sensíveis (fitBounds / invalidateSize, etc.)
+        tab_ok <- isTRUE(
+          !is.null(input$qc_tabs) &&
+            nzchar(input$qc_tabs) &&
+            identical(input$qc_tabs, "data_overview")
+        )
+        cat("[OBS] tab_ok=", tab_ok, "\n")
+
+        cat("[OBS] OK: vai tentar ler dados (mesmo se qc_tabs for NULL)\n")
+
+        ev <- tryCatch(event_in(), error = function(e) {
+          cat("[OBS] ERRO event_in():", conditionMessage(e), "\n")
+          NULL
+        })
+        oc <- tryCatch(occ_in(), error = function(e) {
+          cat("[OBS] ERRO occ_in():", conditionMessage(e), "\n")
+          NULL
+        })
+        mi <- tryCatch(qc_res()$map_issues, error = function(e) {
+          cat("[OBS] ERRO qc_res()$map_issues:", conditionMessage(e), "\n")
+          data.frame()
+        })
+
+        cat("[OBS] ev:", if (is.data.frame(ev)) paste(dim(ev), collapse="x") else "NOT_DF", "\n")
+        cat("[OBS] oc:", if (is.data.frame(oc)) paste(dim(oc), collapse="x") else "NOT_DF", "\n")
+        cat("[OBS] mi:", if (is.data.frame(mi)) paste(dim(mi), collapse="x") else "NOT_DF", "\n")
+
+        if (is.data.frame(ev)) cat("[OBS] ev_cols:", paste(names(ev), collapse=", "), "\n")
+        if (is.data.frame(oc)) cat("[OBS] oc_cols:", paste(names(oc), collapse=", "), "\n")
+
+        get_coords <- function(df, id_field, label) {
+          if (!is.data.frame(df) || nrow(df) == 0) {
+            cat("[OBS] get_coords(", label, "): DF vazio/NA\n", sep = "")
+            return(NULL)
+          }
+          if (!all(c("decimalLatitude", "decimalLongitude") %in% names(df))) {
+            cat("[OBS] get_coords(", label, "): sem colunas decimalLatitude/decimalLongitude\n", sep = "")
+            return(NULL)
+          }
+          if (!id_field %in% names(df)) {
+            cat("[OBS] get_coords(", label, "): sem id_field=", id_field, "\n", sep = "")
+            return(NULL)
+          }
 
           lat <- suppressWarnings(as.numeric(df$decimalLatitude))
           lon <- suppressWarnings(as.numeric(df$decimalLongitude))
           ok <- is.finite(lat) & is.finite(lon)
+
+          cat("[OBS] get_coords(", label, "): n=", nrow(df),
+              " ok=", sum(ok, na.rm=TRUE),
+              " lat_na=", sum(!is.finite(lat)),
+              " lon_na=", sum(!is.finite(lon)),
+              "\n", sep = "")
+
           if (!any(ok)) return(NULL)
 
           data.frame(
@@ -1495,19 +1548,36 @@ mod_qc_server <- function(id, event_in, occ_in,
           )
         }
 
-        coords <- get_coords(oc, "occurrenceID")
+        coords <- get_coords(oc, "occurrenceID", "occurrence")
         coords_src <- "occurrence"
+
         if (is.null(coords)) {
-          coords <- get_coords(ev, "eventID")
+          coords <- get_coords(ev, "eventID", "event")
           coords_src <- "event"
         }
 
+        cat("[OBS] coords_src=", coords_src,
+            " coords_n=", if (is.null(coords)) "NULL" else nrow(coords),
+            "\n", sep = "")
+        
+        last_coords(coords)
+        last_coords_src(coords_src)
+        last_issues(mi)
+        cat("[OBS] cache: coords=", if (is.null(coords)) "NULL" else nrow(coords),
+            " issues=", if (is.data.frame(mi)) nrow(mi) else "NA", "\n")
+
+        cat("[OBS] leafletProxy: limpar grupos\n")
         proxy <- leaflet::leafletProxy("overview_map", session) |>
           leaflet::clearGroup("Records") |>
           leaflet::clearGroup("Issues")
 
         if (is.data.frame(coords) && nrow(coords) > 0) {
-          if (nrow(coords) > 5000) coords <- coords[sample.int(nrow(coords), 5000), , drop = FALSE]
+          cat("[OBS] addCircleMarkers Records: n=", nrow(coords), "\n", sep="")
+
+          if (nrow(coords) > 5000) {
+            coords <- coords[sample.int(nrow(coords), 5000), , drop = FALSE]
+            cat("[OBS] Records: downsample para ", nrow(coords), "\n", sep="")
+          }
 
           proxy <- proxy |>
             leaflet::addCircleMarkers(
@@ -1521,17 +1591,30 @@ mod_qc_server <- function(id, event_in, occ_in,
                 "<b>source:</b> ", coords_src, "<br/>",
                 "<b>id:</b> ", coords$id
               )
-            ) |>
-            leaflet::fitBounds(
-              lng1 = min(coords$decimalLongitude, na.rm = TRUE),
-              lat1 = min(coords$decimalLatitude,  na.rm = TRUE),
-              lng2 = max(coords$decimalLongitude, na.rm = TRUE),
-              lat2 = max(coords$decimalLatitude,  na.rm = TRUE)
             )
+
+          # fitBounds só quando o tab estiver realmente ativo
+          if (isTRUE(tab_ok)) {
+            proxy <- proxy |>
+              leaflet::fitBounds(
+                lng1 = min(coords$decimalLongitude, na.rm = TRUE),
+                lat1 = min(coords$decimalLatitude,  na.rm = TRUE),
+                lng2 = max(coords$decimalLongitude, na.rm = TRUE),
+                lat2 = max(coords$decimalLatitude,  na.rm = TRUE)
+              )
+            cat("[OBS] fitBounds aplicado (tab_ok=TRUE)\n")
+          } else {
+            cat("[OBS] SKIP fitBounds (tab_ok=FALSE)\n")
+          }
+
+        } else {
+          cat("[OBS] SKIP Records: coords NULL/0\n")
         }
 
         if (is.data.frame(mi) && nrow(mi) > 0 &&
             all(c("decimalLongitude","decimalLatitude") %in% names(mi))) {
+          cat("[OBS] addCircleMarkers Issues: n=", nrow(mi), "\n", sep="")
+
           proxy <- proxy |>
             leaflet::addCircleMarkers(
               lng = mi$decimalLongitude,
@@ -1547,24 +1630,85 @@ mod_qc_server <- function(id, event_in, occ_in,
                 "<b>issue:</b> ", mi$issue
               )
             )
+        } else {
+          cat("[OBS] SKIP Issues: mi vazio/sem colunas coords\n")
         }
+
+        cat("[OBS] FIM\n")
       },
-      ignoreInit = TRUE
+      ignoreInit = FALSE
     )
 
     # Força repaint quando o tab data_overview abre (evita leaflet com tamanho 0)
-    shiny::observeEvent(input$qc_tabs, {
-      if (!requireNamespace("leaflet", quietly = TRUE)) return(NULL)
+    shiny::observeEvent(
+      input$qc_tabs,
+      {
+        if (!requireNamespace("leaflet", quietly = TRUE)) return(NULL)
 
-      # só quando o tab do mapa estiver visível
-      if (!identical(input$qc_tabs, "data_overview")) return(NULL)
+        tab_ok <- isTRUE(!is.null(input$qc_tabs) && nzchar(input$qc_tabs) &&
+                        identical(input$qc_tabs, "data_overview"))
+        cat("[TAB] qc_tabs=", if (is.null(input$qc_tabs)) "NULL" else input$qc_tabs,
+            " tab_ok=", tab_ok, "\n")
 
-      shiny::req(isTRUE(map_ready()))
+        if (!tab_ok) return(NULL)
+        if (!isTRUE(map_ready())) {
+          cat("[TAB] map_ready ainda FALSE\n")
+          return(NULL)
+        }
 
-      leaflet::leafletProxy("overview_map", session) |>
-        leaflet::invalidateSize() |>
-        leaflet::setView(lng = 0, lat = 0, zoom = 2)
-    }, ignoreInit = FALSE)
+        coords <- last_coords()
+        coords_src <- last_coords_src()
+        mi <- last_issues()
+
+        cat("[TAB] reapply: coords=", if (is.null(coords)) "NULL" else nrow(coords),
+            " src=", coords_src,
+            " issues=", if (is.data.frame(mi)) nrow(mi) else "NA", "\n")
+
+        proxy <- leaflet::leafletProxy("overview_map", session) |>
+          leaflet::clearGroup("Records") |>
+          leaflet::clearGroup("Issues") |>
+          leaflet::invalidateSize()
+
+        if (is.data.frame(coords) && nrow(coords) > 0) {
+          proxy <- proxy |>
+            leaflet::addCircleMarkers(
+              lng = coords$decimalLongitude,
+              lat = coords$decimalLatitude,
+              radius = 4,
+              stroke = FALSE,
+              fillOpacity = 0.7,
+              group = "Records",
+              popup = paste0("<b>source:</b> ", coords_src, "<br/>",
+                            "<b>id:</b> ", coords$id)
+            ) |>
+            leaflet::fitBounds(
+              lng1 = min(coords$decimalLongitude, na.rm = TRUE),
+              lat1 = min(coords$decimalLatitude,  na.rm = TRUE),
+              lng2 = max(coords$decimalLongitude, na.rm = TRUE),
+              lat2 = max(coords$decimalLatitude,  na.rm = TRUE)
+            )
+
+          cat("[TAB] desenhou Records e aplicou fitBounds\n")
+        } else {
+          cat("[TAB] sem coords para desenhar\n")
+        }
+
+        if (is.data.frame(mi) && nrow(mi) > 0 &&
+            all(c("decimalLongitude","decimalLatitude") %in% names(mi))) {
+          proxy <- proxy |>
+            leaflet::addCircleMarkers(
+              lng = mi$decimalLongitude,
+              lat = mi$decimalLatitude,
+              radius = 5,
+              stroke = FALSE,
+              fillOpacity = 0.8,
+              group = "Issues"
+            )
+          cat("[TAB] desenhou Issues\n")
+        }
+      },
+      ignoreInit = FALSE
+    )
 
     # ---------------------------------------------------------
     # Taxonomic UI/plot
