@@ -37,7 +37,7 @@ mod_qc_ui <- function(id) {
 
       .qc-dt-report table.dataTable {
         border-collapse: collapse !important;
-        width: auto !important;          /* ocupa a largura do container */
+        width: auto !important;
       }
 
       .qc-dt-report table.dataTable thead th {
@@ -55,6 +55,26 @@ mod_qc_ui <- function(id) {
         padding-top: 6px;
       }
 
+      /* Wrapper com altura fixa */
+      .qc-map-wrap {
+        height: 420px !important;
+        min-height: 420px !important;
+        width: 100%;
+      }
+
+      /* O widget do leaflet deve preencher o wrapper */
+      .qc-map-wrap .leaflet.html-widget,
+      .qc-map-wrap .leaflet-container {
+        height: 100% !important;
+        min-height: 420px !important;
+      }
+
+      /* Proteção contra colapso por html-fill-item do bslib */
+      .qc-map-wrap.html-fill-item,
+      .qc-map-wrap .html-fill-item {
+        flex: 0 0 auto !important;
+      }
+      
     ")),
 
     bslib::navset_card_tab(
@@ -79,9 +99,6 @@ mod_qc_ui <- function(id) {
           )
         ),
 
-        # -----------------------------
-        # Ajuste 2: DEBUG no topo
-        # -----------------------------
         shiny::hr(),
         shiny::h5("DEBUG: colunas recebidas no QC"),
         shiny::verbatimTextOutput(ns("debug_cols")),
@@ -89,6 +106,10 @@ mod_qc_ui <- function(id) {
 
         shiny::h5("DEBUG: overview_event_occ"),
         shiny::verbatimTextOutput(ns("debug_overview_event_occ")),
+        shiny::hr(),
+
+        shiny::h5("DEBUG: overview_map"),
+        shiny::verbatimTextOutput(ns("debug_overview_map")),
         shiny::hr(),
 
         shiny::fluidRow(
@@ -144,7 +165,10 @@ mod_qc_ui <- function(id) {
 
         shiny::h4("Geographical cover of the dataset"),
         if (has_leaflet) {
-          leaflet::leafletOutput(ns("overview_map"), height = 420)
+          shiny::div(
+            class = "qc-map-wrap",
+            leaflet::leafletOutput(ns("overview_map"), height = "100%")
+          )
         } else {
           shiny::div(
             class = "qc-muted",
@@ -290,14 +314,12 @@ mod_qc_ui <- function(id) {
 .qc_is_blank <- function(x) {
   if (is.null(x)) return(TRUE)
 
-  # trabalha sempre em vetor de caracteres quando for character/factor
   if (is.factor(x)) x <- as.character(x)
 
   if (is.character(x)) {
     return(is.na(x) | trimws(x) == "")
   }
 
-  # para outros tipos (numeric, Date, etc.)
   is.na(x)
 }
 
@@ -929,7 +951,9 @@ run_qc_dwca <- function(event, occurrence, emof = NULL, pre_issues = NULL) {
   }
   invalid_emof <- .make_invalid(emof, "emof", id_emof, issues_detailed)
 
+  # Coordenadas e issues para mapa
   map_issues <- data.frame()
+
   get_coords <- function(df, id_field) {
     if (!is.data.frame(df) || nrow(df) == 0) return(NULL)
     if (!all(c("decimalLatitude", "decimalLongitude") %in% names(df))) return(NULL)
@@ -958,7 +982,17 @@ run_qc_dwca <- function(event, occurrence, emof = NULL, pre_issues = NULL) {
     coords <- ev_coords
   }
 
-  if (!is.null(coords) && nrow(issues_detailed) > 0) {
+  bounds <- NULL
+  if (!is.null(coords) && is.data.frame(coords) && nrow(coords) > 0) {
+    bounds <- list(
+      lng1 = min(coords$decimalLongitude, na.rm = TRUE),
+      lat1 = min(coords$decimalLatitude,  na.rm = TRUE),
+      lng2 = max(coords$decimalLongitude, na.rm = TRUE),
+      lat2 = max(coords$decimalLatitude,  na.rm = TRUE)
+    )
+  }
+
+  if (!is.null(coords) && is.data.frame(coords) && nrow(issues_detailed) > 0) {
     det2 <- issues_detailed[issues_detailed$table %in% c("occurrence", "event"), , drop = FALSE]
     det2 <- det2[det2$row_id != "*" & !is.na(det2$row_id), , drop = FALSE]
     if (nrow(det2) > 0) {
@@ -1098,7 +1132,8 @@ run_qc_dwca <- function(event, occurrence, emof = NULL, pre_issues = NULL) {
     overview = list(
       event_occ = overview_event_occ,
       emof_types = overview_emof_types,
-      coords_source = coords_src
+      coords_source = coords_src,
+      coords_bounds = bounds
     ),
     issues_summary = issues_summary,
     issues_detailed = issues_detailed,
@@ -1124,10 +1159,6 @@ run_qc_dwca <- function(event, occurrence, emof = NULL, pre_issues = NULL) {
 #' @param pre_issues_in Reactive returning pre-split issues (optional)
 #' @return list with qc_res reactive and can_export reactive
 #' @export
-# =========================================================
-# QC module server  (PATCH: tab values + no-suspend debug)
-# =========================================================
-
 mod_qc_server <- function(id, event_in, occ_in,
                           emof_in = NULL, pre_issues_in = NULL) {
 
@@ -1135,26 +1166,31 @@ mod_qc_server <- function(id, event_in, occ_in,
 
     # ---------------------------------------------------------
     # 1) Garantir que outputs críticos NÃO ficam suspensos
-    #    (especialmente dentro de navset/tabsets do bslib)
     # ---------------------------------------------------------
     session$onFlushed(function() {
       shiny::outputOptions(output, "debug_cols", suspendWhenHidden = FALSE)
+      shiny::outputOptions(output, "debug_overview_event_occ", suspendWhenHidden = FALSE)
+      shiny::outputOptions(output, "debug_overview_map", suspendWhenHidden = FALSE)
 
+      shiny::outputOptions(output, "overview_event_occ_tbl", suspendWhenHidden = FALSE)
       shiny::outputOptions(output, "overview_emof_types_tbl", suspendWhenHidden = FALSE)
 
-      # opcional, mas útil para evitar “vazio” em KPIs por suspensão
+      shiny::outputOptions(output, "overview_map", suspendWhenHidden = FALSE)
+      shiny::outputOptions(output, "issues_map", suspendWhenHidden = FALSE)
+
       shiny::outputOptions(output, "export_status_ui", suspendWhenHidden = FALSE)
       shiny::outputOptions(output, "kpi_errors", suspendWhenHidden = FALSE)
       shiny::outputOptions(output, "kpi_warnings", suspendWhenHidden = FALSE)
       shiny::outputOptions(output, "kpi_n_occ", suspendWhenHidden = FALSE)
 
-      shiny::outputOptions(output, "overview_event_occ_tbl", suspendWhenHidden = FALSE)
-
-      shiny::outputOptions(output, "debug_overview_event_occ", suspendWhenHidden = FALSE)
-
-      # plot pode continuar suspenso para performance
       shiny::outputOptions(output, "overview_tax_plot", suspendWhenHidden = TRUE)
     }, once = TRUE)
+
+    map_ready <- shiny::reactiveVal(FALSE)
+
+    shiny::observe({
+      cat("\nmap_ready:", map_ready(), " tab:", input$qc_tabs, "\n")
+    })
 
     # ---------------------------------------------------------
     # QC runner
@@ -1182,7 +1218,8 @@ mod_qc_server <- function(id, event_in, occ_in,
             overview = list(
               event_occ = data.frame(),
               emof_types = data.frame(),
-              coords_source = NA_character_
+              coords_source = NA_character_,
+              coords_bounds = NULL
             ),
             issues_summary = .qc_make_summary(issues),
             issues_detailed = issues,
@@ -1206,7 +1243,7 @@ mod_qc_server <- function(id, event_in, occ_in,
     })
 
     # ---------------------------------------------------------
-    # DEBUG UI (este é o que está a aparecer vazio)
+    # DEBUG outputs
     # ---------------------------------------------------------
     output$debug_cols <- shiny::renderPrint({
       safe_call <- function(fn) {
@@ -1222,7 +1259,6 @@ mod_qc_server <- function(id, event_in, occ_in,
             )
           },
           error = function(e) {
-            # importante: mostrar o erro na UI (em vez de ficar “vazio”)
             list(ok = FALSE, error = conditionMessage(e))
           }
         )
@@ -1238,7 +1274,6 @@ mod_qc_server <- function(id, event_in, occ_in,
 
     output$debug_overview_event_occ <- shiny::renderPrint({
       x <- qc_res()$overview$event_occ
-
       list(
         is_df = is.data.frame(x),
         dim = if (is.data.frame(x)) dim(x) else NULL,
@@ -1247,8 +1282,27 @@ mod_qc_server <- function(id, event_in, occ_in,
       )
     })
 
+    output$debug_overview_map <- shiny::renderPrint({
+      ev <- tryCatch(event_in(), error = function(e) NULL)
+      oc <- tryCatch(occ_in(), error = function(e) NULL)
+      mi <- tryCatch(qc_res()$map_issues, error = function(e) NULL)
+
+      has_ev_coords <- is.data.frame(ev) && all(c("decimalLatitude","decimalLongitude") %in% names(ev))
+      has_oc_coords <- is.data.frame(oc) && all(c("decimalLatitude","decimalLongitude") %in% names(oc))
+
+      list(
+        leaflet_installed = requireNamespace("leaflet", quietly = TRUE),
+        event_dim = if (is.data.frame(ev)) dim(ev) else NULL,
+        occ_dim = if (is.data.frame(oc)) dim(oc) else NULL,
+        has_event_coords = has_ev_coords,
+        has_occ_coords = has_oc_coords,
+        map_issues_dim = if (is.data.frame(mi)) dim(mi) else NULL,
+        map_issues_head = if (is.data.frame(mi)) utils::head(mi, 3) else NULL
+      )
+    })
+
     # ---------------------------------------------------------
-    # Console debug (só quando o tab muda, para evitar spam)
+    # Console debug (quando o tab muda)
     # ---------------------------------------------------------
     shiny::observeEvent(input$qc_tabs, {
       ev <- tryCatch(event_in(), error = function(e) NULL)
@@ -1286,14 +1340,9 @@ mod_qc_server <- function(id, event_in, occ_in,
     })
 
     # ---------------------------------------------------------
-    # Tables / plots (igual ao teu)
+    # Overview tables
     # ---------------------------------------------------------
     output$overview_event_occ_tbl <- DT::renderDT({
-      # ev <- event_in()
-      # shiny::req(is.data.frame(ev))
-
-      # x <- utils::head(ev, 50)
-      
       x <- qc_res()$overview$event_occ
       if (!is.data.frame(x) || nrow(x) == 0) {
         x <- data.frame(
@@ -1310,7 +1359,7 @@ mod_qc_server <- function(id, event_in, occ_in,
         x,
         rownames = FALSE,
         options = list(
-          dom = "t",        # só a tabela (estilo “report”)
+          dom = "t",
           paging = FALSE,
           searching = FALSE,
           info = FALSE,
@@ -1336,11 +1385,9 @@ mod_qc_server <- function(id, event_in, occ_in,
         )
       }
 
-      # opcional: ordenar para ficar “relatório”
       if ("count" %in% names(x)) {
         x <- x[order(x$count, decreasing = TRUE), , drop = FALSE]
       }
-
 
       DT::datatable(
         x,
@@ -1357,37 +1404,171 @@ mod_qc_server <- function(id, event_in, occ_in,
       )
     })
 
+    # TODO:
+    # Enrich overview_emof_types with NVS metadata
+    # - Use measurementTypeID (if available)
+    # - Lookup NERC Vocabulary Server
+    # - Add columns:
+    #   * TypeID_standardUnit
+    #   * TypeID_name
+    #   * TypeID_definition
+    # Must implement with:
+    # - Unique URI lookup
+    # - Cache
+    # - Timeout protection
+
+    # ---------------------------------------------------------
+    # Overview map: sempre aparece (mapa base) desde o início
+    # ---------------------------------------------------------
     output$overview_map <- leaflet::renderLeaflet({
       if (!requireNamespace("leaflet", quietly = TRUE)) return(NULL)
 
-      leaf <- leaflet::leaflet() |>
-        leaflet::addProviderTiles("OpenStreetMap") |>
-        leaflet::addProviderTiles("OpenSeaMap", group = "OpenSeaMap") |>
-        leaflet::addLayersControl(
-          baseGroups = c("OpenStreetMap"),
-          overlayGroups = c("OpenSeaMap"),
-          options = leaflet::layersControlOptions(collapsed = FALSE)
-        )
+      map_ready(TRUE)
 
-      mi <- qc_res()$map_issues
-      if (is.data.frame(mi) && nrow(mi) > 0) {
-        leaf <- leaf |>
-          leaflet::addCircleMarkers(
-            lng = mi$decimalLongitude,
-            lat = mi$decimalLatitude,
-            radius = 4,
-            stroke = FALSE,
-            fillOpacity = 0.7,
-            popup = paste0(
-              "<b>id:</b> ", mi$id, "<br/>",
-              "<b>table:</b> ", mi$table, "<br/>",
-              "<b>issue:</b> ", mi$issue
-            )
-          )
-      }
-      leaf
+      m <- leaflet::leaflet() |>
+        leaflet::addProviderTiles("OpenStreetMap", group = "OSM") |>
+        leaflet::addTiles(
+          urlTemplate = "https://tiles.openseamap.org/seamark/{z}/{x}/{y}.png",
+          group = "OpenSeaMap",
+          options = leaflet::tileOptions(opacity = 0.9)
+        ) |>
+        leaflet::addLayersControl(
+          baseGroups = c("OSM"),
+          overlayGroups = c("OpenSeaMap", "Records", "Issues"),
+          options = leaflet::layersControlOptions(collapsed = FALSE)
+        ) |>
+        leaflet::setView(lng = 0, lat = 0, zoom = 2)
+
+      htmlwidgets::onRender(
+        m,
+        "
+        function(el, x) {
+          var map = this;
+
+          // 1) Tenta logo após render
+          setTimeout(function(){ map.invalidateSize(); }, 0);
+          setTimeout(function(){ map.invalidateSize(); }, 250);
+          setTimeout(function(){ map.invalidateSize(); }, 1000);
+
+          // 2) Observa mudanças de tamanho do container
+          if (window.ResizeObserver) {
+            var ro = new ResizeObserver(function(){
+              map.invalidateSize();
+            });
+            ro.observe(el);
+          }
+        }
+        "
+      )
     })
 
+    # Atualiza markers via leafletProxy quando os dados existirem
+    shiny::observeEvent(
+      list(map_ready(), qc_res(), input$qc_tabs),
+      {
+        if (!requireNamespace("leaflet", quietly = TRUE)) return(NULL)
+
+        shiny::req(isTRUE(map_ready()))
+        shiny::req(!is.null(input$qc_tabs))
+        shiny::req(nzchar(input$qc_tabs))
+        shiny::req(identical(input$qc_tabs, "data_overview"))
+
+        ev <- tryCatch(event_in(), error = function(e) NULL)
+        oc <- tryCatch(occ_in(),   error = function(e) NULL)
+        mi <- tryCatch(qc_res()$map_issues, error = function(e) data.frame())
+
+        get_coords <- function(df, id_field) {
+          if (!is.data.frame(df) || nrow(df) == 0) return(NULL)
+          if (!all(c("decimalLatitude", "decimalLongitude") %in% names(df))) return(NULL)
+          if (!id_field %in% names(df)) return(NULL)
+
+          lat <- suppressWarnings(as.numeric(df$decimalLatitude))
+          lon <- suppressWarnings(as.numeric(df$decimalLongitude))
+          ok <- is.finite(lat) & is.finite(lon)
+          if (!any(ok)) return(NULL)
+
+          data.frame(
+            id = as.character(df[[id_field]][ok]),
+            decimalLatitude = lat[ok],
+            decimalLongitude = lon[ok],
+            stringsAsFactors = FALSE
+          )
+        }
+
+        coords <- get_coords(oc, "occurrenceID")
+        coords_src <- "occurrence"
+        if (is.null(coords)) {
+          coords <- get_coords(ev, "eventID")
+          coords_src <- "event"
+        }
+
+        proxy <- leaflet::leafletProxy("overview_map", session) |>
+          leaflet::clearGroup("Records") |>
+          leaflet::clearGroup("Issues")
+
+        if (is.data.frame(coords) && nrow(coords) > 0) {
+          if (nrow(coords) > 5000) coords <- coords[sample.int(nrow(coords), 5000), , drop = FALSE]
+
+          proxy <- proxy |>
+            leaflet::addCircleMarkers(
+              lng = coords$decimalLongitude,
+              lat = coords$decimalLatitude,
+              radius = 4,
+              stroke = FALSE,
+              fillOpacity = 0.7,
+              group = "Records",
+              popup = paste0(
+                "<b>source:</b> ", coords_src, "<br/>",
+                "<b>id:</b> ", coords$id
+              )
+            ) |>
+            leaflet::fitBounds(
+              lng1 = min(coords$decimalLongitude, na.rm = TRUE),
+              lat1 = min(coords$decimalLatitude,  na.rm = TRUE),
+              lng2 = max(coords$decimalLongitude, na.rm = TRUE),
+              lat2 = max(coords$decimalLatitude,  na.rm = TRUE)
+            )
+        }
+
+        if (is.data.frame(mi) && nrow(mi) > 0 &&
+            all(c("decimalLongitude","decimalLatitude") %in% names(mi))) {
+          proxy <- proxy |>
+            leaflet::addCircleMarkers(
+              lng = mi$decimalLongitude,
+              lat = mi$decimalLatitude,
+              radius = 5,
+              stroke = FALSE,
+              fillOpacity = 0.8,
+              group = "Issues",
+              popup = paste0(
+                "<b>id:</b> ", mi$id, "<br/>",
+                "<b>table:</b> ", mi$table, "<br/>",
+                "<b>severity:</b> ", mi$severity, "<br/>",
+                "<b>issue:</b> ", mi$issue
+              )
+            )
+        }
+      },
+      ignoreInit = TRUE
+    )
+
+    # Força repaint quando o tab data_overview abre (evita leaflet com tamanho 0)
+    shiny::observeEvent(input$qc_tabs, {
+      if (!requireNamespace("leaflet", quietly = TRUE)) return(NULL)
+
+      # só quando o tab do mapa estiver visível
+      if (!identical(input$qc_tabs, "data_overview")) return(NULL)
+
+      shiny::req(isTRUE(map_ready()))
+
+      leaflet::leafletProxy("overview_map", session) |>
+        leaflet::invalidateSize() |>
+        leaflet::setView(lng = 0, lat = 0, zoom = 2)
+    }, ignoreInit = FALSE)
+
+    # ---------------------------------------------------------
+    # Taxonomic UI/plot
+    # ---------------------------------------------------------
     output$kingdom_ui <- shiny::renderUI({
       oc <- occ_in()
       if (!is.data.frame(oc) || nrow(oc) == 0) return(NULL)
@@ -1426,6 +1607,9 @@ mod_qc_server <- function(id, event_in, occ_in,
       graphics::barplot(tab, horiz = TRUE, las = 1, main = "")
     })
 
+    # ---------------------------------------------------------
+    # Issues tables
+    # ---------------------------------------------------------
     output$issues_summary_tbl <- DT::renderDT({
       x <- qc_res()$issues_summary
       if (!is.data.frame(x)) x <- data.frame()
@@ -1462,6 +1646,9 @@ mod_qc_server <- function(id, event_in, occ_in,
       DT::datatable(x, rownames = FALSE, options = list(scrollX = TRUE, pageLength = 15))
     })
 
+    # ---------------------------------------------------------
+    # Issues map (como já tinhas)
+    # ---------------------------------------------------------
     output$issues_map <- leaflet::renderLeaflet({
       if (!requireNamespace("leaflet", quietly = TRUE)) return(NULL)
 
@@ -1495,6 +1682,9 @@ mod_qc_server <- function(id, event_in, occ_in,
         )
     })
 
+    # ---------------------------------------------------------
+    # Invalid tables
+    # ---------------------------------------------------------
     output$invalid_event_tbl <- DT::renderDT({
       x <- qc_res()$invalid$event
       if (!is.data.frame(x)) x <- data.frame()
@@ -1513,6 +1703,9 @@ mod_qc_server <- function(id, event_in, occ_in,
       DT::datatable(x, rownames = FALSE, options = list(scrollX = TRUE, pageLength = 10))
     })
 
+    # ---------------------------------------------------------
+    # Hierarchy
+    # ---------------------------------------------------------
     output$hierarchy_issues_tbl <- DT::renderDT({
       x <- qc_res()$hierarchy$issues
       if (!is.data.frame(x)) x <- data.frame()
@@ -1525,6 +1718,9 @@ mod_qc_server <- function(id, event_in, occ_in,
       DT::datatable(x, rownames = FALSE, options = list(scrollX = TRUE, pageLength = 10))
     })
 
+    # ---------------------------------------------------------
+    # About
+    # ---------------------------------------------------------
     output$about_ui <- shiny::renderUI({
       shiny::tagList(
         shiny::tags$h5("Phase 1 (deterministic)"),
