@@ -74,7 +74,13 @@ mod_qc_ui <- function(id) {
       .qc-map-wrap .html-fill-item {
         flex: 0 0 auto !important;
       }
-      
+
+      /* DT normal (Issues found): ocupa 100% e evita controles “a flutuar” */
+      .qc-dt { width: 100%; overflow-x: auto; clear: both; }
+      .qc-dt .dataTables_wrapper { width: 100% !important; }
+      .qc-dt table.dataTable { width: 100% !important; border-collapse: collapse !important; }
+
+
     ")),
 
     bslib::navset_card_tab(
@@ -82,9 +88,6 @@ mod_qc_ui <- function(id) {
       selected = "data_overview",
       title = "Quality Control",
 
-      # -----------------------------------------------------
-      # Data overview
-      # -----------------------------------------------------
       bslib::nav_panel(
         "Data overview",
         value = "data_overview",
@@ -185,32 +188,26 @@ mod_qc_ui <- function(id) {
         )
       ),
 
-      # -----------------------------------------------------
-      # Issues found
-      # -----------------------------------------------------
       bslib::nav_panel(
         "Issues found",
         value = "issues_found",
 
         shiny::h4("Overview of all issues"),
-        DT::DTOutput(ns("issues_summary_tbl")),
+        shiny::div(class = "qc-dt", DT::DTOutput(ns("issues_summary_tbl"))),
 
         shiny::hr(),
         shiny::h4("Details (filterable)"),
-        DT::DTOutput(ns("issues_detailed_tbl")),
+        shiny::div(class = "qc-dt", DT::DTOutput(ns("issues_detailed_tbl"))),
 
         shiny::hr(),
         shiny::h4("Taxonomic issues"),
-        DT::DTOutput(ns("tax_issues_tbl")),
+        shiny::div(class = "qc-dt", DT::DTOutput(ns("tax_issues_tbl"))),
 
         shiny::hr(),
         shiny::h4("eMoF issues"),
-        DT::DTOutput(ns("emof_issues_tbl"))
+        shiny::div(class = "qc-dt", DT::DTOutput(ns("emof_issues_tbl")))
       ),
 
-      # -----------------------------------------------------
-      # Issues on map
-      # -----------------------------------------------------
       bslib::nav_panel(
         "Issues on map",
         value = "issues_map",
@@ -228,16 +225,10 @@ mod_qc_ui <- function(id) {
         }
       ),
 
-      # -----------------------------------------------------
-      # Invalid records
-      # -----------------------------------------------------
       bslib::nav_panel("Invalid Event Records", value = "invalid_event", DT::DTOutput(ns("invalid_event_tbl"))),
       bslib::nav_panel("Invalid Occurrence Records", value = "invalid_occ", DT::DTOutput(ns("invalid_occ_tbl"))),
       bslib::nav_panel("Invalid eMoF Records", value = "invalid_emof", DT::DTOutput(ns("invalid_emof_tbl"))),
 
-      # -----------------------------------------------------
-      # Event hierarchy
-      # -----------------------------------------------------
       bslib::nav_panel(
         "OBIS Event Hierarchy tree",
         value = "event_hierarchy",
@@ -250,9 +241,6 @@ mod_qc_ui <- function(id) {
         DT::DTOutput(ns("hierarchy_edges_tbl"))
       ),
 
-      # -----------------------------------------------------
-      # About
-      # -----------------------------------------------------
       bslib::nav_panel(
         "About",
         value = "about",
@@ -951,7 +939,6 @@ run_qc_dwca <- function(event, occurrence, emof = NULL, pre_issues = NULL) {
   }
   invalid_emof <- .make_invalid(emof, "emof", id_emof, issues_detailed)
 
-  # Coordenadas e issues para mapa
   map_issues <- data.frame()
 
   get_coords <- function(df, id_field) {
@@ -1164,9 +1151,6 @@ mod_qc_server <- function(id, event_in, occ_in,
 
   shiny::moduleServer(id, function(input, output, session) {
 
-    # ---------------------------------------------------------
-    # 1) Garantir que outputs críticos NÃO ficam suspensos
-    # ---------------------------------------------------------
     session$onFlushed(function() {
       shiny::outputOptions(output, "debug_cols", suspendWhenHidden = FALSE)
       shiny::outputOptions(output, "debug_overview_event_occ", suspendWhenHidden = FALSE)
@@ -1195,9 +1179,6 @@ mod_qc_server <- function(id, event_in, occ_in,
       cat("\nmap_ready:", map_ready(), " tab:", input$qc_tabs, "\n")
     })
 
-    # ---------------------------------------------------------
-    # QC runner
-    # ---------------------------------------------------------
     qc_res <- shiny::reactive({
       ev <- event_in()
       oc <- occ_in()
@@ -1245,9 +1226,6 @@ mod_qc_server <- function(id, event_in, occ_in,
       isTRUE(qc_res()$can_export)
     })
 
-    # ---------------------------------------------------------
-    # DEBUG outputs
-    # ---------------------------------------------------------
     output$debug_cols <- shiny::renderPrint({
       safe_call <- function(fn) {
         tryCatch(
@@ -1304,9 +1282,6 @@ mod_qc_server <- function(id, event_in, occ_in,
       )
     })
 
-    # ---------------------------------------------------------
-    # Console debug (quando o tab muda)
-    # ---------------------------------------------------------
     shiny::observeEvent(input$qc_tabs, {
       ev <- tryCatch(event_in(), error = function(e) NULL)
       oc <- tryCatch(occ_in(), error = function(e) NULL)
@@ -1322,9 +1297,6 @@ mod_qc_server <- function(id, event_in, occ_in,
       )
     }, ignoreInit = FALSE)
 
-    # ---------------------------------------------------------
-    # KPIs / status
-    # ---------------------------------------------------------
     output$kpi_errors <- shiny::renderText({ qc_res()$counts$errors })
     output$kpi_warnings <- shiny::renderText({ qc_res()$counts$warnings })
     output$kpi_n_occ <- shiny::renderText({
@@ -1342,9 +1314,6 @@ mod_qc_server <- function(id, event_in, occ_in,
       }
     })
 
-    # ---------------------------------------------------------
-    # Overview tables
-    # ---------------------------------------------------------
     output$overview_event_occ_tbl <- DT::renderDT({
       x <- qc_res()$overview$event_occ
       if (!is.data.frame(x) || nrow(x) == 0) {
@@ -1448,12 +1417,10 @@ mod_qc_server <- function(id, event_in, occ_in,
         function(el, x) {
           var map = this;
 
-          // 1) Tenta logo após render
           setTimeout(function(){ map.invalidateSize(); }, 0);
           setTimeout(function(){ map.invalidateSize(); }, 250);
           setTimeout(function(){ map.invalidateSize(); }, 1000);
 
-          // 2) Observa mudanças de tamanho do container
           if (window.ResizeObserver) {
             var ro = new ResizeObserver(function(){
               map.invalidateSize();
@@ -1465,7 +1432,6 @@ mod_qc_server <- function(id, event_in, occ_in,
       )
     })
 
-    # Atualiza markers via leafletProxy quando os dados existirem
     shiny::observeEvent(
       list(map_ready(), qc_res(), input$qc_tabs),
       {
@@ -1484,12 +1450,9 @@ mod_qc_server <- function(id, event_in, occ_in,
           return(NULL)
         }
 
-        # tab_ok: só para operações sensíveis (fitBounds / invalidateSize, etc.)
-        tab_ok <- isTRUE(
-          !is.null(input$qc_tabs) &&
-            nzchar(input$qc_tabs) &&
-            identical(input$qc_tabs, "data_overview")
-        )
+        # ### FIX ZOOM ###
+        # Tratar NULL como "data_overview" para permitir zoom no arranque
+        tab_ok <- isTRUE(is.null(input$qc_tabs) || identical(input$qc_tabs, "data_overview"))
         cat("[OBS] tab_ok=", tab_ok, "\n")
 
         cat("[OBS] OK: vai tentar ler dados (mesmo se qc_tabs for NULL)\n")
@@ -1559,7 +1522,7 @@ mod_qc_server <- function(id, event_in, occ_in,
         cat("[OBS] coords_src=", coords_src,
             " coords_n=", if (is.null(coords)) "NULL" else nrow(coords),
             "\n", sep = "")
-        
+
         last_coords(coords)
         last_coords_src(coords_src)
         last_issues(mi)
@@ -1593,7 +1556,8 @@ mod_qc_server <- function(id, event_in, occ_in,
               )
             )
 
-          # fitBounds só quando o tab estiver realmente ativo
+          # ### FIX ZOOM ###
+          # fitBounds dá zoom para enquadrar todos os pontos
           if (isTRUE(tab_ok)) {
             proxy <- proxy |>
               leaflet::fitBounds(
@@ -1602,9 +1566,9 @@ mod_qc_server <- function(id, event_in, occ_in,
                 lng2 = max(coords$decimalLongitude, na.rm = TRUE),
                 lat2 = max(coords$decimalLatitude,  na.rm = TRUE)
               )
-            cat("[OBS] fitBounds aplicado (tab_ok=TRUE)\n")
+            cat("[OBS] zoom aplicado (tab_ok=TRUE)\n")
           } else {
-            cat("[OBS] SKIP fitBounds (tab_ok=FALSE)\n")
+            cat("[OBS] SKIP zoom (tab_ok=FALSE)\n")
           }
 
         } else {
@@ -1639,14 +1603,13 @@ mod_qc_server <- function(id, event_in, occ_in,
       ignoreInit = FALSE
     )
 
-    # Força repaint quando o tab data_overview abre (evita leaflet com tamanho 0)
     shiny::observeEvent(
       input$qc_tabs,
       {
         if (!requireNamespace("leaflet", quietly = TRUE)) return(NULL)
 
-        tab_ok <- isTRUE(!is.null(input$qc_tabs) && nzchar(input$qc_tabs) &&
-                        identical(input$qc_tabs, "data_overview"))
+        # ### FIX ZOOM ###
+        tab_ok <- isTRUE(is.null(input$qc_tabs) || identical(input$qc_tabs, "data_overview"))
         cat("[TAB] qc_tabs=", if (is.null(input$qc_tabs)) "NULL" else input$qc_tabs,
             " tab_ok=", tab_ok, "\n")
 
@@ -1666,8 +1629,8 @@ mod_qc_server <- function(id, event_in, occ_in,
 
         proxy <- leaflet::leafletProxy("overview_map", session) |>
           leaflet::clearGroup("Records") |>
-          leaflet::clearGroup("Issues") |>
-          leaflet::invalidateSize()
+          leaflet::clearGroup("Issues")
+        # (sem leaflet::invalidateSize() porque não existe no R)
 
         if (is.data.frame(coords) && nrow(coords) > 0) {
           proxy <- proxy |>
@@ -1688,7 +1651,7 @@ mod_qc_server <- function(id, event_in, occ_in,
               lat2 = max(coords$decimalLatitude,  na.rm = TRUE)
             )
 
-          cat("[TAB] desenhou Records e aplicou fitBounds\n")
+          cat("[TAB] desenhou Records e aplicou zoom\n")
         } else {
           cat("[TAB] sem coords para desenhar\n")
         }
@@ -1710,9 +1673,6 @@ mod_qc_server <- function(id, event_in, occ_in,
       ignoreInit = FALSE
     )
 
-    # ---------------------------------------------------------
-    # Taxonomic UI/plot
-    # ---------------------------------------------------------
     output$kingdom_ui <- shiny::renderUI({
       oc <- occ_in()
       if (!is.data.frame(oc) || nrow(oc) == 0) return(NULL)
@@ -1751,19 +1711,48 @@ mod_qc_server <- function(id, event_in, occ_in,
       graphics::barplot(tab, horiz = TRUE, las = 1, main = "")
     })
 
-    # ---------------------------------------------------------
-    # Issues tables
-    # ---------------------------------------------------------
     output$issues_summary_tbl <- DT::renderDT({
       x <- qc_res()$issues_summary
       if (!is.data.frame(x)) x <- data.frame()
-      DT::datatable(x, rownames = FALSE, options = list(scrollX = TRUE, pageLength = 15))
+
+      DT::datatable(
+        x,
+        rownames = FALSE,
+        width = "100%",
+        options = list(
+          scrollX = TRUE,
+          autoWidth = FALSE,
+          pageLength = 15,
+          destroy = TRUE
+        ),
+        callback = DT::JS("
+          var t = table;
+          setTimeout(function(){ t.columns.adjust().draw(false); }, 50);
+          setTimeout(function(){ t.columns.adjust().draw(false); }, 250);
+        ")
+      )
     })
 
     output$issues_detailed_tbl <- DT::renderDT({
       x <- qc_res()$issues_detailed
       if (!is.data.frame(x)) x <- data.frame()
-      DT::datatable(x, rownames = FALSE, options = list(scrollX = TRUE, pageLength = 20))
+
+      DT::datatable(
+        x,
+        rownames = FALSE,
+        width = "100%",
+        options = list(
+          scrollX = TRUE,
+          autoWidth = FALSE,
+          pageLength = 20,
+          destroy = TRUE
+        ),
+        callback = DT::JS("
+          var t = table;
+          setTimeout(function(){ t.columns.adjust().draw(false); }, 50);
+          setTimeout(function(){ t.columns.adjust().draw(false); }, 250);
+        ")
+      )
     })
 
     output$tax_issues_tbl <- DT::renderDT({
@@ -1780,19 +1769,48 @@ mod_qc_server <- function(id, event_in, occ_in,
         broken$type <- "broken_one_to_one"
         out <- rbind(out, broken)
       }
-      DT::datatable(out, rownames = FALSE, options = list(scrollX = TRUE, pageLength = 10))
+
+      DT::datatable(
+        out,
+        rownames = FALSE,
+        width = "100%",
+        options = list(
+          scrollX = TRUE,
+          autoWidth = FALSE,
+          pageLength = 10,
+          destroy = TRUE
+        ),
+        callback = DT::JS("
+          var t = table;
+          setTimeout(function(){ t.columns.adjust().draw(false); }, 50);
+          setTimeout(function(){ t.columns.adjust().draw(false); }, 250);
+        ")
+      )
     })
 
     output$emof_issues_tbl <- DT::renderDT({
       x <- qc_res()$issues_detailed
       if (!is.data.frame(x)) x <- data.frame()
       x <- x[x$table == "emof", , drop = FALSE]
-      DT::datatable(x, rownames = FALSE, options = list(scrollX = TRUE, pageLength = 15))
+
+      DT::datatable(
+        x,
+        rownames = FALSE,
+        width = "100%",
+        options = list(
+          scrollX = TRUE,
+          autoWidth = FALSE,
+          pageLength = 15,
+          destroy = TRUE
+        ),
+        callback = DT::JS("
+          var t = table;
+          setTimeout(function(){ t.columns.adjust().draw(false); }, 50);
+          setTimeout(function(){ t.columns.adjust().draw(false); }, 250);
+        ")
+      )
     })
 
-    # ---------------------------------------------------------
-    # Issues map (como já tinhas)
-    # ---------------------------------------------------------
     output$issues_map <- leaflet::renderLeaflet({
       if (!requireNamespace("leaflet", quietly = TRUE)) return(NULL)
 
