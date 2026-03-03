@@ -81,6 +81,27 @@ mod_qc_ui <- function(id) {
       .qc-dt table.dataTable { width: 100% !important; border-collapse: collapse !important; }
 
 
+      td.dt-control {
+      cursor: pointer;
+      text-align: center;
+    }
+
+    td.dt-control::before {
+      content: '+';
+      font-weight: bold;
+      color: white;
+      background: #2c7be5;
+      border-radius: 50%;
+      padding: 2px 6px;
+      display: inline-block;
+    }
+
+    tr.shown td.dt-control::before {
+      content: '-';
+      background: #e63757;
+    }
+
+
     ")),
 
     bslib::navset_card_tab(
@@ -1859,10 +1880,72 @@ mod_qc_server <- function(id, event_in, occ_in,
       DT::datatable(x, rownames = FALSE, options = list(scrollX = TRUE, pageLength = 10))
     })
 
+    # output$invalid_emof_tbl <- DT::renderDT({
+    #   x <- qc_res()$invalid$emof
+    #   if (!is.data.frame(x)) x <- data.frame()
+    #   DT::datatable(x, rownames = FALSE, options = list(scrollX = TRUE, pageLength = 10))
+    # })
+
     output$invalid_emof_tbl <- DT::renderDT({
       x <- qc_res()$invalid$emof
-      if (!is.data.frame(x)) x <- data.frame()
-      DT::datatable(x, rownames = FALSE, options = list(scrollX = TRUE, pageLength = 10))
+      if (!is.data.frame(x) || nrow(x) == 0) x <- data.frame()
+
+      # Coluna para o botão (+ / -)
+      x$details <- ""
+      x <- x[, c("details", setdiff(names(x), "details"))]
+
+      DT::datatable(
+        x,
+        rownames = FALSE,
+        escape = FALSE,
+        selection = "none",
+        extensions = "Buttons",
+        width = "100%",
+        options = list(
+          dom = "Bfrtip",
+          buttons = list(
+            list(extend = "colvis", text = "Column visibility")
+          ),
+          columnDefs = list(
+            list(
+              targets = 0,
+              className = "dt-control",
+              orderable = FALSE,
+              data = NULL,
+              defaultContent = ""
+            )
+          ),
+          order = list(list(1, "asc")),
+          scrollX = TRUE,
+          autoWidth = FALSE,
+          pageLength = 10,
+          destroy = TRUE
+        ),
+        callback = DT::JS("
+          table.on('click', 'td.dt-control', function () {
+            var tr = $(this).closest('tr');
+            var row = table.row(tr);
+
+            if (row.child.isShown()) {
+              row.child.hide();
+              tr.removeClass('shown');
+            } else {
+              var data = row.data();
+              var html = '<div style=\"padding:10px\">';
+
+              for (var i = 1; i < data.length; i++) {
+                html += '<b>' + table.column(i).header().innerText + ':</b> ' +
+                        (data[i] === null ? '' : data[i]) + '<br>';
+              }
+
+              html += '</div>';
+
+              row.child(html).show();
+              tr.addClass('shown');
+            }
+          });
+        ")
+      )
     })
 
     # ---------------------------------------------------------
