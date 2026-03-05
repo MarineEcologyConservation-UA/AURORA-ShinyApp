@@ -17,13 +17,18 @@ server <- function(input, output, session) {
     df_in = ingest$tidy
   )
 
+  tax_match <- mod_taxonomy_match_server(
+    "tax_match",
+    df_in = dwc_map$cleaned
+  )
+
   # --- Build DwC-A -----------------------------------------------------------
   dwc_terms_path <- system.file("extdata", "dwc_terms.csv", package = "shinyRv02")
   dwc_terms <- read.csv(dwc_terms_path, stringsAsFactors = FALSE, fileEncoding = "UTF-8")
 
   dwca <- mod_build_dwca_server(
     "dwca",
-    df_in = dwc_map$cleaned,
+    df_in = tax_match$df_out,   # <- em vez de dwc_map$cleaned
     dwc_terms = dwc_terms
   )
 
@@ -56,5 +61,5 @@ server <- function(input, output, session) {
     pre_issues_in = dwc_map$issues %||% NULL
   )
 
-  invisible(list(ingest = ingest, dwc_map = dwc_map, dwca = dwca, qc = qc))
+  invisible(list(ingest = ingest, dwc_map = dwc_map, dwca = dwca, qc = qc, tax_match = tax_match))
 }

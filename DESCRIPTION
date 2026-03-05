@@ -28,6 +28,8 @@ Imports:
     leaflet,
     worrms,
     httr,
+    dplyr,
+    taxize,
 Suggests:
     testthat (>= 3.0.0)
 Config/testthat/edition: 3

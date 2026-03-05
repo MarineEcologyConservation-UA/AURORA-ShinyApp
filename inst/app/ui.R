@@ -52,20 +52,28 @@ ui <- bslib::page_navbar(
   # 2️⃣ MAPPING
   # -------------------------------------------------------
   bslib::nav_panel(
-    title = "Mapping",
+    title = "Field Mapping",
     mod_dwc_mapping_ui("dwc_map")
   ),
 
   # -------------------------------------------------------
-  # 3️⃣ BUILD DWC-A
+  # 3️⃣ TAXONOMY
   # -------------------------------------------------------
   bslib::nav_panel(
-    title = "Build DwC-A",
+    title = "Taxonomy",
+    mod_taxonomy_match_ui("tax_match")
+  ),
+
+  # -------------------------------------------------------
+  # 4️⃣ BUILD DWC-A
+  # -------------------------------------------------------
+  bslib::nav_panel(
+    title = "Darwin Tables",
     mod_build_dwca_ui("dwca")
   ),
 
   # -------------------------------------------------------
-  # 4 QC & DIAGNOSTICS
+  # 5️⃣ QC & DIAGNOSTICS
   # -------------------------------------------------------
   mod_qc_ui("qc")
 )
