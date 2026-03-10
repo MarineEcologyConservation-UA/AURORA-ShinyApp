@@ -59,6 +59,30 @@
   )
 }
 
+.metadata_nav_buttons <- function(ns, current, prev_tab = NULL, next_tab = NULL) {
+  shiny::div(
+    class = "metadata-nav-buttons d-flex justify-content-between align-items-center mt-4",
+    shiny::div(
+      if (!is.null(prev_tab)) {
+        shiny::actionButton(
+          ns(paste0("prev_", current)),
+          "Previous",
+          class = "btn btn-outline-secondary"
+        )
+      }
+    ),
+    shiny::div(
+      if (!is.null(next_tab)) {
+        shiny::actionButton(
+          ns(paste0("next_", current)),
+          "Next",
+          class = "btn btn-success"
+        )
+      }
+    )
+  )
+}
+
 # ---------------------------------------------------------
 # Module UI
 # ---------------------------------------------------------
@@ -133,7 +157,62 @@ mod_metadata_ui <- function(id) {
         background: rgba(0,0,0,.08);
         margin: 1rem 0;
       }
+      .metadata-nav-buttons {
+        padding-top: .5rem;
+      }
     ")),
+
+    shiny::tags$script(shiny::HTML(sprintf("
+      Shiny.addCustomMessageHandler('metadata-click-tab-%s', function(message) {
+        console.log('DEBUG JS metadata-click-tab message:', message);
+
+        var container = document.getElementById('%s');
+        if (!container) {
+          console.log('DEBUG JS: nav container not found');
+          return;
+        }
+
+        var target = message.target;
+        if (!target) {
+          console.log('DEBUG JS: target missing');
+          return;
+        }
+
+        var selectors = [
+          '[data-value=\"' + target + '\"]',
+          'a[data-value=\"' + target + '\"]',
+          'button[data-value=\"' + target + '\"]'
+        ];
+
+        var el = null;
+        for (var i = 0; i < selectors.length; i++) {
+          el = container.querySelector(selectors[i]);
+          if (el) break;
+        }
+
+        if (!el) {
+          var allTabs = container.querySelectorAll('[data-value]');
+          console.log(
+            'DEBUG JS: target tab not found. Available data-values:',
+            Array.from(allTabs).map(function(x) { return x.getAttribute('data-value'); })
+          );
+          return;
+        }
+
+        console.log('DEBUG JS: clicking tab ->', target, el);
+        el.click();
+
+        setTimeout(function() {
+          var moduleRoot = container.closest('.tab-pane') || container;
+          var topPos = moduleRoot.getBoundingClientRect().top + window.pageYOffset - 20;
+
+          window.scrollTo({
+            top: topPos,
+            behavior: 'smooth'
+          });
+        }, 50);
+      });
+    ", id, ns("metadata_tabs")))),
 
     shiny::div(
       class = "metadata-page-title",
@@ -152,6 +231,7 @@ mod_metadata_ui <- function(id) {
       class = "metadata-pilllist",
       bslib::navset_pill_list(
         id = ns("metadata_tabs"),
+        selected = "basic",
         well = TRUE,
         widths = c(3, 9),
 
@@ -160,6 +240,7 @@ mod_metadata_ui <- function(id) {
         # ---------------------------------------------------
         bslib::nav_panel(
           title = "Basic Metadata",
+          value = "basic",
           shiny::div(
             class = "metadata-block",
 
@@ -206,13 +287,7 @@ mod_metadata_ui <- function(id) {
                   .metadata_select(
                     ns("basic_type"),
                     "Type *",
-                    choices = c(
-                      "",
-                      "Sampling event",
-                      "Occurrence",
-                      "Checklist",
-                      "Metadata-only"
-                    )
+                    choices = c("", "Sampling event", "Occurrence", "Checklist", "Metadata-only")
                   )
                 ),
                 shiny::column(
@@ -305,7 +380,9 @@ mod_metadata_ui <- function(id) {
                 rows = 4,
                 help = "Descrição da frequência de manutenção."
               )
-            )
+            ),
+
+            .metadata_nav_buttons(ns, current = "basic", next_tab = "contacts")
           )
         ),
 
@@ -314,6 +391,7 @@ mod_metadata_ui <- function(id) {
         # ---------------------------------------------------
         bslib::nav_panel(
           title = "Contacts",
+          value = "contacts",
           shiny::div(
             class = "metadata-block",
             .metadata_section(
@@ -324,7 +402,8 @@ mod_metadata_ui <- function(id) {
                 value = 2, min = 1, max = 20, width = "220px"
               ),
               shiny::uiOutput(ns("contacts_ui"))
-            )
+            ),
+            .metadata_nav_buttons(ns, current = "contacts", prev_tab = "basic", next_tab = "ack")
           )
         ),
 
@@ -333,6 +412,7 @@ mod_metadata_ui <- function(id) {
         # ---------------------------------------------------
         bslib::nav_panel(
           title = "Acknowledgements",
+          value = "ack",
           shiny::div(
             class = "metadata-block",
             .metadata_section(
@@ -343,7 +423,8 @@ mod_metadata_ui <- function(id) {
                 rows = 8,
                 help = "Agradecimentos a financiadores e principais colaboradores."
               )
-            )
+            ),
+            .metadata_nav_buttons(ns, current = "ack", prev_tab = "contacts", next_tab = "geo")
           )
         ),
 
@@ -352,6 +433,7 @@ mod_metadata_ui <- function(id) {
         # ---------------------------------------------------
         bslib::nav_panel(
           title = "Geographical Coverage",
+          value = "geo",
           shiny::div(
             class = "metadata-block",
             .metadata_section(
@@ -368,7 +450,8 @@ mod_metadata_ui <- function(id) {
                 rows = 4,
                 help = "Descrição geográfica da área de estudo."
               )
-            )
+            ),
+            .metadata_nav_buttons(ns, current = "geo", prev_tab = "ack", next_tab = "tax")
           )
         ),
 
@@ -377,6 +460,7 @@ mod_metadata_ui <- function(id) {
         # ---------------------------------------------------
         bslib::nav_panel(
           title = "Taxonomic Coverage",
+          value = "tax",
           shiny::div(
             class = "metadata-block",
             .metadata_section(
@@ -405,7 +489,8 @@ mod_metadata_ui <- function(id) {
                   )
                 )
               )
-            )
+            ),
+            .metadata_nav_buttons(ns, current = "tax", prev_tab = "geo", next_tab = "temp")
           )
         ),
 
@@ -414,6 +499,7 @@ mod_metadata_ui <- function(id) {
         # ---------------------------------------------------
         bslib::nav_panel(
           title = "Temporal Coverage",
+          value = "temp",
           shiny::div(
             class = "metadata-block",
             .metadata_section(
@@ -422,7 +508,8 @@ mod_metadata_ui <- function(id) {
                 shiny::column(6, .metadata_date(ns("temp_start_date"), "Start Date")),
                 shiny::column(6, .metadata_date(ns("temp_end_date"), "End Date"))
               )
-            )
+            ),
+            .metadata_nav_buttons(ns, current = "temp", prev_tab = "tax", next_tab = "adddesc")
           )
         ),
 
@@ -431,6 +518,7 @@ mod_metadata_ui <- function(id) {
         # ---------------------------------------------------
         bslib::nav_panel(
           title = "Additional Description",
+          value = "adddesc",
           shiny::div(
             class = "metadata-block",
             .metadata_section(
@@ -438,7 +526,8 @@ mod_metadata_ui <- function(id) {
               .metadata_textarea(ns("adddesc_purpose"), "Purpose", rows = 4),
               .metadata_textarea(ns("adddesc_intro"), "Introduction", rows = 6),
               .metadata_textarea(ns("adddesc_getting_started"), "Getting Started", rows = 6)
-            )
+            ),
+            .metadata_nav_buttons(ns, current = "adddesc", prev_tab = "temp", next_tab = "keywords")
           )
         ),
 
@@ -447,6 +536,7 @@ mod_metadata_ui <- function(id) {
         # ---------------------------------------------------
         bslib::nav_panel(
           title = "Keywords",
+          value = "keywords",
           shiny::div(
             class = "metadata-block",
             .metadata_section(
@@ -457,7 +547,8 @@ mod_metadata_ui <- function(id) {
                 value = 2, min = 1, max = 15, width = "260px"
               ),
               shiny::uiOutput(ns("keywords_ui"))
-            )
+            ),
+            .metadata_nav_buttons(ns, current = "keywords", prev_tab = "adddesc", next_tab = "project")
           )
         ),
 
@@ -466,6 +557,7 @@ mod_metadata_ui <- function(id) {
         # ---------------------------------------------------
         bslib::nav_panel(
           title = "Project Data",
+          value = "project",
           shiny::div(
             class = "metadata-block",
 
@@ -485,7 +577,9 @@ mod_metadata_ui <- function(id) {
                 value = 2, min = 1, max = 20, width = "260px"
               ),
               shiny::uiOutput(ns("project_personnel_ui"))
-            )
+            ),
+
+            .metadata_nav_buttons(ns, current = "project", prev_tab = "keywords", next_tab = "sampling")
           )
         ),
 
@@ -494,6 +588,7 @@ mod_metadata_ui <- function(id) {
         # ---------------------------------------------------
         bslib::nav_panel(
           title = "Sampling Methods",
+          value = "sampling",
           shiny::div(
             class = "metadata-block",
             .metadata_section(
@@ -502,7 +597,8 @@ mod_metadata_ui <- function(id) {
               .metadata_textarea(ns("sampling_description"), "Sampling Description *", rows = 5),
               .metadata_textarea(ns("sampling_quality_control"), "Quality Control", rows = 4),
               .metadata_textarea(ns("sampling_step_description"), "Step Description *", rows = 6)
-            )
+            ),
+            .metadata_nav_buttons(ns, current = "sampling", prev_tab = "project", next_tab = "citations")
           )
         ),
 
@@ -511,6 +607,7 @@ mod_metadata_ui <- function(id) {
         # ---------------------------------------------------
         bslib::nav_panel(
           title = "Citations",
+          value = "citations",
           shiny::div(
             class = "metadata-block",
 
@@ -535,7 +632,9 @@ mod_metadata_ui <- function(id) {
                 value = 1, min = 0, max = 20, width = "280px"
               ),
               shiny::uiOutput(ns("citations_ui"))
-            )
+            ),
+
+            .metadata_nav_buttons(ns, current = "citations", prev_tab = "sampling", next_tab = "collections")
           )
         ),
 
@@ -544,6 +643,7 @@ mod_metadata_ui <- function(id) {
         # ---------------------------------------------------
         bslib::nav_panel(
           title = "Collection Data",
+          value = "collections",
           shiny::div(
             class = "metadata-block",
 
@@ -575,7 +675,9 @@ mod_metadata_ui <- function(id) {
                 value = 0, min = 0, max = 20, width = "280px"
               ),
               shiny::uiOutput(ns("curatorial_ui"))
-            )
+            ),
+
+            .metadata_nav_buttons(ns, current = "collections", prev_tab = "citations", next_tab = "external")
           )
         ),
 
@@ -584,6 +686,7 @@ mod_metadata_ui <- function(id) {
         # ---------------------------------------------------
         bslib::nav_panel(
           title = "External Links",
+          value = "external",
           shiny::div(
             class = "metadata-block",
             .metadata_section(
@@ -595,7 +698,8 @@ mod_metadata_ui <- function(id) {
                 value = 0, min = 0, max = 20, width = "260px"
               ),
               shiny::uiOutput(ns("external_formats_ui"))
-            )
+            ),
+            .metadata_nav_buttons(ns, current = "external", prev_tab = "collections", next_tab = "meta")
           )
         ),
 
@@ -604,6 +708,7 @@ mod_metadata_ui <- function(id) {
         # ---------------------------------------------------
         bslib::nav_panel(
           title = "Additional Metadata",
+          value = "meta",
           shiny::div(
             class = "metadata-block",
             .metadata_section(
@@ -621,7 +726,8 @@ mod_metadata_ui <- function(id) {
                 value = 0, min = 0, max = 20, width = "260px"
               ),
               shiny::uiOutput(ns("alt_ids_ui"))
-            )
+            ),
+            .metadata_nav_buttons(ns, current = "meta", prev_tab = "external", next_tab = "info")
           )
         ),
 
@@ -630,6 +736,7 @@ mod_metadata_ui <- function(id) {
         # ---------------------------------------------------
         bslib::nav_panel(
           title = "Info",
+          value = "info",
           shiny::div(
             class = "metadata-block",
             .metadata_section(
@@ -665,7 +772,8 @@ mod_metadata_ui <- function(id) {
                 shiny::tags$li("Curator"),
                 shiny::tags$li("Reviewer")
               )
-            )
+            ),
+            .metadata_nav_buttons(ns, current = "info", prev_tab = "meta")
           )
         )
       )
@@ -705,6 +813,64 @@ mod_metadata_server <- function(id) {
       "Curator",
       "Reviewer"
     )
+
+    tab_order <- c(
+      "basic",
+      "contacts",
+      "ack",
+      "geo",
+      "tax",
+      "temp",
+      "adddesc",
+      "keywords",
+      "project",
+      "sampling",
+      "citations",
+      "collections",
+      "external",
+      "meta",
+      "info"
+    )
+
+    go_to_tab <- function(target_tab) {
+      cat("DEBUG go_to_tab() ->", target_tab, "\n")
+      session$sendCustomMessage(
+        paste0("metadata-click-tab-", id),
+        list(target = target_tab)
+      )
+    }
+
+    for (i in seq_along(tab_order)) {
+      current <- tab_order[i]
+      prev_tab <- if (i > 1) tab_order[i - 1] else NULL
+      next_tab <- if (i < length(tab_order)) tab_order[i + 1] else NULL
+
+      if (!is.null(prev_tab)) {
+        local({
+          btn_id <- paste0("prev_", current)
+          target <- prev_tab
+          shiny::observeEvent(input[[btn_id]], {
+            cat("DEBUG click ->", btn_id, "| target:", target, "\n")
+            go_to_tab(target)
+          }, ignoreInit = TRUE)
+        })
+      }
+
+      if (!is.null(next_tab)) {
+        local({
+          btn_id <- paste0("next_", current)
+          target <- next_tab
+          shiny::observeEvent(input[[btn_id]], {
+            cat("DEBUG click ->", btn_id, "| target:", target, "\n")
+            go_to_tab(target)
+          }, ignoreInit = TRUE)
+        })
+      }
+    }
+
+    shiny::observe({
+      cat("DEBUG current metadata tab input ->", input$metadata_tabs %||% "NULL", "\n")
+    })
 
     # ---------------------------
     # Dynamic UI: Contacts
