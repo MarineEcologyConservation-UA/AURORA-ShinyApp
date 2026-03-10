@@ -32,6 +32,9 @@ server <- function(input, output, session) {
     dwc_terms = dwc_terms
   )
 
+  # NOVO MÓDULO
+  metadata <- mod_metadata_server("metadata")
+
   # --- QC & Diagnostics ------------------------------------------------------
   # Pré-issues: usa o que já tens no mapping. No teu módulo, o nome é `issues`.
   # Se `dwc_map$issues` não existir ainda como reactive exportado, coloca NULL.
@@ -61,5 +64,5 @@ server <- function(input, output, session) {
     pre_issues_in = dwc_map$issues %||% NULL
   )
 
-  invisible(list(ingest = ingest, dwc_map = dwc_map, dwca = dwca, qc = qc, tax_match = tax_match))
+  invisible(list(ingest = ingest, dwc_map = dwc_map, dwca = dwca, qc = qc, tax_match = tax_match, metadata = metadata))
 }
