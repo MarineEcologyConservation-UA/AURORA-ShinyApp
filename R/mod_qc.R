@@ -1888,11 +1888,20 @@ mod_qc_server <- function(id, event_in, occ_in,
 
     output$invalid_emof_tbl <- DT::renderDT({
       x <- qc_res()$invalid$emof
-      if (!is.data.frame(x) || nrow(x) == 0) x <- data.frame()
 
-      # Coluna para o botão (+ / -)
-      x$details <- ""
-      x <- x[, c("details", setdiff(names(x), "details"))]
+      if (!is.data.frame(x)) {
+        x <- data.frame()
+      }
+
+      if (nrow(x) == 0) {
+        x <- data.frame(
+          details = character(),
+          stringsAsFactors = FALSE
+        )
+      } else {
+        x$details <- rep("", nrow(x))
+        x <- x[, c("details", setdiff(names(x), "details")), drop = FALSE]
+      }
 
       DT::datatable(
         x,
@@ -1915,7 +1924,7 @@ mod_qc_server <- function(id, event_in, occ_in,
               defaultContent = ""
             )
           ),
-          order = list(list(1, "asc")),
+          order = if (ncol(x) > 1) list(list(1, "asc")) else list(),
           scrollX = TRUE,
           autoWidth = FALSE,
           pageLength = 10,
