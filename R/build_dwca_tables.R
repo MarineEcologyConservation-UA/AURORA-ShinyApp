@@ -75,6 +75,15 @@ build_dwca_tables <- function(df,
     paste(x, collapse = sep)
   }
 
+  # helper: first non-empty value
+  .first_non_empty <- function(x) {
+    x <- as.character(x)
+    x <- trimws(x)
+    x <- x[!is.na(x) & x != ""]
+    if (length(x) == 0) return(NA_character_)
+    x[[1]]
+  }
+
   # -------------------------------------------------------
   # 2) EVENT ID
   # -------------------------------------------------------
@@ -212,11 +221,13 @@ build_dwca_tables <- function(df,
       for (cc in missing_cols) parent_events[[cc]] <- NA
     }
     parent_events <- parent_events[, names(event_table), drop = FALSE]
-    event_table <- dplyr::bind_rows(parent_events, event_table)
+    event_table <- dplyr::bind_rows(parent_events, event_table) |>
+      dplyr::distinct(.data$eventID, .keep_all = TRUE)
   }
 
   occurrence_table <- df_work |>
-    dplyr::select(dplyr::any_of(occ_terms))
+    dplyr::select(dplyr::any_of(occ_terms)) |>
+    dplyr::distinct()
 
   # -------------------------------------------------------
   # 6) EMOF BUILD (LEVEL PER COLUMN)
@@ -242,13 +253,11 @@ build_dwca_tables <- function(df,
 
     if (length(cols_ok) > 0) {
 
-      # levels must be provided as named list col -> level
       levels <- emof_spec$levels
       if (is.null(levels) || length(levels) == 0) {
         stop("emof_spec$levels must be a named list mapping column -> level.")
       }
 
-      # validate levels for selected columns
       bad <- cols_ok[!cols_ok %in% names(levels)]
       if (length(bad) > 0) {
         stop(paste0(
@@ -257,41 +266,134 @@ build_dwca_tables <- function(df,
         ))
       }
 
-      # build long table
-      emof_table <- df_work |>
-        dplyr::select(
-          .data$eventID,
-          .data$occurrenceID,
-          dplyr::all_of(cols_ok)
-        ) |>
-        tidyr::pivot_longer(
-          cols = dplyr::all_of(cols_ok),
-          names_to = "measurementType",
-          values_to = "measurementValue",
-          values_transform = list(measurementValue = as.character)
-        ) |>
-        dplyr::filter(!is.na(.data$measurementValue) & .data$measurementValue != "")
+      event_cols <- cols_ok[
+        vapply(cols_ok, function(x) identical(levels[[x]], "event"), logical(1))
+      ]
+      occurrence_cols <- cols_ok[
+        vapply(cols_ok, function(x) identical(levels[[x]], "occurrence"), logical(1))
+      ]
 
-      # apply per-column level rule: if measurementType is event-level -> blank occurrenceID
-      is_event_level <- vapply(
-        emof_table$measurementType,
-        function(mt) identical(levels[[mt]], "event"),
-        logical(1)
-      )
-      emof_table$occurrenceID[is_event_level] <- ""
+      emof_parts <- list()
 
-      for (nm in c("measurementTypeID", "measurementValueID",
-                   "measurementUnit", "measurementUnitID")) {
-        if (!nm %in% names(emof_table)) emof_table[[nm]] <- ""
+      # -----------------------------------------------
+      # 6a) EVENT-LEVEL EMOF
+      # one row per eventID + measurementType
+      # -----------------------------------------------
+      if (length(event_cols) > 0) {
+
+        # warn if same event has conflicting values for same event-level variable
+        for (cc in event_cols) {
+          conflicts <- df_work |>
+            dplyr::mutate(.tmp_val = as.character(.data[[cc]])) |>
+            dplyr::mutate(.tmp_val = trimws(.data$.tmp_val)) |>
+            dplyr::filter(!is.na(.data$.tmp_val) & .data$.tmp_val != "") |>
+            dplyr::group_by(.data$eventID) |>
+            dplyr::summarise(
+              n_values = dplyr::n_distinct(.data$.tmp_val),
+              .groups = "drop"
+            ) |>
+            dplyr::filter(.data$n_values > 1)
+
+          if (nrow(conflicts) > 0) {
+            qc_messages <- c(
+              qc_messages,
+              paste0(
+                "WARNING: event-level eMoF column '", cc,
+                "' has conflicting values within the same eventID; ",
+                "keeping the first non-empty value per event."
+              )
+            )
+          }
+        }
+
+        event_emof_wide <- df_work |>
+          dplyr::select(.data$eventID, dplyr::all_of(event_cols)) |>
+          dplyr::group_by(.data$eventID) |>
+          dplyr::summarise(
+            dplyr::across(
+              dplyr::all_of(event_cols),
+              .first_non_empty
+            ),
+            .groups = "drop"
+          )
+
+        event_emof <- event_emof_wide |>
+          tidyr::pivot_longer(
+            cols = dplyr::all_of(event_cols),
+            names_to = "measurementType",
+            values_to = "measurementValue",
+            values_transform = list(measurementValue = as.character)
+          ) |>
+          dplyr::filter(!is.na(.data$measurementValue) & .data$measurementValue != "") |>
+          dplyr::mutate(occurrenceID = "")
+
+        emof_parts[["event"]] <- event_emof
       }
 
-      emof_table <- emof_table |>
-        dplyr::select(
-          .data$eventID, .data$occurrenceID,
-          .data$measurementType, .data$measurementTypeID,
-          .data$measurementValue, .data$measurementValueID,
-          .data$measurementUnit, .data$measurementUnitID
-        )
+      # -----------------------------------------------
+      # 6b) OCCURRENCE-LEVEL EMOF
+      # one row per eventID + occurrenceID + measurementType
+      # -----------------------------------------------
+      if (length(occurrence_cols) > 0) {
+
+        occurrence_emof <- df_work |>
+          dplyr::select(
+            .data$eventID,
+            .data$occurrenceID,
+            dplyr::all_of(occurrence_cols)
+          ) |>
+          dplyr::distinct() |>
+          tidyr::pivot_longer(
+            cols = dplyr::all_of(occurrence_cols),
+            names_to = "measurementType",
+            values_to = "measurementValue",
+            values_transform = list(measurementValue = as.character)
+          ) |>
+          dplyr::filter(!is.na(.data$measurementValue) & .data$measurementValue != "")
+
+        emof_parts[["occurrence"]] <- occurrence_emof
+      }
+
+      if (length(emof_parts) > 0) {
+        emof_table <- dplyr::bind_rows(emof_parts)
+
+        for (nm in c("measurementTypeID", "measurementValueID",
+                     "measurementUnit", "measurementUnitID")) {
+          if (!nm %in% names(emof_table)) emof_table[[nm]] <- ""
+        }
+
+        emof_table <- emof_table |>
+          dplyr::select(
+            .data$eventID, .data$occurrenceID,
+            .data$measurementType, .data$measurementTypeID,
+            .data$measurementValue, .data$measurementValueID,
+            .data$measurementUnit, .data$measurementUnitID
+          ) |>
+          dplyr::distinct()
+
+        # final safeguard against duplicate measurementType per event for event-level rows
+        dup_event_measurements <- emof_table |>
+          dplyr::filter(.data$occurrenceID == "") |>
+          dplyr::count(.data$eventID, .data$measurementType, name = "n") |>
+          dplyr::filter(.data$n > 1)
+
+        if (nrow(dup_event_measurements) > 0) {
+          qc_messages <- c(
+            qc_messages,
+            "WARNING: duplicate event-level eMoF records were detected and collapsed."
+          )
+
+          emof_table_event <- emof_table |>
+            dplyr::filter(.data$occurrenceID == "") |>
+            dplyr::distinct(.data$eventID, .data$measurementType, .keep_all = TRUE)
+
+          emof_table_occ <- emof_table |>
+            dplyr::filter(.data$occurrenceID != "")
+
+          emof_table <- dplyr::bind_rows(emof_table_event, emof_table_occ) |>
+            dplyr::distinct()
+        }
+      }
     }
   }
 
@@ -313,6 +415,20 @@ build_dwca_tables <- function(df,
   if (!is.null(emof_table)) {
     if (!"eventID" %in% names(emof_table)) {
       qc_messages <- c(qc_messages, "ERROR: eMoF table missing eventID.")
+    }
+
+    if (all(c("eventID", "occurrenceID", "measurementType") %in% names(emof_table))) {
+      dup_event_measurements <- emof_table |>
+        dplyr::filter(.data$occurrenceID == "") |>
+        dplyr::count(.data$eventID, .data$measurementType, name = "n") |>
+        dplyr::filter(.data$n > 1)
+
+      if (nrow(dup_event_measurements) > 0) {
+        qc_messages <- c(
+          qc_messages,
+          "ERROR: Duplicate measurementType linked to the same eventID still exists in eMoF."
+        )
+      }
     }
   }
 
