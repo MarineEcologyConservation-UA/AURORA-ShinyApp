@@ -314,7 +314,7 @@ mod_ingest_server <- function(id, example_map) {
           shiny::textInput(session$ns("pivot_names_to"), "names_to", "variable"),
           shiny::textInput(session$ns("pivot_values_to"), "values_to", "value"),
           shiny::checkboxInput(session$ns("pivot_drop_na"), "Drop NA", TRUE),
-          shiny::checkboxInput(session$ns("pivot_drop_zero"), "Drop zero", FALSE),
+          shiny::checkboxInput(session$ns("pivot_drop_zero"), "Drop zero", TRUE),
           shiny::checkboxInput(session$ns("pivot_trim_names"), "Trim names_to", TRUE),
           shiny::br(),
           shiny::actionButton(session$ns("pivot_apply"), "Pivotar"),
