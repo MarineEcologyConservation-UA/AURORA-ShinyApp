@@ -30,6 +30,7 @@ Imports:
     httr,
     dplyr,
     taxize,
+    rgbif,
 Suggests:
     testthat (>= 3.0.0)
 Config/testthat/edition: 3

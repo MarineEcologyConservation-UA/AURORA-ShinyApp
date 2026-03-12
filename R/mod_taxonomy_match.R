@@ -4,6 +4,7 @@
 # + choice starts empty
 # + popup on choice selection
 # + apply/commit to dataset
+# + GBIF refactored to same pattern as WoRMS
 # File: R/mod_taxonomy_match.R
 # =========================================================
 
@@ -111,6 +112,7 @@ mod_taxonomy_match_ui <- function(id) {
                     shiny::tags$li("normalisedQuery indica o texto realmente enviado à base (pode ser truncado)."),
                     shiny::tags$li("AMBIGUOUS aparece quando existem múltiplos candidatos; o choice começa vazio."),
                     shiny::tags$li("Ao escolher um candidato, abre popup de confirmação."),
+                    shiny::tags$li("WoRMS e GBIF seguem agora a mesma lógica de candidatos e resolução manual."),
                     shiny::tags$li("Aplicar ao dataset faz commit real do dataframe que seguirá para o build_dwca_tables.")
                   )
                 )
@@ -146,6 +148,8 @@ mod_taxonomy_match_server <- function(id, df_in) {
   shiny::moduleServer(id, function(input, output, session) {
     ns <- session$ns
 
+    `%||%` <- function(x, y) if (is.null(x)) y else x
+
     empty_issues <- function() {
       data.frame(
         row = integer(),
@@ -163,7 +167,7 @@ mod_taxonomy_match_server <- function(id, df_in) {
       applied_df = NULL,
       issues = empty_issues(),
       cache = new.env(parent = emptyenv()),
-      worms_candidates_map = list(),
+      candidates_map = list(),
       choice_observers = list(),
       suppress_choice_popup = FALSE,
       pending_choice = NULL
@@ -198,7 +202,7 @@ mod_taxonomy_match_server <- function(id, df_in) {
       if (identical(input$tax_db, "worms")) {
         requireNamespace("worrms", quietly = TRUE)
       } else {
-        requireNamespace("taxize", quietly = TRUE)
+        requireNamespace("rgbif", quietly = TRUE)
       }
     })
 
@@ -210,7 +214,7 @@ mod_taxonomy_match_server <- function(id, df_in) {
         if (identical(input$tax_db, "worms")) {
           shiny::tags$div("Falta o pacote 'worrms' para usar WoRMS.")
         } else {
-          shiny::tags$div("Falta o pacote 'taxize' para usar GBIF Backbone.")
+          shiny::tags$div("Falta o pacote 'rgbif' para usar GBIF Backbone.")
         }
       }
     })
@@ -230,6 +234,17 @@ mod_taxonomy_match_server <- function(id, df_in) {
       if (length(x) == 0 || is.null(x)) return(TRUE)
       if (all(is.na(x))) return(TRUE)
       !nzchar(trimws(as.character(x)))
+    }
+
+    to_chr1 <- function(x) {
+      if (is.null(x) || length(x) == 0) return(NA_character_)
+      x <- as.character(x[1])
+      if (is.na(x) || identical(x, "NULL")) return(NA_character_)
+      x
+    }
+
+    lower_norm <- function(x) {
+      tolower(normalize_ws(x))
     }
 
     is_unresolvable <- function(x) {
@@ -429,8 +444,130 @@ mod_taxonomy_match_server <- function(id, df_in) {
       res
     }
 
-    match_one_gbif <- function(input_name, normalised_query) {
-      key <- cache_key("gbif", normalised_query, FALSE, 1, TRUE)
+    # ------------------------------------------------------
+    # GBIF helpers (refactored like WoRMS)
+    # ------------------------------------------------------
+    gbif_candidates <- function(query, use_fuzzy = TRUE, top_n = 5) {
+      res <- tryCatch(
+        rgbif::name_lookup(q = query, limit = as.integer(top_n)),
+        error = function(e) NULL
+      )
+
+      dat <- NULL
+      if (!is.null(res) && is.list(res) && "data" %in% names(res)) {
+        dat <- res$data
+      }
+
+      if (is.null(dat) || !is.data.frame(dat) || nrow(dat) == 0) {
+        return(data.frame())
+      }
+
+      keep <- intersect(
+        names(dat),
+        c(
+          "key", "nubKey", "scientificName", "canonicalName", "rank",
+          "taxonomicStatus", "status", "authorship", "acceptedKey",
+          "accepted", "matchType", "confidence"
+        )
+      )
+
+      out <- dat[, keep, drop = FALSE]
+
+      if ("key" %in% names(out)) {
+        out$key <- as.character(out$key)
+        out <- out[!duplicated(out$key), , drop = FALSE]
+      }
+
+      sci <- if ("scientificName" %in% names(out)) lower_norm(out$scientificName) else rep("", nrow(out))
+      can <- if ("canonicalName" %in% names(out)) lower_norm(out$canonicalName) else rep("", nrow(out))
+      qn  <- lower_norm(query)
+
+      score <- integer(nrow(out))
+      score[sci == qn] <- score[sci == qn] + 3L
+      score[can == qn] <- score[can == qn] + 2L
+
+      if ("matchType" %in% names(out)) {
+        mt <- toupper(as.character(out$matchType))
+        score[mt == "EXACT"] <- score[mt == "EXACT"] + 2L
+        score[mt == "FUZZY"] <- score[mt == "FUZZY"] + 1L
+      }
+
+      if ("confidence" %in% names(out)) {
+        conf <- suppressWarnings(as.numeric(out$confidence))
+        conf[is.na(conf)] <- 0
+      } else {
+        conf <- rep(0, nrow(out))
+      }
+
+      ord <- order(-score, -conf)
+      out <- out[ord, , drop = FALSE]
+
+      if (!isTRUE(use_fuzzy)) {
+        exact_idx <- which(
+          sci == qn |
+            can == qn
+        )
+        if (length(exact_idx) > 0) {
+          out <- out[exact_idx, , drop = FALSE]
+        }
+      }
+
+      utils::head(out, n = as.integer(top_n))
+    }
+
+    gbif_record_by_id <- function(gbif_key) {
+      tryCatch(
+        rgbif::name_usage(key = as.integer(gbif_key), data = "all"),
+        error = function(e) NULL
+      )
+    }
+
+    gbif_find_candidate_row <- function(input_name, selected_id) {
+      cand <- rv$candidates_map[[input_name]]
+      if (is.null(cand) || !is.data.frame(cand) || nrow(cand) == 0) {
+        return(NULL)
+      }
+      if (!("key" %in% names(cand))) return(NULL)
+
+      idx <- which(as.character(cand$key) == as.character(selected_id))
+      if (length(idx) == 0) return(NULL)
+
+      cand[idx[1], , drop = FALSE]
+    }
+
+    gbif_extract_accepted_name <- function(candidate_row = NULL, record = NULL) {
+      # 1) try accepted/scientific fields from candidate row
+      if (!is.null(candidate_row) && is.data.frame(candidate_row) && nrow(candidate_row) > 0) {
+        acc_txt <- to_chr1(candidate_row$accepted)
+        if (!is_blank(acc_txt)) return(acc_txt)
+
+        acc_key <- to_chr1(candidate_row$acceptedKey)
+        if (!is_blank(acc_key)) {
+          rec_acc <- gbif_record_by_id(acc_key)
+          if (!is.null(rec_acc)) {
+            nm <- to_chr1(rec_acc$scientificName %||% rec_acc$canonicalName)
+            if (!is_blank(nm)) return(nm)
+          }
+        }
+      }
+
+      # 2) try acceptedKey from detailed record
+      if (!is.null(record)) {
+        acc_key <- to_chr1(record$acceptedKey)
+        if (!is_blank(acc_key)) {
+          rec_acc <- gbif_record_by_id(acc_key)
+          if (!is.null(rec_acc)) {
+            nm <- to_chr1(rec_acc$scientificName %||% rec_acc$canonicalName)
+            if (!is_blank(nm)) return(nm)
+          }
+        }
+      }
+
+      NA_character_
+    }
+
+    match_one_gbif <- function(input_name, normalised_query, use_fuzzy = TRUE, top_n = 5, auto_apply_unique = TRUE) {
+      key <- cache_key("gbif", normalised_query, use_fuzzy, top_n, auto_apply_unique)
       cached <- cache_get(key)
 
       if (!is.null(cached)) {
@@ -439,11 +576,13 @@ mod_taxonomy_match_server <- function(id, df_in) {
         return(cached)
       }
 
-      gbif_id <- tryCatch(taxize::get_gbifid(normalised_query), error = function(e) NA)
-      if (length(gbif_id) == 0) gbif_id <- NA
-      gbif_id <- as.character(gbif_id[1])
+      cand <- gbif_candidates(
+        query = normalised_query,
+        use_fuzzy = use_fuzzy,
+        top_n = top_n
+      )
 
-      if (is.na(gbif_id) || gbif_id == "" || gbif_id == "NA") {
+      if (!is.data.frame(cand) || nrow(cand) == 0) {
         res <- list(
           row = data.frame(
             inputName = input_name,
@@ -465,36 +604,48 @@ mod_taxonomy_match_server <- function(id, df_in) {
         return(res)
       }
 
-      cls <- tryCatch(
-        taxize::classification(gbif_id, db = "gbif"),
-        error = function(e) NULL
-      )
+      if (nrow(cand) == 1) {
+        one <- cand[1, , drop = FALSE]
+        gbif_key <- to_chr1(one$key)
+        status_auto <- if (isTRUE(auto_apply_unique)) "MATCHED" else "AMBIGUOUS"
 
-      matched <- NA_character_
-      rank <- NA_character_
-
-      if (!is.null(cls) && length(cls) >= 1 && is.data.frame(cls[[1]]) && nrow(cls[[1]]) >= 1) {
-        last <- cls[[1]][nrow(cls[[1]]), , drop = FALSE]
-        if ("name" %in% names(last)) matched <- as.character(last$name)
-        if ("rank" %in% names(last)) rank <- as.character(last$rank)
+        res <- list(
+          row = data.frame(
+            inputName = input_name,
+            normalisedQuery = normalised_query,
+            matchedName = to_chr1(one$scientificName %||% one$canonicalName),
+            scientificNameID = gbif_key,
+            taxonomicStatus = to_chr1(one$taxonomicStatus %||% one$status),
+            acceptedNameUsage = gbif_extract_accepted_name(candidate_row = one, record = NULL),
+            taxonRank = to_chr1(one$rank),
+            authority = to_chr1(one$authorship),
+            nameAccordingTo = "GBIF Backbone",
+            taxonMatchStatus = status_auto,
+            selectedID = if (isTRUE(auto_apply_unique)) gbif_key else NA_character_,
+            stringsAsFactors = FALSE
+          ),
+          candidates = cand
+        )
+        cache_set(key, res)
+        return(res)
       }
 
       res <- list(
         row = data.frame(
           inputName = input_name,
           normalisedQuery = normalised_query,
-          matchedName = matched,
-          scientificNameID = gbif_id,
+          matchedName = NA_character_,
+          scientificNameID = NA_character_,
           taxonomicStatus = NA_character_,
           acceptedNameUsage = NA_character_,
-          taxonRank = rank,
+          taxonRank = NA_character_,
           authority = NA_character_,
           nameAccordingTo = "GBIF Backbone",
-          taxonMatchStatus = "MATCHED",
-          selectedID = gbif_id,
+          taxonMatchStatus = "AMBIGUOUS",
+          selectedID = NA_character_,
           stringsAsFactors = FALSE
         ),
-        candidates = NULL
+        candidates = cand
       )
       cache_set(key, res)
       res
@@ -525,6 +676,50 @@ mod_taxonomy_match_server <- function(id, df_in) {
       invisible(TRUE)
     }
 
+    resolve_row_gbif <- function(i, selected_id) {
+      if (is.null(rv$lookup) || nrow(rv$lookup) < i) return(invisible(FALSE))
+      if (is_blank(selected_id)) return(invisible(FALSE))
+
+      input_name <- rv$lookup$inputName[i]
+      cand_row <- gbif_find_candidate_row(input_name, selected_id)
+      rec <- gbif_record_by_id(selected_id)
+
+      rv$lookup$selectedID[i] <- as.character(selected_id)
+      rv$lookup$scientificNameID[i] <- as.character(selected_id)
+
+      rv$lookup$matchedName[i] <- to_chr1(
+        (if (!is.null(rec)) rec$scientificName else NULL) %||%
+          (if (!is.null(rec)) rec$canonicalName else NULL) %||%
+          (if (!is.null(cand_row)) cand_row$scientificName else NULL) %||%
+          (if (!is.null(cand_row)) cand_row$canonicalName else NULL)
+      )
+
+      rv$lookup$taxonomicStatus[i] <- to_chr1(
+        (if (!is.null(rec)) rec$taxonomicStatus else NULL) %||%
+          (if (!is.null(rec)) rec$status else NULL) %||%
+          (if (!is.null(cand_row)) cand_row$taxonomicStatus else NULL) %||%
+          (if (!is.null(cand_row)) cand_row$status else NULL)
+      )
+
+      rv$lookup$acceptedNameUsage[i] <- gbif_extract_accepted_name(
+        candidate_row = cand_row,
+        record = rec
+      )
+
+      rv$lookup$taxonRank[i] <- to_chr1(
+        (if (!is.null(rec)) rec$rank else NULL) %||%
+          (if (!is.null(cand_row)) cand_row$rank else NULL)
+      )
+
+      rv$lookup$authority[i] <- to_chr1(
+        (if (!is.null(rec)) rec$authorship else NULL) %||%
+          (if (!is.null(cand_row)) cand_row$authorship else NULL)
+      )
+
+      rv$lookup$taxonMatchStatus[i] <- "MATCHED"
+      invisible(TRUE)
+    }
+
     apply_choice_to_rows <- function(row_ids, selected_id) {
       if (length(row_ids) == 0) return(invisible(FALSE))
 
@@ -534,9 +729,7 @@ mod_taxonomy_match_server <- function(id, df_in) {
         }
       } else {
         for (ii in row_ids) {
-          rv$lookup$selectedID[ii] <- as.character(selected_id)
-          rv$lookup$scientificNameID[ii] <- as.character(selected_id)
-          rv$lookup$taxonMatchStatus[ii] <- "MATCHED"
+          resolve_row_gbif(ii, selected_id)
         }
       }
 
@@ -548,14 +741,20 @@ mod_taxonomy_match_server <- function(id, df_in) {
     get_candidate_table <- function(i) {
       if (is.null(rv$lookup) || nrow(rv$lookup) < i) return(NULL)
       nm <- rv$lookup$inputName[i]
-      rv$worms_candidates_map[[nm]]
+      rv$candidates_map[[nm]]
     }
 
     get_first_candidate_id <- function(i) {
       cand <- get_candidate_table(i)
       if (is.null(cand) || !is.data.frame(cand) || nrow(cand) == 0) return(NA_character_)
-      if (!("AphiaID" %in% names(cand))) return(NA_character_)
-      as.character(cand$AphiaID[1])
+
+      if (identical(input$tax_db, "worms")) {
+        if (!("AphiaID" %in% names(cand))) return(NA_character_)
+        return(as.character(cand$AphiaID[1]))
+      }
+
+      if (!("key" %in% names(cand))) return(NA_character_)
+      as.character(cand$key[1])
     }
 
     # ------------------------------------------------------
@@ -573,27 +772,56 @@ mod_taxonomy_match_server <- function(id, df_in) {
         if (!identical(disp$taxonMatchStatus[i], "AMBIGUOUS")) next
 
         nm <- disp$inputName[i]
-        cand <- rv$worms_candidates_map[[nm]]
+        cand <- rv$candidates_map[[nm]]
         if (is.null(cand) || !is.data.frame(cand) || nrow(cand) == 0) next
 
-        ids <- as.character(cand$AphiaID)
+        if (identical(input$tax_db, "worms")) {
+          ids <- as.character(cand$AphiaID)
 
-        sci <- if ("scientificname" %in% names(cand)) as.character(cand$scientificname) else rep("", nrow(cand))
-        rk  <- if ("rank" %in% names(cand)) as.character(cand$rank) else rep("", nrow(cand))
-        au  <- if ("authority" %in% names(cand)) as.character(cand$authority) else rep("", nrow(cand))
-        st  <- if ("status" %in% names(cand)) as.character(cand$status) else rep("", nrow(cand))
+          sci <- if ("scientificname" %in% names(cand)) as.character(cand$scientificname) else rep("", nrow(cand))
+          rk  <- if ("rank" %in% names(cand)) as.character(cand$rank) else rep("", nrow(cand))
+          au  <- if ("authority" %in% names(cand)) as.character(cand$authority) else rep("", nrow(cand))
+          st  <- if ("status" %in% names(cand)) as.character(cand$status) else rep("", nrow(cand))
 
-        rk[is.na(rk) | rk == "NA"] <- ""
-        au[is.na(au) | au == "NA"] <- ""
-        st[is.na(st) | st == "NA"] <- ""
+          rk[is.na(rk) | rk == "NA"] <- ""
+          au[is.na(au) | au == "NA"] <- ""
+          st[is.na(st) | st == "NA"] <- ""
 
-        lab <- paste0(
-          ids, " — ",
-          sci,
-          ifelse(rk != "", paste0(" [", rk, "]"), ""),
-          ifelse(st != "", paste0(" (", st, ")"), ""),
-          ifelse(au != "", paste0(" — ", au), "")
-        )
+          lab <- paste0(
+            ids, " — ",
+            sci,
+            ifelse(rk != "", paste0(" [", rk, "]"), ""),
+            ifelse(st != "", paste0(" (", st, ")"), ""),
+            ifelse(au != "", paste0(" — ", au), "")
+          )
+        } else {
+          ids <- as.character(cand$key)
+
+          sci <- if ("scientificName" %in% names(cand)) as.character(cand$scientificName) else rep("", nrow(cand))
+          can <- if ("canonicalName" %in% names(cand)) as.character(cand$canonicalName) else rep("", nrow(cand))
+          rk  <- if ("rank" %in% names(cand)) as.character(cand$rank) else rep("", nrow(cand))
+          au  <- if ("authorship" %in% names(cand)) as.character(cand$authorship) else rep("", nrow(cand))
+          st  <- if ("taxonomicStatus" %in% names(cand)) as.character(cand$taxonomicStatus) else rep("", nrow(cand))
+          mt  <- if ("matchType" %in% names(cand)) as.character(cand$matchType) else rep("", nrow(cand))
+
+          sci[is.na(sci) | sci == "NA"] <- ""
+          can[is.na(can) | can == "NA"] <- ""
+          rk[is.na(rk) | rk == "NA"] <- ""
+          au[is.na(au) | au == "NA"] <- ""
+          st[is.na(st) | st == "NA"] <- ""
+          mt[is.na(mt) | mt == "NA"] <- ""
+
+          primary_nm <- ifelse(sci != "", sci, can)
+
+          lab <- paste0(
+            ids, " — ",
+            primary_nm,
+            ifelse(rk != "", paste0(" [", rk, "]"), ""),
+            ifelse(st != "", paste0(" (", st, ")"), ""),
+            ifelse(mt != "", paste0(" <", mt, ">"), ""),
+            ifelse(au != "", paste0(" — ", au), "")
+          )
+        }
 
         choices <- c("-- selecionar candidato --" = "", stats::setNames(ids, lab))
         input_id <- ns(paste0("cand_", i))
@@ -758,7 +986,7 @@ mod_taxonomy_match_server <- function(id, df_in) {
       rv$issues <- empty_issues()
       rv$lookup <- NULL
       rv$lookup_display <- NULL
-      rv$worms_candidates_map <- list()
+      rv$candidates_map <- list()
       rv$applied_df <- NULL
       rv$pending_choice <- NULL
 
@@ -849,18 +1077,20 @@ mod_taxonomy_match_server <- function(id, df_in) {
             } else {
               match_one_gbif(
                 input_name = nm,
-                normalised_query = q
+                normalised_query = q,
+                use_fuzzy = input$use_fuzzy,
+                top_n = input$top_n,
+                auto_apply_unique = input$auto_apply_unique
               )
             }
 
             row <- res$row
             lookup[i, names(row)] <- row[1, names(row)]
 
-            if (identical(input$tax_db, "worms") &&
-                !is.null(res$candidates) &&
+            if (!is.null(res$candidates) &&
                 is.data.frame(res$candidates) &&
                 nrow(res$candidates) > 0) {
-              rv$worms_candidates_map[[nm]] <- res$candidates
+              rv$candidates_map[[nm]] <- res$candidates
             }
 
             if (lookup$taxonMatchStatus[i] == "NOT_FOUND") {
