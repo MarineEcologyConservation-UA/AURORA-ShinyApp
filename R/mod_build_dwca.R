@@ -2,6 +2,7 @@
 # Shiny Module: Build DwC-A
 # =========================================================
 
+#' @export
 mod_build_dwca_ui <- function(id) {
   ns <- shiny::NS(id)
 
@@ -142,6 +143,7 @@ mod_build_dwca_ui <- function(id) {
   )
 }
 
+#' @export
 mod_build_dwca_server <- function(id, df_in, dwc_terms) {
   shiny::moduleServer(id, function(input, output, session) {
 

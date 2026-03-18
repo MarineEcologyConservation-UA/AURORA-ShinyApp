@@ -2,6 +2,7 @@
 # Build DwC-A tables from flat mapped dataframe
 # =========================================================
 
+#' @export
 build_dwca_tables <- function(df,
                               dwc_terms,
                               id_spec,
