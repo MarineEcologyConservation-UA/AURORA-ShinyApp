@@ -3,7 +3,7 @@
 #   shiny::runApp(system.file("app", package = "shinyRv02"))
 
 library(shiny)
-
+library(shinyRv02)
 # When you run via devtools::load_all(), functions from R/ are available.
 # When installed, they are available via the package namespace.
 
