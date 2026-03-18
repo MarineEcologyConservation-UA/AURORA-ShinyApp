@@ -8,11 +8,29 @@ clean_dwc_pipeline(
   df,
   coord_epsg_in = 4326,
   target_epsg = 4326,
-  force_parzer = TRUE
+  force_parzer = TRUE,
+  bathy = NULL,
+  bathy_auto_download = TRUE,
+  bathy_depth_tolerance_m = 200,
+  swap_auto_fix = FALSE
 )
 }
 \arguments{
 \item{df}{data.frame after mapping (DwC column names)}
+
+\item{coord_epsg_in}{EPSG code of input coordinates}
+
+\item{target_epsg}{EPSG code to reproject to (default 4326)}
+
+\item{force_parzer}{logical; if TRUE, try parzer parsing even when values look numeric}
+
+\item{bathy}{optional marmap bathy object already loaded/downloaded}
+
+\item{bathy_auto_download}{logical; if TRUE and bathy is NULL, tries to fetch bathymetry with marmap for the dataset extent}
+
+\item{bathy_depth_tolerance_m}{numeric; tolerance (meters) to compare reported depth with bathymetry}
+
+\item{swap_auto_fix}{logical; if TRUE, auto-swap coordinates in clear range-based cases}
 }
 \value{
 list(data=cleaned_df, issues=issues_df, summary=summary_df)
