@@ -1,4 +1,5 @@
 ui <- bslib::page_navbar(
+  id = "main_nav",
   title = "shinyRv02",
 
   theme = bslib::bs_theme(
@@ -37,49 +38,80 @@ ui <- bslib::page_navbar(
       }
 
       table.dataTable { font-size: 0.95rem; }
+
+      .nav-link.disabled-tab,
+      .dropdown-item.disabled-tab {
+        pointer-events: none !important;
+        opacity: .5 !important;
+        cursor: not-allowed !important;
+      }
+    ")),
+    shiny::tags$script(shiny::HTML("
+      Shiny.addCustomMessageHandler('toggleMainTabs', function(message) {
+        var locked = !!message.locked;
+        var protectedTabs = ['field_mapping', 'taxonomy', 'darwin_tables', 'metadata', 'qc'];
+
+        protectedTabs.forEach(function(value) {
+          var navLink = document.querySelector('[data-value=\"' + value + '\"]');
+          if (navLink) {
+            if (locked) {
+              navLink.classList.add('disabled-tab');
+              navLink.setAttribute('aria-disabled', 'true');
+              navLink.setAttribute('tabindex', '-1');
+            } else {
+              navLink.classList.remove('disabled-tab');
+              navLink.removeAttribute('aria-disabled');
+              navLink.removeAttribute('tabindex');
+            }
+          }
+        });
+      });
     "))
   ),
 
   # -------------------------------------------------------
-  # 1️⃣ INGEST
+  # 1 INGEST
   # -------------------------------------------------------
   bslib::nav_panel(
     title = "Ingest",
+    value = "ingest",
     mod_ingest_ui("ingest")
   ),
 
   # -------------------------------------------------------
-  # 2️⃣ MAPPING
+  # 2 MAPPING
   # -------------------------------------------------------
   bslib::nav_panel(
     title = "Field Mapping",
+    value = "field_mapping",
     mod_dwc_mapping_ui("dwc_map")
   ),
 
   # -------------------------------------------------------
-  # 3️⃣ TAXONOMY
+  # 3 TAXONOMY
   # -------------------------------------------------------
   bslib::nav_panel(
     title = "Taxonomy",
+    value = "taxonomy",
     mod_taxonomy_match_ui("tax_match")
   ),
 
   # -------------------------------------------------------
-  # 4️⃣ BUILD DWC-A
+  # 4 BUILD DWC-A
   # -------------------------------------------------------
   bslib::nav_panel(
     title = "Darwin Tables",
+    value = "darwin_tables",
     mod_build_dwca_ui("dwca")
   ),
 
   # -------------------------------------------------------
-  # 5️⃣ METADATA
+  # 5 METADATA
   # -------------------------------------------------------
   mod_metadata_ui("metadata"),
 
-
   # -------------------------------------------------------
-  # 5️⃣ QC & DIAGNOSTICS
+  # 6 QC & DIAGNOSTICS
   # -------------------------------------------------------
   mod_qc_ui("qc")
 )

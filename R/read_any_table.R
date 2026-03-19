@@ -7,7 +7,7 @@
 #'
 #' Supported extensions:
 #' - `.csv`, `.tsv`, `.txt` via [readr::read_delim()]
-#' - `.xlsx`, `.xls` via [readxl::read_xlsx()]
+#' - `.xlsx`, `.xls` via [readxl::read_excel()]
 #'
 #' @param path Character scalar. Path to the input file.
 #' @param ext Character scalar (optional). File extension override. If `NULL`, it
@@ -18,7 +18,6 @@
 #' @param encoding Character scalar. Preferred encoding to try first for text
 #'   files (e.g., `"UTF-8"`, `"Windows-1252"`, `"Latin1"`).
 #'
-#' @param is_tidy Logical scalar. If `TRUE`, performs a lightweight, safe cleanup
 #' @return A [data.frame] with the imported data. The returned object includes
 #'   attribute `"encoding_used"` indicating which encoding successfully read the
 #'   file.
@@ -34,14 +33,17 @@ read_any_table <- function(path,
                            ext = NULL,
                            delim = ",",
                            has_header = TRUE,
-                           encoding = "UTF-8",
-                           is_tidy = TRUE) {
+                           encoding = "UTF-8") {
 
-  if (is.null(ext)) ext <- tools::file_ext(path)
+  if (is.null(ext)) {
+    ext <- tools::file_ext(path)
+  }
   ext <- tolower(ext)
 
   if (ext %in% c("csv", "tsv", "txt")) {
-    if (ext == "tsv") delim <- "\t"
+    if (identical(ext, "tsv")) {
+      delim <- "\t"
+    }
 
     encodings <- unique(c(
       encoding,
@@ -68,7 +70,7 @@ read_any_table <- function(path,
       )
 
       if (!inherits(res, "error")) {
-        out <- as.data.frame(res)
+        out <- as.data.frame(res, stringsAsFactors = FALSE)
         attr(out, "encoding_used") <- enc
         return(out)
       }
@@ -84,7 +86,13 @@ read_any_table <- function(path,
   }
 
   if (ext %in% c("xlsx", "xls")) {
-    out <- as.data.frame(readxl::read_xlsx(path))
+    out <- as.data.frame(
+      readxl::read_excel(
+        path = path,
+        col_names = has_header
+      ),
+      stringsAsFactors = FALSE
+    )
     attr(out, "encoding_used") <- "UTF-8"
     return(out)
   }

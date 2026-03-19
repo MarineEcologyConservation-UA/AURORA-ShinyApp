@@ -12,6 +12,24 @@ server <- function(input, output, session) {
 
   ingest <- mod_ingest_server("ingest", example_map = example_map)
 
+  # bloquear tabs downstream até Complete ingest
+  shiny::observe({
+    ready <- isTRUE(ingest$ready())
+
+    session$sendCustomMessage(
+      "toggleMainTabs",
+      list(locked = !ready)
+    )
+
+    if (!ready && !is.null(input$main_nav) && input$main_nav != "ingest") {
+      bslib::nav_select(
+        id = "main_nav",
+        selected = "ingest",
+        session = session
+      )
+    }
+  })
+
   dwc_map <- mod_dwc_mapping_server(
     "dwc_map",
     df_in = ingest$tidy
@@ -28,16 +46,12 @@ server <- function(input, output, session) {
 
   dwca <- mod_build_dwca_server(
     "dwca",
-    df_in = tax_match$df_out,   # <- em vez de dwc_map$cleaned
+    df_in = tax_match$df_out,
     dwc_terms = dwc_terms
   )
 
-  # NOVO MÓDULO
   metadata <- mod_metadata_server("metadata")
 
-  # --- QC & Diagnostics ------------------------------------------------------
-  # Pré-issues: usa o que já tens no mapping. No teu módulo, o nome é `issues`.
-  # Se `dwc_map$issues` não existir ainda como reactive exportado, coloca NULL.
   # --- QC & Diagnostics ------------------------------------------------------
   shiny::observe({
     cat("\n--- DEBUG DWCA ---\n")
@@ -46,14 +60,25 @@ server <- function(input, output, session) {
     cat("dwca$occurrence is reactive:", shiny::is.reactive(dwca$occurrence), "\n")
     cat("dwca$emof is reactive:", shiny::is.reactive(dwca$emof), "\n")
 
-    # tentar “puxar” os dados (vai bloquear se ainda não houver result())
     ev <- try(dwca$event(), silent = TRUE)
     oc <- try(dwca$occurrence(), silent = TRUE)
     em <- try(dwca$emof(), silent = TRUE)
 
-    cat("event():", if (inherits(ev, "try-error")) "ERROR/req blocked" else paste(dim(ev), collapse = " x "), "\n")
-    cat("occurrence():", if (inherits(oc, "try-error")) "ERROR/req blocked" else paste(dim(oc), collapse = " x "), "\n")
-    cat("emof():", if (inherits(em, "try-error")) "ERROR/req blocked" else paste(dim(em), collapse = " x "), "\n")
+    cat(
+      "event():",
+      if (inherits(ev, "try-error")) "ERROR/req blocked" else paste(dim(ev), collapse = " x "),
+      "\n"
+    )
+    cat(
+      "occurrence():",
+      if (inherits(oc, "try-error")) "ERROR/req blocked" else paste(dim(oc), collapse = " x "),
+      "\n"
+    )
+    cat(
+      "emof():",
+      if (inherits(em, "try-error")) "ERROR/req blocked" else paste(dim(em), collapse = " x "),
+      "\n"
+    )
   })
 
   qc <- mod_qc_server(
@@ -64,5 +89,12 @@ server <- function(input, output, session) {
     pre_issues_in = dwc_map$issues %||% NULL
   )
 
-  invisible(list(ingest = ingest, dwc_map = dwc_map, dwca = dwca, qc = qc, tax_match = tax_match, metadata = metadata))
+  invisible(list(
+    ingest = ingest,
+    dwc_map = dwc_map,
+    dwca = dwca,
+    qc = qc,
+    tax_match = tax_match,
+    metadata = metadata
+  ))
 }
