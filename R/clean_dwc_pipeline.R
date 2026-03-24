@@ -10,6 +10,12 @@
 #' @param bathy_auto_download logical; if TRUE and bathy is NULL, tries to fetch bathymetry with marmap for the dataset extent
 #' @param bathy_depth_tolerance_m numeric; tolerance (meters) to compare reported depth with bathymetry
 #' @param swap_auto_fix logical; if TRUE, auto-swap coordinates in clear range-based cases
+#' @param preserve_original_coords logical; if TRUE, preserve original decimalLatitude/decimalLongitude
+#'   into verbatimLatitude/verbatimLongitude before any parsing/reprojection, when those
+#'   verbatim fields do not already exist
+#' @param create_geodetic_datum logical; if TRUE, create/fill geodeticDatum
+#' @param geodetic_datum_value character; value used to fill geodeticDatum when enabled
+#' @param standardize_event_date logical; if TRUE, try to normalize eventDate to ISO-8601
 #' @return list(data=cleaned_df, issues=issues_df, summary=summary_df)
 #' @export
 clean_dwc_pipeline <- function(df,
@@ -19,7 +25,11 @@ clean_dwc_pipeline <- function(df,
                                bathy = NULL,
                                bathy_auto_download = TRUE,
                                bathy_depth_tolerance_m = 200,
-                               swap_auto_fix = FALSE) {
+                               swap_auto_fix = FALSE,
+                               preserve_original_coords = FALSE,
+                               create_geodetic_datum = FALSE,
+                               geodetic_datum_value = "WGS84",
+                               standardize_event_date = TRUE) {
   if (is.null(df) || !is.data.frame(df)) {
     return(list(data = df, issues = data.frame(), summary = data.frame()))
   }
@@ -84,7 +94,7 @@ clean_dwc_pipeline <- function(df,
   # 2) Dates to ISO-8601 (eventDate)
   #    Política: tenta produzir YYYY-MM-DD / YYYY-MM / YYYY ou intervalos start/end
   # ------------------------------------------------------------
-  if ("eventDate" %in% names(out)) {
+  if (isTRUE(standardize_event_date) && "eventDate" %in% names(out)) {
     x <- as.character(out$eventDate)
     x0 <- x
 
@@ -145,6 +155,31 @@ clean_dwc_pipeline <- function(df,
     out$decimalLongitude <- NA_real_
     add_issue(NA_integer_, "decimalLongitude", "coord_missing_created",
               "INFO", "decimalLongitude não existia e foi criada.")
+  }
+
+  # 3.0) preservar coordenadas originais antes de qualquer transformação
+  if (isTRUE(preserve_original_coords)) {
+    if ("decimalLatitude" %in% names(out) && !("verbatimLatitude" %in% names(out))) {
+      out$verbatimLatitude <- as.character(out$decimalLatitude)
+      add_issue(
+        NA_integer_,
+        "verbatimLatitude",
+        "verbatim_created_from_decimalLatitude",
+        "INFO",
+        "verbatimLatitude criado a partir de decimalLatitude antes da transformação."
+      )
+    }
+
+    if ("decimalLongitude" %in% names(out) && !("verbatimLongitude" %in% names(out))) {
+      out$verbatimLongitude <- as.character(out$decimalLongitude)
+      add_issue(
+        NA_integer_,
+        "verbatimLongitude",
+        "verbatim_created_from_decimalLongitude",
+        "INFO",
+        "verbatimLongitude criado a partir de decimalLongitude antes da transformação."
+      )
+    }
   }
 
   has_vlat <- "verbatimLatitude" %in% names(out)
@@ -383,6 +418,32 @@ clean_dwc_pipeline <- function(df,
 
   out$decimalLatitude <- lat
   out$decimalLongitude <- lon
+
+  # 3.8) geodeticDatum
+  if (isTRUE(create_geodetic_datum)) {
+    if (!("geodeticDatum" %in% names(out))) {
+      out$geodeticDatum <- NA_character_
+      add_issue(
+        NA_integer_,
+        "geodeticDatum",
+        "geodeticDatum_created",
+        "INFO",
+        "geodeticDatum não existia e foi criado."
+      )
+    }
+
+    idx_fill <- is.na(out$geodeticDatum) | trimws(as.character(out$geodeticDatum)) == ""
+    if (any(idx_fill)) {
+      out$geodeticDatum[idx_fill] <- geodetic_datum_value
+      add_issue(
+        NA_integer_,
+        "geodeticDatum",
+        "geodeticDatum_filled",
+        "INFO",
+        paste0("geodeticDatum preenchido com '", geodetic_datum_value, "'.")
+      )
+    }
+  }
 
   # ------------------------------------------------------------
   # 4) Depth validation (minimumDepthInMeters/maximumDepthInMeters)

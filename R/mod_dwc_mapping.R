@@ -2,7 +2,7 @@
 
 #' Darwin Core mapping module UI
 #'
-#' Shiny module UI for mapping user columns to Darwin Core terms (Item 3).
+#' Shiny module UI for mapping user columns to Darwin Core terms.
 #'
 #' @param id Module id.
 #' @return A Shiny UI definition.
@@ -10,104 +10,448 @@
 mod_dwc_mapping_ui <- function(id) {
   ns <- shiny::NS(id)
 
-
-  # --- NEW: CSS to fix selectize dropdown clipping + stacking ---
-  shiny::tags$head(
+  shiny::tagList(
     shiny::tags$style(shiny::HTML("
-      /* selectize dropdown must appear above cards/tables/scroll areas */
-      .selectize-dropdown, .selectize-dropdown.form-control {
-        z-index: 3000 !important;
+      .dwc-map-page {
+        padding: 1rem 1.25rem 2rem 1.25rem;
+        min-width: 0;
       }
 
-      /* avoid clipping in common bootstrap/bslib containers */
-      .bslib-card, .card, .card-body {
+      .dwc-map-page h2 {
+        margin-bottom: 0.5rem;
+      }
+
+      .dwc-map-page .card {
+        border-radius: 0.9rem;
+      }
+
+      .dwc-map-page .card-header {
+        font-weight: 600;
+      }
+
+      .dwc-map-page .btn {
+        padding: 0.6rem 1rem;
+        font-size: 0.98rem;
+      }
+
+      .dwc-map-page .form-control,
+      .dwc-map-page .form-select,
+      .dwc-map-page .selectize-input {
+        font-size: 0.98rem;
+      }
+
+      .dwc-map-page .nav-tabs .nav-link {
+        font-size: 1rem;
+        padding: 0.85rem 1rem;
+      }
+
+      .dwc-map-page .alert {
+        margin-bottom: 0.75rem;
+      }
+
+      .dwc-map-sidebar .btn,
+      .dwc-map-sidebar .download-btn {
+        width: 100%;
+      }
+
+      .dwc-map-sidebar .card + .card {
+        margin-top: 1rem;
+      }
+
+      .dwc-map-section-gap {
+        height: 1rem;
+      }
+
+      .dwc-map-section-gap-sm {
+        height: 0.75rem;
+      }
+
+      .dwc-map-muted {
+        color: #6c757d;
+      }
+
+      .dwc-map-mapping-wrap {
+        max-height: 600px;
+        min-height: 420px;
+        overflow-y: auto;
+        overflow-x: hidden;
+        padding-right: 8px;
+      }
+
+      .dwc-map-grid {
+        display: grid;
+        grid-template-columns: minmax(220px, 1fr) minmax(360px, 2fr);
+        gap: 0;
+        width: 100%;
+        border: 1px solid #cbd5e1;
+        border-radius: 10px;
+        overflow: hidden;
+        background: #fff;
+      }
+
+      .dwc-map-grid-head {
+        padding: 10px 12px;
+        font-weight: 700;
+        background: #f8fafc;
+        border-bottom: 1px solid #cbd5e1;
+        position: sticky;
+        top: 0;
+        z-index: 2;
+      }
+
+      .dwc-map-grid-head-left {
+        border-right: 1px solid #cbd5e1;
+      }
+
+      .dwc-map-grid-cell-left {
+        padding: 12px;
+        font-weight: 600;
+        border-right: 1px solid #cbd5e1;
+        border-bottom: 1px solid #cbd5e1;
+        word-break: break-word;
+      }
+
+      .dwc-map-grid-cell-right {
+        padding: 12px;
+        border-bottom: 1px solid #cbd5e1;
+      }
+
+      .dwc-map-grid-inputrow {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+      }
+
+      .dwc-map-grid-inputcol {
+        flex: 1;
+        min-width: 0;
+        max-width: 680px;
+      }
+
+      .dwc-map-tip-trigger {
+        cursor: help;
+        opacity: 0.85;
+        flex: 0 0 auto;
+      }
+
+      .dwc-map-status p {
+        margin-bottom: 0.45rem;
+      }
+
+      .dwc-map-validation-card .card-body,
+      .dwc-map-tab-card .card-body {
         overflow: visible !important;
       }
-    "))
-  )
+    ")),
 
-  bslib::layout_sidebar(
-    sidebar = bslib::sidebar(
-      bslib::card(
-        bslib::card_header("Actions"),
-        shiny::actionButton(
-          ns("auto_suggest"),
-          "Auto-suggest",
-          icon = shiny::icon("magic")
+    bslib::layout_sidebar(
+      fillable = FALSE,
+
+      sidebar = bslib::sidebar(
+        width = "280px",
+        open = "desktop",
+        class = "dwc-map-sidebar",
+
+        bslib::card(
+          fill = FALSE,
+          bslib::card_header("Actions"),
+          shiny::actionButton(
+            ns("auto_suggest"),
+            "Auto-suggest",
+            icon = shiny::icon("magic"),
+            class = "btn-primary"
+          ),
+          shiny::div(class = "dwc-map-section-gap"),
+          shiny::downloadButton(
+            ns("download_issues_csv"),
+            "Download issues (CSV)",
+            class = "btn-outline-secondary download-btn"
+          )
         ),
-        shiny::br(), shiny::br(),
-        shiny::actionButton(
-          ns("apply_mapping"),
-          "Apply mapping",
-          icon = shiny::icon("check")
+
+        bslib::card(
+          fill = FALSE,
+          bslib::card_header("Workflow status"),
+          shiny::div(
+            class = "dwc-map-status",
+            shiny::uiOutput(ns("workflow_status"))
+          )
+        )
+      ),
+
+      shiny::div(
+        class = "dwc-map-page",
+
+        shiny::div(
+          class = "mb-4",
+          shiny::h2("Field mapping to Darwin Core"),
+          shiny::p(
+            class = "dwc-map-muted",
+            "Configure formatting options, map columns to Darwin Core terms, ",
+            "create derived fields, and review the final cleaned dataset."
+          ),
+          shiny::tags$p(
+            shiny::tags$a(
+              href = "https://dwc.tdwg.org/terms/",
+              target = "_blank",
+              "Darwin Core Quick Reference Guide"
+            )
+          )
         ),
-        shiny::br(), shiny::br(),
-        shiny::uiOutput(ns("apply_notice"))
-      ),
 
-      bslib::card(
-        bslib::card_header("Validation"),
-        shiny::verbatimTextOutput(ns("validation"))
-      ),
-
-      bslib::card(
-        bslib::card_header("Coordinate system"),
-        shiny::p(
-          "Informe o CRS (EPSG) do ficheiro de entrada.",
-          "O sistema alvo será sempre EPSG:[4326] (WGS84 lon/lat)."
+        bslib::card(
+          fill = FALSE,
+          class = "mb-4 dwc-map-validation-card",
+          bslib::card_header("Validation"),
+          shiny::uiOutput(ns("validation_ui"))
         ),
-        shiny::numericInput(
-          ns("coord_epsg_in"),
-          label = "Input CRS EPSG:[ ]",
-          value = 4326,
-          min = 1
-        ),
-        shiny::checkboxInput(
-          ns("coord_cols_are_messy"),
-          label = "Forçar parsing (parzer) mesmo se parecer numérico",
-          value = TRUE
-        ),
-        shiny::tags$hr(),
-        shiny::tags$b("Target CRS EPSG:[4326]"),
-        shiny::p("As coordenadas serão guardadas em decimal degrees.")
-      ),
 
-      bslib::card(
-        bslib::card_header("Data cleaning"),
-        shiny::verbatimTextOutput(ns("cleaning_summary")),
-        shiny::downloadButton(ns("download_issues_csv"), "Download issues (CSV)")
-      )
-    ),
+        bslib::card(
+          fill = FALSE,
+          class = "dwc-map-tab-card",
 
-    bslib::navset_card_tab(
-      id = ns("main_tabs"),
-      title = "Field mapping to Darwin Core",
+          bslib::navset_tab(
+            id = ns("main_tabs"),
 
-      bslib::nav_panel(
-        "Mapping",
-        value = "mapping",
-        shiny::h4("Map each column to a Darwin Core term"),
-        shiny::uiOutput(ns("mapping_ui"))
-      ),
+            bslib::nav_panel(
+              "Formatting",
+              value = "formatting",
 
-      bslib::nav_panel(
-        "Preview (mapped)",
-        value = "preview_mapped",
-        shiny::p("Preview após aplicar o mapping (primeiras linhas)."),
-        DT::DTOutput(ns("preview_mapped_tbl"))
-      ),
+              shiny::div(
+                class = "p-3",
 
-      bslib::nav_panel(
-        "Preview (cleaned)",
-        value = "preview_cleaned",
-        shiny::p("Preview após cleaning (primeiras linhas)."),
-        DT::DTOutput(ns("preview_cleaned_tbl"))
-      ),
+                bslib::layout_columns(
+                  col_widths = c(6, 6),
 
-      bslib::nav_panel(
-        "Cleaning issues",
-        value = "issues",
-        DT::DTOutput(ns("issues_tbl"))
+                  bslib::card(
+                    fill = FALSE,
+                    bslib::card_header("Coordinate system"),
+                    shiny::p(
+                      "Set the input CRS (EPSG). The target CRS will always be EPSG:[4326] (WGS84 lon/lat)."
+                    ),
+                    shiny::numericInput(
+                      ns("coord_epsg_in"),
+                      label = "Input CRS EPSG:[ ]",
+                      value = 4326,
+                      min = 1,
+                      width = "100%"
+                    ),
+                    shiny::checkboxInput(
+                      ns("coord_cols_are_messy"),
+                      label = "Force parsing (parzer) even if coordinates look numeric",
+                      value = TRUE
+                    ),
+                    shiny::checkboxInput(
+                      ns("preserve_original_coords"),
+                      label = "Preserve original coordinates in verbatimLatitude / verbatimLongitude",
+                      value = TRUE
+                    ),
+                    shiny::checkboxInput(
+                      ns("create_geodetic_datum"),
+                      label = "Create/fill geodeticDatum",
+                      value = TRUE
+                    ),
+                    shiny::textInput(
+                      ns("geodetic_datum_value"),
+                      label = "geodeticDatum value",
+                      value = "WGS84",
+                      width = "100%"
+                    ),
+                    shiny::tags$hr(),
+                    shiny::tags$b("Target CRS EPSG:[4326]"),
+                    shiny::p("Coordinates will be stored in decimal degrees.")
+                  ),
+
+                  bslib::card(
+                    fill = FALSE,
+                    bslib::card_header("Date formatting"),
+                    shiny::checkboxInput(
+                      ns("standardize_event_date"),
+                      label = "Standardize eventDate to ISO-8601",
+                      value = TRUE
+                    ),
+                    shiny::p(
+                      class = "text-muted",
+                      "eventDate will be normalized during the cleaning step."
+                    )
+                  )
+                ),
+
+                shiny::div(class = "dwc-map-section-gap"),
+
+                shiny::actionButton(
+                  ns("formatting_done"),
+                  "Continue to Mapping",
+                  icon = shiny::icon("arrow-right"),
+                  class = "btn-primary"
+                )
+              )
+            ),
+
+            bslib::nav_panel(
+              "Mapping",
+              value = "mapping",
+
+              shiny::div(
+                class = "p-3",
+                shiny::h4("Map each column to a Darwin Core term"),
+                shiny::uiOutput(ns("mapping_ui")),
+                shiny::div(class = "dwc-map-section-gap"),
+                shiny::actionButton(
+                  ns("apply_mapping"),
+                  "Apply mapping",
+                  icon = shiny::icon("check"),
+                  class = "btn-primary"
+                ),
+                shiny::div(class = "dwc-map-section-gap"),
+                shiny::uiOutput(ns("apply_notice"))
+              )
+            ),
+
+            bslib::nav_panel(
+              "Create fields",
+              value = "create_fields",
+
+              shiny::div(
+                class = "p-3",
+
+                bslib::layout_columns(
+                  col_widths = c(6, 6),
+
+                  bslib::card(
+                    fill = FALSE,
+                    bslib::card_header("Create IDs"),
+                    shiny::selectInput(
+                      ns("id_target"),
+                      "Target field",
+                      choices = c("eventID", "parentEventID", "occurrenceID"),
+                      selected = "eventID",
+                      width = "100%"
+                    ),
+                    shiny::selectizeInput(
+                      ns("id_source_cols"),
+                      "Source columns",
+                      choices = NULL,
+                      selected = NULL,
+                      multiple = TRUE,
+                      width = "100%",
+                      options = list(plugins = list("remove_button"))
+                    ),
+                    shiny::textInput(
+                      ns("id_sep"),
+                      "Separator",
+                      value = ":",
+                      width = "100%"
+                    ),
+                    shiny::checkboxInput(
+                      ns("id_overwrite"),
+                      "Overwrite target if it already exists",
+                      value = FALSE
+                    ),
+                    shiny::actionButton(
+                      ns("create_id_btn"),
+                      "Create / update ID field",
+                      icon = shiny::icon("plus")
+                    )
+                  ),
+
+                  bslib::card(
+                    fill = FALSE,
+                    bslib::card_header("Create remarks"),
+                    shiny::selectInput(
+                      ns("remarks_target"),
+                      "Remarks field",
+                      choices = c(
+                        "eventRemarks",
+                        "occurrenceRemarks",
+                        "organismRemarks",
+                        "materialEntityRemarks",
+                        "locationRemarks",
+                        "georeferenceRemarks",
+                        "identificationRemarks",
+                        "taxonRemarks",
+                        "measurementRemarks",
+                        "relationshipRemarks"
+                      ),
+                      selected = "occurrenceRemarks",
+                      width = "100%"
+                    ),
+                    shiny::selectizeInput(
+                      ns("remarks_source_cols"),
+                      "Source columns",
+                      choices = NULL,
+                      selected = NULL,
+                      multiple = TRUE,
+                      width = "100%",
+                      options = list(plugins = list("remove_button"))
+                    ),
+                    shiny::textInput(
+                      ns("remarks_sep"),
+                      "Separator",
+                      value = " | ",
+                      width = "100%"
+                    ),
+                    shiny::checkboxInput(
+                      ns("remarks_overwrite"),
+                      "Overwrite target if it already exists",
+                      value = FALSE
+                    ),
+                    shiny::actionButton(
+                      ns("create_remarks_btn"),
+                      "Create / update remarks field",
+                      icon = shiny::icon("plus")
+                    )
+                  )
+                ),
+
+                shiny::div(class = "dwc-map-section-gap"),
+
+                bslib::card(
+                  fill = FALSE,
+                  bslib::card_header("Companion fields"),
+                  shiny::uiOutput(ns("dependency_ui"))
+                ),
+
+                shiny::div(class = "dwc-map-section-gap"),
+
+                shiny::actionButton(
+                  ns("apply_create_fields"),
+                  "Apply created fields",
+                  icon = shiny::icon("check"),
+                  class = "btn-primary"
+                ),
+                shiny::div(class = "dwc-map-section-gap-sm"),
+                shiny::actionButton(
+                  ns("complete_mapping"),
+                  "Complete field mapping",
+                  icon = shiny::icon("lock-open"),
+                  class = "btn-success"
+                )
+              )
+            ),
+
+            bslib::nav_panel(
+              "Preview",
+              value = "preview",
+
+              shiny::div(
+                class = "p-3",
+                shiny::p("Preview of the cleaned dataset after formatting, mapping, and create-fields."),
+                DT::DTOutput(ns("preview_tbl"))
+              )
+            ),
+
+            bslib::nav_panel(
+              "Issues",
+              value = "issues",
+
+              shiny::div(
+                class = "p-3",
+                DT::DTOutput(ns("issues_tbl"))
+              )
+            )
+          )
+        )
       )
     )
   )
@@ -136,14 +480,43 @@ mod_dwc_mapping_ui <- function(id) {
   c("", terms)
 }
 
-.dwc_required_terms <- function() {
-  c(
-    "scientificName",
-    "eventDate",
-    "decimalLatitude",
-    "decimalLongitude",
-    "basisOfRecord",
-    "occurrenceID"
+# termos mínimos para desbloquear os módulos seguintes
+.dwc_gate_terms <- function() {
+  c("eventDate", "occurrenceID", "basisOfRecord", "scientificName")
+}
+
+# termos mostrados na validação, além do gate
+.dwc_validation_extra_terms <- function() {
+  c("eventID")
+}
+
+# termos "fortemente recomendados" definidos localmente na app
+.dwc_strongly_recommended_terms <- function() {
+  c("decimalLatitude", "decimalLongitude", "geodeticDatum")
+}
+
+# dependências genéricas entre termos
+# um termo "trigger_term" implica ou recomenda fortemente "required_term"
+# suggested_value é apenas sugestão opcional para criação rápida
+.dwc_term_dependencies <- function() {
+  data.frame(
+    trigger_term = c(
+      "sampleSizeValue",
+      "organismQuantity"
+    ),
+    required_term = c(
+      "sampleSizeUnit",
+      "organismQuantityType"
+    ),
+    relation = c(
+      "required_with",
+      "required_with"
+    ),
+    suggested_value = c(
+      "square meters",
+      "individuals"
+    ),
+    stringsAsFactors = FALSE
   )
 }
 
@@ -214,42 +587,6 @@ mod_dwc_mapping_ui <- function(id) {
   if (d[i] <= 0.22) terms2[i] else ""
 }
 
-.validate_mapping_basic <- function(map_df) {
-  req <- .dwc_required_terms()
-  mapped <- map_df$dwc_term
-
-  missing_req <- setdiff(req, mapped)
-
-  dup <- mapped[mapped != ""]
-  dup <- dup[duplicated(dup)]
-  dup <- unique(dup)
-
-  msgs <- character(0)
-
-  if (length(missing_req) > 0) {
-    msgs <- c(
-      msgs,
-      paste0(
-        "Missing required/strongly recommended terms: ",
-        paste(missing_req, collapse = ", ")
-      )
-    )
-  }
-
-  if (length(dup) > 0) {
-    msgs <- c(
-      msgs,
-      paste0(
-        "Duplicate mappings not allowed: ",
-        paste(dup, collapse = ", ")
-      )
-    )
-  }
-
-  if (length(msgs) == 0) msgs <- "OK: mapping passes basic validation."
-  msgs
-}
-
 .mapping_equal <- function(a, b) {
   if (is.null(a) || is.null(b)) return(FALSE)
   if (!all(c("user_column", "dwc_term") %in% names(a))) return(FALSE)
@@ -300,23 +637,189 @@ mod_dwc_mapping_ui <- function(id) {
   )
 }
 
+.validation_state <- function(map_df, final_df = NULL) {
+  gate_terms <- .dwc_gate_terms()
+  extra_terms <- .dwc_validation_extra_terms()
+  strong_terms <- .dwc_strongly_recommended_terms()
+
+  mapped <- map_df$dwc_term %||% character(0)
+  mapped <- mapped[!is.na(mapped) & mapped != ""]
+
+  missing_gate <- setdiff(gate_terms, mapped)
+  missing_extra <- setdiff(extra_terms, mapped)
+  missing_strong <- setdiff(strong_terms, mapped)
+
+  dup <- mapped[duplicated(mapped)]
+  dup <- unique(dup)
+
+  dep_msgs <- character(0)
+  if (!is.null(final_df) && is.data.frame(final_df)) {
+    deps <- .detect_missing_dependencies(final_df)
+    if (nrow(deps) > 0) {
+      dep_msgs <- paste0(
+        deps$trigger_term, " is present but ", deps$required_term, " is missing."
+      )
+    }
+  }
+
+  list(
+    missing_gate = missing_gate,
+    missing_extra = missing_extra,
+    missing_strong = missing_strong,
+    duplicate_terms = dup,
+    dependency_messages = dep_msgs
+  )
+}
+
+.validation_ui_block <- function(v) {
+  make_alert <- function(type, title, items = NULL, text = NULL) {
+    shiny::tags$div(
+      class = paste("alert", paste0("alert-", type), "mb-2"),
+      style = "padding: 0.75rem 1rem;",
+      shiny::tags$b(title),
+      if (!is.null(text)) shiny::tags$div(text),
+      if (!is.null(items) && length(items) > 0) {
+        shiny::tags$ul(
+          style = "margin-top: 0.35rem; margin-bottom: 0;",
+          lapply(items, shiny::tags$li)
+        )
+      }
+    )
+  }
+
+  tag_list <- list()
+
+  if (length(v$missing_gate) > 0) {
+    tag_list <- c(tag_list, list(
+      make_alert(
+        "danger",
+        "Missing minimum terms required to unlock next modules:",
+        v$missing_gate
+      )
+    ))
+  } else {
+    tag_list <- c(tag_list, list(
+      make_alert("success", "Minimum required terms are present.")
+    ))
+  }
+
+  if (length(v$missing_extra) > 0) {
+    tag_list <- c(tag_list, list(
+      make_alert(
+        "warning",
+        "Additional validation term(s) missing:",
+        v$missing_extra
+      )
+    ))
+  }
+
+  if (length(v$missing_strong) > 0) {
+    tag_list <- c(tag_list, list(
+      make_alert(
+        "warning",
+        "Strongly recommended term(s) missing:",
+        v$missing_strong
+      )
+    ))
+  }
+
+  if (length(v$duplicate_terms) > 0) {
+    tag_list <- c(tag_list, list(
+      make_alert(
+        "danger",
+        "Duplicate mappings are not allowed:",
+        v$duplicate_terms
+      )
+    ))
+  }
+
+  if (length(v$dependency_messages) > 0) {
+    tag_list <- c(tag_list, list(
+      make_alert(
+        "warning",
+        "Companion field warnings:",
+        v$dependency_messages
+      )
+    ))
+  }
+
+  if (length(tag_list) == 0) {
+    return(make_alert("light", "No validation messages."))
+  }
+
+  shiny::tagList(tag_list)
+}
+
+.detect_missing_dependencies <- function(df) {
+  deps <- .dwc_term_dependencies()
+  if (is.null(df) || !is.data.frame(df) || nrow(deps) == 0) {
+    return(deps[0, , drop = FALSE])
+  }
+
+  nms <- names(df)
+
+  keep <- vapply(
+    seq_len(nrow(deps)),
+    function(i) {
+      deps$trigger_term[i] %in% nms && !(deps$required_term[i] %in% nms)
+    },
+    logical(1)
+  )
+
+  deps[keep, , drop = FALSE]
+}
+
+.build_companion_choice_label <- function(trigger_term, required_term) {
+  paste0(trigger_term, " -> ", required_term)
+}
+
+.add_constant_if_missing <- function(df, field, value, overwrite = FALSE) {
+  if (field %in% names(df) && !isTRUE(overwrite)) {
+    return(df)
+  }
+  df[[field]] <- value
+  df
+}
+
+.build_concat_field <- function(df, target, source_cols, sep = ":", overwrite = FALSE) {
+  if (length(source_cols) == 0) return(df)
+  if (target %in% names(df) && !isTRUE(overwrite)) return(df)
+
+  vals <- lapply(source_cols, function(nm) as.character(df[[nm]]))
+  mat <- as.data.frame(vals, stringsAsFactors = FALSE)
+
+  out_val <- apply(mat, 1, function(row) {
+    row <- trimws(as.character(row))
+    row <- row[!is.na(row) & row != ""]
+    if (length(row) == 0) return(NA_character_)
+    paste(row, collapse = sep)
+  })
+
+  df[[target]] <- out_val
+  df
+}
+
 #' Darwin Core mapping module server
 #'
 #' @param id Module id.
-#' @param df_in Reactive returning a data.frame (use ingest$tidy).
-#' @return A list of reactives: mapping, mapped, cleaned, issues, clean_summary, validation.
+#' @param df_in Reactive returning a data.frame.
+#' @return A list of reactives: mapping, mapped, cleaned, issues,
+#'   clean_summary, validation, ready.
 #' @export
 mod_dwc_mapping_server <- function(id, df_in) {
   shiny::moduleServer(id, function(input, output, session) {
 
     rv <- shiny::reactiveValues(
+      formatting_done = FALSE,
       mapping = NULL,
       mapped = NULL,
+      created = NULL,
       cleaned = NULL,
       issues = NULL,
       clean_summary = NULL,
       corella_checks = NULL,
-      corella_suggest = NULL
+      corella_suggest = NULL,
+      ready = FALSE
     )
 
     if (!requireNamespace("bslib", quietly = TRUE)) {
@@ -335,7 +838,6 @@ mod_dwc_mapping_server <- function(id, df_in) {
       stats::setNames(cols, keys)
     })
 
-    # --- mapping table from inputs (OK to depend on input; do NOT use this inside mapping_ui) ---
     mapping_tbl <- shiny::reactive({
       df <- df_in()
       shiny::req(df)
@@ -361,7 +863,124 @@ mod_dwc_mapping_server <- function(id, df_in) {
       map
     })
 
-    # --- tooltip outputs per row: updates when the corresponding select changes ---
+    current_preclean_df <- shiny::reactive({
+      if (!is.null(rv$created)) return(rv$created)
+      if (!is.null(rv$mapped)) return(rv$mapped)
+      NULL
+    })
+
+    current_validation <- shiny::reactive({
+      .validation_state(mapping_tbl(), current_preclean_df())
+    })
+
+    run_clean_pipeline <- function(df_to_clean) {
+      if (!exists("clean_dwc_pipeline", mode = "function")) {
+        rv$cleaned <- df_to_clean
+        rv$issues <- data.frame()
+        rv$clean_summary <- data.frame()
+        return(invisible(NULL))
+      }
+
+      epsg_in <- input$coord_epsg_in %||% 4326
+      force_parse <- isTRUE(input$coord_cols_are_messy)
+      preserve_original_coords_flag = isTRUE(input$preserve_original_coords)
+      create_geodetic_datum_flag = isTRUE(input$create_geodetic_datum)
+      geodetic_datum_value_flag = input$geodetic_datum_value %||% "WGS84"
+      standardize_event_date_flag = isTRUE(input$standardize_event_date)
+
+      clean_res <- tryCatch(
+        clean_dwc_pipeline(
+          df_to_clean,
+          coord_epsg_in = epsg_in,
+          target_epsg = 4326,
+          force_parzer = force_parse,
+          preserve_original_coords = preserve_original_coords_flag,
+          create_geodetic_datum = create_geodetic_datum_flag,
+          geodetic_datum_value = geodetic_datum_value_flag,
+          standardize_event_date = standardize_event_date_flag
+        ),
+        error = function(e) e
+      )
+
+      if (inherits(clean_res, "error")) {
+        rv$cleaned <- df_to_clean
+        rv$issues <- data.frame(
+          row = NA_integer_,
+          field = "pipeline",
+          rule = "clean_dwc_pipeline_error",
+          severity = "ERROR",
+          message = clean_res$message,
+          stringsAsFactors = FALSE
+        )
+        rv$clean_summary <- data.frame(
+          severity = "ERROR",
+          n = 1L,
+          stringsAsFactors = FALSE
+        )
+      } else {
+        rv$cleaned <- clean_res$data
+        rv$issues <- clean_res$issues
+        rv$clean_summary <- clean_res$summary
+      }
+    }
+
+    shiny::observeEvent(df_in(), {
+      rv$formatting_done <- FALSE
+      rv$mapping <- NULL
+      rv$mapped <- NULL
+      rv$created <- NULL
+      rv$cleaned <- NULL
+      rv$issues <- NULL
+      rv$clean_summary <- NULL
+      rv$corella_checks <- NULL
+      rv$corella_suggest <- NULL
+      rv$ready <- FALSE
+    }, ignoreInit = FALSE)
+
+    shiny::observeEvent(df_in(), {
+      df <- df_in()
+      shiny::req(df)
+
+      cols <- names(df)
+
+      shiny::updateSelectizeInput(
+        session,
+        "id_source_cols",
+        choices = cols,
+        selected = character(0),
+        server = TRUE
+      )
+
+      shiny::updateSelectizeInput(
+        session,
+        "remarks_source_cols",
+        choices = cols,
+        selected = character(0),
+        server = TRUE
+      )
+    }, ignoreInit = FALSE)
+
+    shiny::observeEvent(current_preclean_df(), {
+      df <- current_preclean_df()
+      if (is.null(df)) return()
+
+      cols <- names(df)
+
+      shiny::updateSelectizeInput(
+        session,
+        "id_source_cols",
+        choices = cols,
+        server = TRUE
+      )
+
+      shiny::updateSelectizeInput(
+        session,
+        "remarks_source_cols",
+        choices = cols,
+        server = TRUE
+      )
+    }, ignoreInit = TRUE)
+
     shiny::observeEvent(df_in(), {
       df <- df_in()
       shiny::req(df)
@@ -380,8 +999,11 @@ mod_dwc_mapping_server <- function(id, df_in) {
 
             meta_row <- term_meta[term_meta$term == term, , drop = FALSE]
             html <- if (nrow(meta_row) == 0) {
-              if (term == "") "Select a term to see definition and examples."
-              else "No metadata found for this term in corella."
+              if (term == "") {
+                "Select a term to see definition and examples."
+              } else {
+                "No metadata found for this term in corella."
+              }
             } else {
               .term_tooltip_html(term, meta_row[1, ])
             }
@@ -391,6 +1013,31 @@ mod_dwc_mapping_server <- function(id, df_in) {
         })
       }
     }, ignoreInit = FALSE)
+
+    output$workflow_status <- shiny::renderUI({
+      shiny::tagList(
+        shiny::tags$p(
+          shiny::tags$b("Formatting completed: "),
+          if (isTRUE(rv$formatting_done)) "Yes" else "No"
+        ),
+        shiny::tags$p(
+          shiny::tags$b("Mapping applied: "),
+          if (!is.null(rv$mapped)) "Yes" else "No"
+        ),
+        shiny::tags$p(
+          shiny::tags$b("Create fields applied: "),
+          if (!is.null(rv$created)) "Yes" else "No"
+        ),
+        shiny::tags$p(
+          shiny::tags$b("Field mapping complete: "),
+          if (isTRUE(rv$ready)) "Yes" else "No"
+        )
+      )
+    })
+
+    output$validation_ui <- shiny::renderUI({
+      .validation_ui_block(current_validation())
+    })
 
     output$apply_notice <- shiny::renderUI({
       df <- df_in()
@@ -419,7 +1066,6 @@ mod_dwc_mapping_server <- function(id, df_in) {
       }
     })
 
-    # --- UI is built ONLY from df_in() + rv$mapping (NOT from input$map__*) ---
     output$mapping_ui <- shiny::renderUI({
       df <- df_in()
       shiny::req(df)
@@ -427,43 +1073,17 @@ mod_dwc_mapping_server <- function(id, df_in) {
       key_map <- col_key_map()
       keys <- names(key_map)
 
-      border_col <- "#cbd5e1"
-
       shiny::tags$div(
-        # --- CHANGED: remove internal scroll to avoid "scroll inside scroll"
-        style = "padding-right: 8px;",
+        class = "dwc-map-mapping-wrap",
         shiny::tags$div(
-          style = paste0(
-            "display:grid;",
-            "grid-template-columns: 1fr 2fr;",
-            "gap: 0;",
-            "width: 100%;",
-            "border: 1px solid ", border_col, ";",
-            "border-radius: 10px;",
-            # mantém para arredondar, mas dropdown vai para o body (não fica recortado)
-            "overflow: hidden;",
-            "background: #fff;"
-          ),
+          class = "dwc-map-grid",
 
           shiny::tags$div(
-            style = paste0(
-              "padding: 10px 12px;",
-              "font-weight: 700;",
-              "border-right: 1px solid ", border_col, ";",
-              "border-bottom: 1px solid ", border_col, ";",
-              "background: #f8fafc;",
-              "position: sticky; top: 0; z-index: 2;"
-            ),
+            class = "dwc-map-grid-head dwc-map-grid-head-left",
             "Original"
           ),
           shiny::tags$div(
-            style = paste0(
-              "padding: 10px 12px;",
-              "font-weight: 700;",
-              "border-bottom: 1px solid ", border_col, ";",
-              "background: #f8fafc;",
-              "position: sticky; top: 0; z-index: 2;"
-            ),
+            class = "dwc-map-grid-head",
             "DwC"
           ),
 
@@ -472,45 +1092,37 @@ mod_dwc_mapping_server <- function(id, df_in) {
 
             init_term <- ""
             if (!is.null(rv$mapping) &&
-              is.data.frame(rv$mapping) &&
-              all(c("user_column", "dwc_term") %in% names(rv$mapping))) {
+                is.data.frame(rv$mapping) &&
+                all(c("user_column", "dwc_term") %in% names(rv$mapping))) {
               i <- match(col, rv$mapping$user_column)
               if (!is.na(i)) init_term <- rv$mapping$dwc_term[i] %||% ""
             }
 
             tip_trigger <- shiny::tags$span(
               shiny::icon("info-circle"),
-              style = "cursor: help; opacity: 0.85; margin-left: 10px;"
+              class = "dwc-map-tip-trigger"
             )
 
             shiny::tagList(
               shiny::tags$div(
-                style = paste0(
-                  "padding: 12px;",
-                  "font-weight: 600;",
-                  "border-right: 1px solid ", border_col, ";",
-                  "border-bottom: 1px solid ", border_col, ";"
-                ),
+                class = "dwc-map-grid-cell-left",
                 col
               ),
 
               shiny::tags$div(
-                style = paste0(
-                  "padding: 12px;",
-                  "border-bottom: 1px solid ", border_col, ";"
-                ),
+                class = "dwc-map-grid-cell-right",
                 shiny::tags$div(
-                  style = "display:flex; align-items:center;",
+                  class = "dwc-map-grid-inputrow",
                   shiny::tags$div(
-                    style = "flex:1; max-width: 680px;",
+                    class = "dwc-map-grid-inputcol",
                     shiny::selectizeInput(
                       inputId = session$ns(paste0("map__", k)),
                       label = NULL,
                       choices = dwc_terms,
                       selected = init_term,
+                      width = "100%",
                       options = list(
-                        placeholder = "Select a Darwin Core term (or leave blank)",
-                        dropdownParent = "body"
+                        placeholder = "Select a Darwin Core term (or leave blank)"
                       )
                     )
                   ),
@@ -526,6 +1138,89 @@ mod_dwc_mapping_server <- function(id, df_in) {
         )
       )
     })
+
+    output$dependency_ui <- shiny::renderUI({
+      df <- current_preclean_df()
+
+      if (is.null(df)) {
+        return(
+          shiny::tags$div(
+            class = "alert alert-light",
+            "Apply mapping first to detect companion fields."
+          )
+        )
+      }
+
+      deps <- .detect_missing_dependencies(df)
+
+      if (nrow(deps) == 0) {
+        return(
+          shiny::tags$div(
+            class = "alert alert-light",
+            "No companion fields are currently suggested."
+          )
+        )
+      }
+
+      choice_values <- paste0(deps$trigger_term, "||", deps$required_term)
+      choice_labels <- mapply(
+        .build_companion_choice_label,
+        deps$trigger_term,
+        deps$required_term,
+        USE.NAMES = FALSE
+      )
+
+      default_suggestion <- deps$suggested_value[1] %||% ""
+
+      shiny::tagList(
+        shiny::p(
+          "Some mapped or created terms imply the presence of a companion field. ",
+          "Select one dependency below and create the missing field with a constant value."
+        ),
+        shiny::selectInput(
+          session$ns("dependency_choice"),
+          "Dependency",
+          choices = stats::setNames(choice_values, choice_labels),
+          selected = choice_values[1]
+        ),
+        shiny::textInput(
+          session$ns("dependency_value"),
+          "Value to fill the missing companion field",
+          value = default_suggestion
+        ),
+        shiny::actionButton(
+          session$ns("create_dependency_btn"),
+          "Create companion field",
+          icon = shiny::icon("plus")
+        )
+      )
+    })
+
+    shiny::observeEvent(input$dependency_choice, {
+      df <- current_preclean_df()
+      if (is.null(df)) return()
+
+      deps <- .detect_missing_dependencies(df)
+      if (nrow(deps) == 0) return()
+
+      key <- input$dependency_choice %||% ""
+      parts <- strsplit(key, "\\|\\|")[[1]]
+
+      if (length(parts) != 2) return()
+
+      i <- which(
+        deps$trigger_term == parts[1] &
+          deps$required_term == parts[2]
+      )
+
+      if (length(i) == 1) {
+        shiny::updateTextInput(
+          session,
+          "dependency_value",
+          value = deps$suggested_value[i] %||% ""
+        )
+      }
+    }, ignoreInit = TRUE)
 
     shiny::observeEvent(input$auto_suggest, {
       df <- df_in()
@@ -546,6 +1241,15 @@ mod_dwc_mapping_server <- function(id, df_in) {
       }
     })
 
+    shiny::observeEvent(input$formatting_done, {
+      rv$formatting_done <- TRUE
+      bslib::nav_select(
+        id = "main_tabs",
+        selected = "mapping",
+        session = session
+      )
+    })
+
     shiny::observeEvent(input$apply_mapping, {
       df <- df_in()
       shiny::req(df)
@@ -553,46 +1257,10 @@ mod_dwc_mapping_server <- function(id, df_in) {
       map_df <- mapping_tbl()
       rv$mapping <- map_df
       rv$mapped <- .apply_mapping(df, map_df)
+      rv$created <- NULL
+      rv$ready <- FALSE
 
-      if (!exists("clean_dwc_pipeline", mode = "function")) {
-        rv$cleaned <- rv$mapped
-        rv$issues <- data.frame()
-        rv$clean_summary <- data.frame()
-      } else {
-        epsg_in <- input$coord_epsg_in %||% 4326
-        force_parse <- isTRUE(input$coord_cols_are_messy)
-
-        clean_res <- tryCatch(
-          clean_dwc_pipeline(
-            rv$mapped,
-            coord_epsg_in = epsg_in,
-            target_epsg = 4326,
-            force_parzer = force_parse
-          ),
-          error = function(e) e
-        )
-
-        if (inherits(clean_res, "error")) {
-          rv$cleaned <- rv$mapped
-          rv$issues <- data.frame(
-            row = NA_integer_,
-            field = "pipeline",
-            rule = "clean_dwc_pipeline_error",
-            severity = "ERROR",
-            message = clean_res$message,
-            stringsAsFactors = FALSE
-          )
-          rv$clean_summary <- data.frame(
-            severity = "ERROR",
-            n = 1L,
-            stringsAsFactors = FALSE
-          )
-        } else {
-          rv$cleaned <- clean_res$data
-          rv$issues <- clean_res$issues
-          rv$clean_summary <- clean_res$summary
-        }
-      }
+      run_clean_pipeline(rv$mapped)
 
       if (requireNamespace("corella", quietly = TRUE)) {
         rv$corella_checks <- tryCatch(
@@ -605,65 +1273,129 @@ mod_dwc_mapping_server <- function(id, df_in) {
           error = function(e) e
         )
       }
-      shiny::isolate(cat("tab atual (antes):", input$main_tabs, "\n"))
 
-      session$onFlushed(function() {
-        bslib::nav_select(
-          id = "main_tabs",
-          selected = "preview_cleaned",
-          session = session
+      bslib::nav_select(
+        id = "main_tabs",
+        selected = "create_fields",
+        session = session
+      )
+    })
+
+    shiny::observeEvent(input$create_id_btn, {
+      df <- current_preclean_df()
+      shiny::req(df)
+      shiny::req(input$id_target)
+      shiny::req(input$id_source_cols)
+
+      rv$created <- .build_concat_field(
+        df = df,
+        target = input$id_target,
+        source_cols = input$id_source_cols,
+        sep = input$id_sep %||% ":",
+        overwrite = isTRUE(input$id_overwrite)
+      )
+      rv$ready <- FALSE
+    })
+
+    shiny::observeEvent(input$create_remarks_btn, {
+      df <- current_preclean_df()
+      shiny::req(df)
+      shiny::req(input$remarks_target)
+      shiny::req(input$remarks_source_cols)
+
+      rv$created <- .build_concat_field(
+        df = df,
+        target = input$remarks_target,
+        source_cols = input$remarks_source_cols,
+        sep = input$remarks_sep %||% " | ",
+        overwrite = isTRUE(input$remarks_overwrite)
+      )
+      rv$ready <- FALSE
+    })
+
+    shiny::observeEvent(input$create_dependency_btn, {
+      df <- current_preclean_df()
+      shiny::req(df)
+
+      deps <- .detect_missing_dependencies(df)
+      shiny::req(nrow(deps) > 0)
+
+      key <- input$dependency_choice %||% ""
+      parts <- strsplit(key, "\\|\\|")[[1]]
+
+      shiny::req(length(parts) == 2)
+
+      dep_row <- deps[
+        deps$trigger_term == parts[1] &
+          deps$required_term == parts[2],
+        ,
+        drop = FALSE
+      ]
+
+      shiny::req(nrow(dep_row) == 1)
+
+      rv$created <- .add_constant_if_missing(
+        df = df,
+        field = dep_row$required_term[1],
+        value = input$dependency_value %||% dep_row$suggested_value[1] %||% "",
+        overwrite = FALSE
+      )
+      rv$ready <- FALSE
+    })
+
+    shiny::observeEvent(input$apply_create_fields, {
+      df_final <- current_preclean_df()
+      shiny::req(df_final)
+
+      run_clean_pipeline(df_final)
+      rv$ready <- FALSE
+
+      bslib::nav_select(
+        id = "main_tabs",
+        selected = "preview",
+        session = session
+      )
+    })
+
+    shiny::observeEvent(input$complete_mapping, {
+      shiny::req(rv$formatting_done)
+      shiny::req(!is.null(rv$mapped))
+
+      missing_gate <- current_validation()$missing_gate
+
+      if (length(missing_gate) > 0) {
+        shiny::showModal(
+          shiny::modalDialog(
+            title = "Cannot complete field mapping yet",
+            shiny::p("The following minimum terms are still missing:"),
+            shiny::tags$ul(lapply(missing_gate, shiny::tags$li)),
+            easyClose = TRUE,
+            footer = shiny::modalButton("Close")
+          )
         )
-
-        shiny::isolate(cat("tab atual (depois):", input$main_tabs, "\n"))
-      }, once = TRUE)
-
-    })
-
-    output$validation <- shiny::renderText({
-      basic <- .validate_mapping_basic(mapping_tbl())
-
-      if (is.null(rv$mapped)) {
-        return(paste(basic, collapse = "\n"))
+        rv$ready <- FALSE
+        return()
       }
 
-      extra <- character(0)
-      if (!is.null(rv$corella_checks)) {
-        extra <- c(extra, "", .corella_summary(rv$corella_checks, "corella::check_dataset()"))
-      }
-      if (!is.null(rv$corella_suggest)) {
-        extra <- c(extra, "", .corella_summary(rv$corella_suggest, "corella::suggest_workflow()"))
+      if (is.null(rv$cleaned)) {
+        df_final <- current_preclean_df()
+        shiny::req(df_final)
+        run_clean_pipeline(df_final)
       }
 
-      paste(c(basic, extra), collapse = "\n")
-    })
+      rv$ready <- TRUE
 
-    output$cleaning_summary <- shiny::renderText({
-      if (is.null(rv$mapped)) {
-        return("Cleaning: not run yet (apply mapping first).")
-      }
-
-      s <- rv$clean_summary
-      if (is.null(s) || !is.data.frame(s) || nrow(s) == 0) {
-        return("Cleaning: no issues detected (or summary unavailable).")
-      }
-
-      lines <- apply(s, 1, function(r) paste0(r[[1]], ": ", r[[2]]))
-      paste(c("Cleaning summary:", lines), collapse = "\n")
-    })
-
-    output$preview_mapped_tbl <- DT::renderDT({
-      shiny::req(rv$mapped)
-      DT::datatable(
-        utils::head(rv$mapped, 50),
-        rownames = FALSE,
-        options = list(
-          scrollX = TRUE,
-          pageLength = 10
+      shiny::showModal(
+        shiny::modalDialog(
+          title = "Field mapping completed",
+          shiny::p("Minimum terms are present. The next modules can now be unlocked."),
+          easyClose = TRUE,
+          footer = shiny::modalButton("Close")
         )
       )
     })
 
-    output$preview_cleaned_tbl <- DT::renderDT({
+    output$preview_tbl <- DT::renderDT({
       shiny::req(rv$cleaned)
       DT::datatable(
         utils::head(rv$cleaned, 50),
@@ -717,7 +1449,8 @@ mod_dwc_mapping_server <- function(id, df_in) {
       cleaned = shiny::reactive(rv$cleaned),
       issues = shiny::reactive(rv$issues),
       clean_summary = shiny::reactive(rv$clean_summary),
-      validation = shiny::reactive(.validate_mapping_basic(mapping_tbl()))
+      validation = current_validation,
+      ready = shiny::reactive(isTRUE(rv$ready))
     )
   })
 }
