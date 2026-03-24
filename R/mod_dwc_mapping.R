@@ -85,7 +85,7 @@ mod_dwc_mapping_ui <- function(id) {
         width: 100%;
         border: 1px solid #cbd5e1;
         border-radius: 10px;
-        overflow: hidden;
+        overflow: visible;
         background: #fff;
       }
 
@@ -114,18 +114,21 @@ mod_dwc_mapping_ui <- function(id) {
       .dwc-map-grid-cell-right {
         padding: 12px;
         border-bottom: 1px solid #cbd5e1;
+        overflow: visible;
       }
 
       .dwc-map-grid-inputrow {
         display: flex;
         align-items: center;
         gap: 10px;
+        overflow: visible;
       }
 
       .dwc-map-grid-inputcol {
         flex: 1;
         min-width: 0;
         max-width: 680px;
+        overflow: visible;
       }
 
       .dwc-map-tip-trigger {
@@ -138,9 +141,17 @@ mod_dwc_mapping_ui <- function(id) {
         margin-bottom: 0.45rem;
       }
 
+      .dwc-map-validation-card,
+      .dwc-map-tab-card,
       .dwc-map-validation-card .card-body,
-      .dwc-map-tab-card .card-body {
+      .dwc-map-tab-card .card-body,
+      .dwc-map-tab-card .tab-content,
+      .dwc-map-tab-card .tab-pane {
         overflow: visible !important;
+      }
+
+      .selectize-dropdown {
+        z-index: 5000 !important;
       }
     ")),
 
@@ -335,7 +346,10 @@ mod_dwc_mapping_ui <- function(id) {
                       selected = NULL,
                       multiple = TRUE,
                       width = "100%",
-                      options = list(plugins = list("remove_button"))
+                      options = list(
+                        plugins = list("remove_button"),
+                        dropdownParent = "body"
+                      )
                     ),
                     shiny::textInput(
                       ns("id_sep"),
@@ -383,7 +397,10 @@ mod_dwc_mapping_ui <- function(id) {
                       selected = NULL,
                       multiple = TRUE,
                       width = "100%",
-                      options = list(plugins = list("remove_button"))
+                      options = list(
+                        plugins = list("remove_button"),
+                        dropdownParent = "body"
+                      )
                     ),
                     shiny::textInput(
                       ns("remarks_sep"),
@@ -883,10 +900,10 @@ mod_dwc_mapping_server <- function(id, df_in) {
 
       epsg_in <- input$coord_epsg_in %||% 4326
       force_parse <- isTRUE(input$coord_cols_are_messy)
-      preserve_original_coords_flag = isTRUE(input$preserve_original_coords)
-      create_geodetic_datum_flag = isTRUE(input$create_geodetic_datum)
-      geodetic_datum_value_flag = input$geodetic_datum_value %||% "WGS84"
-      standardize_event_date_flag = isTRUE(input$standardize_event_date)
+      preserve_original_coords_flag <- isTRUE(input$preserve_original_coords)
+      create_geodetic_datum_flag <- isTRUE(input$create_geodetic_datum)
+      geodetic_datum_value_flag <- input$geodetic_datum_value %||% "WGS84"
+      standardize_event_date_flag <- isTRUE(input$standardize_event_date)
 
       clean_res <- tryCatch(
         clean_dwc_pipeline(
@@ -1122,7 +1139,8 @@ mod_dwc_mapping_server <- function(id, df_in) {
                       selected = init_term,
                       width = "100%",
                       options = list(
-                        placeholder = "Select a Darwin Core term (or leave blank)"
+                        placeholder = "Select a Darwin Core term (or leave blank)",
+                        dropdownParent = "body"
                       )
                     )
                   ),
