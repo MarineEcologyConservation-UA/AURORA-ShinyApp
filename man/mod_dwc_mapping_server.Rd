@@ -9,10 +9,11 @@ mod_dwc_mapping_server(id, df_in)
 \arguments{
 \item{id}{Module id.}
 
-\item{df_in}{Reactive returning a data.frame (use ingest$tidy).}
+\item{df_in}{Reactive returning a data.frame.}
 }
 \value{
-A list of reactives: mapping, mapped, cleaned, issues, clean_summary, validation.
+A list of reactives: mapping, mapped, cleaned, issues,
+clean_summary, validation, ready.
 }
 \description{
 Darwin Core mapping module server

@@ -13,5 +13,5 @@ mod_dwc_mapping_ui(id)
 A Shiny UI definition.
 }
 \description{
-Shiny module UI for mapping user columns to Darwin Core terms (Item 3).
+Shiny module UI for mapping user columns to Darwin Core terms.
 }

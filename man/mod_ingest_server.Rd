@@ -12,7 +12,7 @@ mod_ingest_server(id, example_map)
 \item{example_map}{Named list mapping example labels to file paths.}
 }
 \value{
-A list of reactives: raw, tidy, label.
+A list of reactives: raw, tidy, label, ready.
 }
 \description{
 Ingestion module server

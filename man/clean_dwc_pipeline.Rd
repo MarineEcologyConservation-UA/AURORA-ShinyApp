@@ -12,7 +12,11 @@ clean_dwc_pipeline(
   bathy = NULL,
   bathy_auto_download = TRUE,
   bathy_depth_tolerance_m = 200,
-  swap_auto_fix = FALSE
+  swap_auto_fix = FALSE,
+  preserve_original_coords = FALSE,
+  create_geodetic_datum = FALSE,
+  geodetic_datum_value = "WGS84",
+  standardize_event_date = TRUE
 )
 }
 \arguments{
@@ -31,6 +35,16 @@ clean_dwc_pipeline(
 \item{bathy_depth_tolerance_m}{numeric; tolerance (meters) to compare reported depth with bathymetry}
 
 \item{swap_auto_fix}{logical; if TRUE, auto-swap coordinates in clear range-based cases}
+
+\item{preserve_original_coords}{logical; if TRUE, preserve original decimalLatitude/decimalLongitude
+into verbatimLatitude/verbatimLongitude before any parsing/reprojection, when those
+verbatim fields do not already exist}
+
+\item{create_geodetic_datum}{logical; if TRUE, create/fill geodeticDatum}
+
+\item{geodetic_datum_value}{character; value used to fill geodeticDatum when enabled}
+
+\item{standardize_event_date}{logical; if TRUE, try to normalize eventDate to ISO-8601}
 }
 \value{
 list(data=cleaned_df, issues=issues_df, summary=summary_df)
