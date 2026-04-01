@@ -172,7 +172,7 @@ mod_taxonomy_match_ui <- function(id) {
 #' Taxonomy match server
 #' @param id module id
 #' @param df_in reactive df after DwC mapping
-#' @return list(df_out, lookup, issues)
+#' @return list(df_out, lookup, issues, ready)
 #' @export
 mod_taxonomy_match_server <- function(id, df_in) {
   shiny::moduleServer(id, function(input, output, session) {
@@ -241,7 +241,8 @@ mod_taxonomy_match_server <- function(id, df_in) {
       candidates_map = list(),
       choice_observers = list(),
       suppress_choice_popup = FALSE,
-      pending_choice = NULL
+      pending_choice = NULL,
+      ready = FALSE
     )
 
     add_issue <- function(idx, field, rule, severity, message) {
@@ -268,6 +269,19 @@ mod_taxonomy_match_server <- function(id, df_in) {
       }
       rv$choice_observers <- list()
     }
+
+    # reset if upstream df changes
+    shiny::observeEvent(df_in(), {
+      destroy_choice_observers()
+      rv$lookup <- NULL
+      rv$lookup_display <- NULL
+      rv$applied_df <- NULL
+      rv$issues <- empty_issues()
+      rv$candidates_map <- list()
+      rv$suppress_choice_popup <- FALSE
+      rv$pending_choice <- NULL
+      rv$ready <- FALSE
+    }, ignoreInit = FALSE)
 
     # ------------------------------------------------------
     # Package checks
@@ -1066,6 +1080,7 @@ mod_taxonomy_match_server <- function(id, df_in) {
 
       rv$lookup_display <- build_lookup_display(rv$lookup)
       rv$applied_df <- NULL
+      rv$ready <- FALSE
       invisible(TRUE)
     }
 
@@ -1314,6 +1329,7 @@ mod_taxonomy_match_server <- function(id, df_in) {
       rv$candidates_map <- list()
       rv$applied_df <- NULL
       rv$pending_choice <- NULL
+      rv$ready <- FALSE
 
       df <- df_in()
       shiny::req(is.data.frame(df))
@@ -1687,6 +1703,7 @@ mod_taxonomy_match_server <- function(id, df_in) {
       out <- compute_out()
       shiny::req(is.data.frame(out))
       rv$applied_df <- out
+      rv$ready <- TRUE
 
       stat_grp <- tax_status_group(rv$lookup$taxonMatchStatus)
       n_matched <- sum(stat_grp == "MATCHED", na.rm = TRUE)
@@ -1738,12 +1755,14 @@ mod_taxonomy_match_server <- function(id, df_in) {
     })
 
     shiny::observeEvent(input$apply_first_choices, {
+      rv$ready <- FALSE
       shiny::removeModal()
       apply_first_choice_to_pending_ambiguous()
       finalize_apply()
     })
 
     shiny::observeEvent(input$apply_keep_ambiguous, {
+      rv$ready <- FALSE
       shiny::removeModal()
 
       n_pending <- length(unresolved_ambiguous_rows())
@@ -1821,7 +1840,8 @@ mod_taxonomy_match_server <- function(id, df_in) {
     list(
       df_out = df_out,
       lookup = shiny::reactive(rv$lookup),
-      issues = shiny::reactive(rv$issues)
+      issues = shiny::reactive(rv$issues),
+      ready = shiny::reactive(isTRUE(rv$ready))
     )
   })
 }

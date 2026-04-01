@@ -10,25 +10,19 @@ server <- function(input, output, session) {
     )
   )
 
-  ingest <- mod_ingest_server("ingest", example_map = example_map)
+  `%||%` <- function(x, y) if (is.null(x)) y else x
 
-  # bloquear tabs downstream até Complete ingest
-  shiny::observe({
-    ready <- isTRUE(ingest$ready())
+  safe_flag <- function(expr) {
+    out <- try(expr, silent = TRUE)
 
-    session$sendCustomMessage(
-      "toggleMainTabs",
-      list(locked = !ready)
-    )
-
-    if (!ready && !is.null(input$main_nav) && input$main_nav != "ingest") {
-      bslib::nav_select(
-        id = "main_nav",
-        selected = "ingest",
-        session = session
-      )
+    if (inherits(out, "try-error")) {
+      return(FALSE)
     }
-  })
+
+    isTRUE(out)
+  }
+
+  ingest <- mod_ingest_server("ingest", example_map = example_map)
 
   dwc_map <- mod_dwc_mapping_server(
     "dwc_map",
@@ -42,7 +36,11 @@ server <- function(input, output, session) {
 
   # --- Build DwC-A -----------------------------------------------------------
   dwc_terms_path <- system.file("extdata", "dwc_terms.csv", package = "shinyRv02")
-  dwc_terms <- read.csv(dwc_terms_path, stringsAsFactors = FALSE, fileEncoding = "UTF-8")
+  dwc_terms <- read.csv(
+    dwc_terms_path,
+    stringsAsFactors = FALSE,
+    fileEncoding = "UTF-8"
+  )
 
   dwca <- mod_build_dwca_server(
     "dwca",
@@ -52,8 +50,54 @@ server <- function(input, output, session) {
 
   metadata <- mod_metadata_server("metadata")
 
+  # --- Sequential tab locking ------------------------------------------------
+  shiny::observe({
+    ingest_done   <- safe_flag(ingest$ready())
+    mapping_done  <- ingest_done  && safe_flag(dwc_map$ready())
+    taxonomy_done <- mapping_done && safe_flag(tax_match$ready())
+    build_done    <- taxonomy_done && safe_flag(dwca$ready())
+
+    allowed_tabs <- c("home", "ingest")
+
+    if (ingest_done) {
+      allowed_tabs <- c(allowed_tabs, "field_mapping")
+    }
+    if (mapping_done) {
+      allowed_tabs <- c(allowed_tabs, "taxonomy")
+    }
+    if (taxonomy_done) {
+      allowed_tabs <- c(allowed_tabs, "darwin_tables")
+    }
+    if (build_done) {
+      allowed_tabs <- c(allowed_tabs, "metadata", "qc")
+    }
+
+    session$sendCustomMessage(
+      "toggleMainTabs",
+      list(allowed = allowed_tabs)
+    )
+
+    current_tab <- input$main_nav %||% "home"
+
+    if (!current_tab %in% allowed_tabs) {
+      fallback_tab <- tail(allowed_tabs, 1)
+
+      bslib::nav_select(
+        id = "main_nav",
+        selected = fallback_tab,
+        session = session
+      )
+    }
+  })
+
   # --- QC & Diagnostics ------------------------------------------------------
   shiny::observe({
+    cat("\n--- DEBUG WORKFLOW ---\n")
+    cat("ingest$ready():",   safe_flag(ingest$ready()), "\n")
+    cat("dwc_map$ready():",  safe_flag(dwc_map$ready()), "\n")
+    cat("tax_match$ready():", safe_flag(tax_match$ready()), "\n")
+    cat("dwca$ready():",     safe_flag(dwca$ready()), "\n")
+
     cat("\n--- DEBUG DWCA ---\n")
     cat("dwca exists:", !is.null(dwca), "\n")
     cat("dwca$event is reactive:", shiny::is.reactive(dwca$event), "\n")

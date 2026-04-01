@@ -149,6 +149,10 @@ mod_build_dwca_server <- function(id, df_in, dwc_terms) {
 
     ns <- session$ns
 
+    rv <- shiny::reactiveValues(
+      ready = FALSE
+    )
+
     shiny::observe({
       shiny::req(df_in())
       cols <- names(df_in())
@@ -242,6 +246,60 @@ mod_build_dwca_server <- function(id, df_in, dwc_terms) {
       levs
     })
 
+    # reset ready if upstream data changes
+    shiny::observeEvent(df_in(), {
+      rv$ready <- FALSE
+    }, ignoreInit = FALSE)
+
+    # reset ready if user changes any build-relevant option
+    shiny::observeEvent(input$event_mode, {
+      rv$ready <- FALSE
+    }, ignoreInit = TRUE)
+
+    shiny::observeEvent(input$event_column, {
+      rv$ready <- FALSE
+    }, ignoreInit = TRUE)
+
+    shiny::observeEvent(input$event_concat_cols, {
+      rv$ready <- FALSE
+    }, ignoreInit = TRUE)
+
+    shiny::observeEvent(input$enable_parent, {
+      rv$ready <- FALSE
+    }, ignoreInit = TRUE)
+
+    shiny::observeEvent(input$parent_cols, {
+      rv$ready <- FALSE
+    }, ignoreInit = TRUE)
+
+    shiny::observeEvent(input$occ_mode, {
+      rv$ready <- FALSE
+    }, ignoreInit = TRUE)
+
+    shiny::observeEvent(input$occ_column, {
+      rv$ready <- FALSE
+    }, ignoreInit = TRUE)
+
+    shiny::observeEvent(input$emof_cols_event, {
+      rv$ready <- FALSE
+    }, ignoreInit = TRUE)
+
+    shiny::observeEvent(input$emof_cols_occ, {
+      rv$ready <- FALSE
+    }, ignoreInit = TRUE)
+
+    shiny::observeEvent(input$enable_remarks, {
+      rv$ready <- FALSE
+    }, ignoreInit = TRUE)
+
+    shiny::observeEvent(input$remarks_cols, {
+      rv$ready <- FALSE
+    }, ignoreInit = TRUE)
+
+    shiny::observeEvent(input$remarks_target, {
+      rv$ready <- FALSE
+    }, ignoreInit = TRUE)
+
     result <- shiny::eventReactive(input$build, {
       shiny::req(df_in())
 
@@ -315,6 +373,12 @@ mod_build_dwca_server <- function(id, df_in, dwc_terms) {
         }
       )
     })
+
+    # mark ready only after a successful build
+    shiny::observeEvent(result(), {
+      shiny::req(result())
+      rv$ready <- TRUE
+    }, ignoreInit = TRUE)
 
     output$qc <- shiny::renderPrint({
       shiny::req(result())
@@ -395,7 +459,8 @@ mod_build_dwca_server <- function(id, df_in, dwc_terms) {
       qc_report = shiny::reactive({
         shiny::req(result())
         result()$qc
-      })
+      }),
+      ready = shiny::reactive(isTRUE(rv$ready))
     )
   })
 }
