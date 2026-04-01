@@ -150,6 +150,13 @@ mod_dwc_mapping_ui <- function(id) {
         overflow: visible !important;
       }
 
+      .dwc-map-inline-help {
+        margin-top: -0.35rem;
+        margin-bottom: 0.6rem;
+        color: #6c757d;
+        font-size: 0.92rem;
+      }
+
       .selectize-dropdown {
         z-index: 5000 !important;
       }
@@ -357,6 +364,7 @@ mod_dwc_mapping_ui <- function(id) {
                       value = ":",
                       width = "100%"
                     ),
+                    shiny::uiOutput(ns("id_mode_ui")),
                     shiny::checkboxInput(
                       ns("id_overwrite"),
                       "Overwrite target if it already exists",
@@ -497,24 +505,18 @@ mod_dwc_mapping_ui <- function(id) {
   c("", terms)
 }
 
-# termos mínimos para desbloquear os módulos seguintes
 .dwc_gate_terms <- function() {
   c("eventDate", "occurrenceID", "basisOfRecord", "scientificName")
 }
 
-# termos mostrados na validação, além do gate
 .dwc_validation_extra_terms <- function() {
   c("eventID")
 }
 
-# termos "fortemente recomendados" definidos localmente na app
 .dwc_strongly_recommended_terms <- function() {
   c("decimalLatitude", "decimalLongitude", "geodeticDatum")
 }
 
-# dependências genéricas entre termos
-# um termo "trigger_term" implica ou recomenda fortemente "required_term"
-# suggested_value é apenas sugestão opcional para criação rápida
 .dwc_term_dependencies <- function() {
   data.frame(
     trigger_term = c(
@@ -662,9 +664,16 @@ mod_dwc_mapping_ui <- function(id) {
   mapped <- map_df$dwc_term %||% character(0)
   mapped <- mapped[!is.na(mapped) & mapped != ""]
 
-  missing_gate <- setdiff(gate_terms, mapped)
-  missing_extra <- setdiff(extra_terms, mapped)
-  missing_strong <- setdiff(strong_terms, mapped)
+  if (!is.null(final_df) && is.data.frame(final_df)) {
+    final_names <- names(final_df)
+    all_present <- unique(c(mapped, final_names))
+  } else {
+    all_present <- unique(mapped)
+  }
+
+  missing_gate <- setdiff(gate_terms, all_present)
+  missing_extra <- setdiff(extra_terms, all_present)
+  missing_strong <- setdiff(strong_terms, all_present)
 
   dup <- mapped[duplicated(mapped)]
   dup <- unique(dup)
@@ -813,6 +822,42 @@ mod_dwc_mapping_ui <- function(id) {
   })
 
   df[[target]] <- out_val
+  df
+}
+
+.build_sequential_occurrence_id <- function(df,
+                                            target = "occurrenceID",
+                                            source_cols,
+                                            sep = "_",
+                                            overwrite = FALSE,
+                                            suffix_prefix = "occ") {
+  if (length(source_cols) == 0) return(df)
+  if (target %in% names(df) && !isTRUE(overwrite)) return(df)
+
+  vals <- lapply(source_cols, function(nm) as.character(df[[nm]]))
+  mat <- as.data.frame(vals, stringsAsFactors = FALSE)
+
+  base_id <- apply(mat, 1, function(row) {
+    row <- trimws(as.character(row))
+    row[row %in% c("", "NA")] <- NA_character_
+    row <- row[!is.na(row)]
+    if (length(row) == 0) return(NA_character_)
+    paste(row, collapse = sep)
+  })
+
+  seq_idx <- ave(
+    seq_along(base_id),
+    base_id,
+    FUN = function(x) seq_along(x)
+  )
+
+  out <- ifelse(
+    is.na(base_id),
+    NA_character_,
+    paste0(base_id, sep, suffix_prefix, "_", seq_idx)
+  )
+
+  df[[target]] <- out
   df
 }
 
@@ -1030,6 +1075,24 @@ mod_dwc_mapping_server <- function(id, df_in) {
         })
       }
     }, ignoreInit = FALSE)
+
+    output$id_mode_ui <- shiny::renderUI({
+      if (!identical(input$id_target %||% "", "occurrenceID")) {
+        return(NULL)
+      }
+
+      shiny::tagList(
+        shiny::checkboxInput(
+          session$ns("id_sequential"),
+          "Sequential",
+          value = FALSE
+        ),
+        shiny::div(
+          class = "dwc-map-inline-help",
+          "When checked, occurrenceID will be generated as <base><separator>occ_<n> using the selected source columns."
+        )
+      )
+    })
 
     output$workflow_status <- shiny::renderUI({
       shiny::tagList(
@@ -1305,13 +1368,31 @@ mod_dwc_mapping_server <- function(id, df_in) {
       shiny::req(input$id_target)
       shiny::req(input$id_source_cols)
 
-      rv$created <- .build_concat_field(
-        df = df,
-        target = input$id_target,
-        source_cols = input$id_source_cols,
-        sep = input$id_sep %||% ":",
-        overwrite = isTRUE(input$id_overwrite)
-      )
+      target_field <- input$id_target %||% ""
+      source_cols <- input$id_source_cols %||% character(0)
+      sep <- input$id_sep %||% ":"
+      overwrite <- isTRUE(input$id_overwrite)
+      sequential <- isTRUE(input$id_sequential)
+
+      if (identical(target_field, "occurrenceID") && sequential) {
+        rv$created <- .build_sequential_occurrence_id(
+          df = df,
+          target = target_field,
+          source_cols = source_cols,
+          sep = sep,
+          overwrite = overwrite,
+          suffix_prefix = "occ"
+        )
+      } else {
+        rv$created <- .build_concat_field(
+          df = df,
+          target = target_field,
+          source_cols = source_cols,
+          sep = sep,
+          overwrite = overwrite
+        )
+      }
+
       rv$ready <- FALSE
     })
 
