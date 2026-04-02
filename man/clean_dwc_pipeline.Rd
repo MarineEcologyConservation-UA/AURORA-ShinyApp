@@ -16,7 +16,8 @@ clean_dwc_pipeline(
   preserve_original_coords = FALSE,
   create_geodetic_datum = FALSE,
   geodetic_datum_value = "WGS84",
-  standardize_event_date = TRUE
+  standardize_event_date = TRUE,
+  ambiguous_date_order = "dmy"
 )
 }
 \arguments{
@@ -45,6 +46,8 @@ verbatim fields do not already exist}
 \item{geodetic_datum_value}{character; value used to fill geodeticDatum when enabled}
 
 \item{standardize_event_date}{logical; if TRUE, try to normalize eventDate to ISO-8601}
+
+\item{ambiguous_date_order}{character; "dmy" or "mdy" for ambiguous numeric dates}
 }
 \value{
 list(data=cleaned_df, issues=issues_df, summary=summary_df)

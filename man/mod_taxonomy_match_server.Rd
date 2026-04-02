@@ -12,7 +12,7 @@ mod_taxonomy_match_server(id, df_in)
 \item{df_in}{reactive df after DwC mapping}
 }
 \value{
-list(df_out, lookup, issues)
+list(df_out, lookup, issues, ready)
 }
 \description{
 Taxonomy match server

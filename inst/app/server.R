@@ -3,9 +3,9 @@ server <- function(input, output, session) {
   example_map <- list(
     "Example (event.csv)" = system.file("extdata", "event.csv", package = "shinyRv02"),
     "Example (occurrence.csv)" = system.file("extdata", "occurrence.csv", package = "shinyRv02"),
-    "Example (aurora.csv)" = system.file(
+    "Example (aurora.xlsx)" = system.file(
       "extdata",
-      "aurora_good_quality_data_densitydata_id_corrected.csv",
+      "aurora_good_quality_data_densitydata_id_corrected.xlsx",
       package = "shinyRv02"
     )
   )

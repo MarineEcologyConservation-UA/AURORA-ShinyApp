@@ -420,11 +420,6 @@ mod_dwc_mapping_ui <- function(id) {
                       label = "Create/fill geodeticDatum",
                       value = TRUE
                     ),
-                    shiny::checkboxInput(
-                      ns("swap_auto_fix"),
-                      label = "Automatically fix clearly swapped coordinates",
-                      value = FALSE
-                    ),
                     shiny::tags$hr(),
                     shiny::tags$b("Target CRS EPSG:[4326]"),
                     shiny::p("Coordinates will be stored in decimal degrees.")
@@ -438,14 +433,15 @@ mod_dwc_mapping_ui <- function(id) {
                       label = "Standardize eventDate to ISO-8601",
                       value = TRUE
                     ),
-                    shiny::checkboxInput(
-                      ns("event_date_mdy"),
-                      label = "Interpret ambiguous numeric dates as mm/dd (otherwise dd/mm)",
-                      value = FALSE
-                    ),
-                    shiny::p(
-                      class = "text-muted",
-                      "eventDate will be normalized during the cleaning step."
+                    shiny::radioButtons(
+                      ns("event_date_order"),
+                      label = "Interpret ambiguous numeric dates as",
+                      choices = c(
+                        "dd/mm" = "dmy",
+                        "mm/dd" = "mdy"
+                      ),
+                      selected = "dmy",
+                      inline = FALSE
                     )
                   )
                 ),
@@ -962,8 +958,8 @@ mod_dwc_mapping_server <- function(id, df_in) {
       create_geodetic_datum_flag <- isTRUE(input$create_geodetic_datum)
       geodetic_datum_value_flag <- "WGS84"
       standardize_event_date_flag <- isTRUE(input$standardize_event_date)
-      ambiguous_date_order_flag <- if (isTRUE(input$event_date_mdy)) "mdy" else "dmy"
-      swap_auto_fix_flag <- isTRUE(input$swap_auto_fix)
+      ambiguous_date_order_flag <- input$event_date_order %||% "dmy"
+      swap_auto_fix_flag <- TRUE
 
       clean_res <- tryCatch(
         clean_dwc_pipeline(

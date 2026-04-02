@@ -1,3 +1,5 @@
+# modules/mod_ingest.R
+
 #' Ingestion module UI
 #'
 #' Shiny module UI for ingesting data from upload or examples.
@@ -26,8 +28,8 @@ mod_ingest_ui <- function(id) {
         condition = sprintf("input['%s'] == 'upload'", ns("source")),
         shiny::fileInput(
           ns("file"),
-          "Upload (.csv)",
-          accept = c(".csv")
+          "Upload (CSV/TSV/XLSX)",
+          accept = c(".csv", ".tsv", ".txt", ".xlsx", ".xls")
         )
       ),
 
@@ -56,7 +58,7 @@ mod_ingest_ui <- function(id) {
 
       shiny::selectInput(
         ns("delim"),
-        "Delimiter (CSV)",
+        "Delimiter (CSV/TSV)",
         choices = c("," = ",", ";" = ";", "TAB" = "\t", "|" = "|"),
         selected = ","
       ),
@@ -168,27 +170,6 @@ mod_ingest_server <- function(id, example_map) {
 
     shiny::observeEvent(input$load, {
       p <- get_path()
-
-      ext <- tolower(tools::file_ext(p$path))
-      if (!identical(ext, "csv")) {
-        shiny::showNotification(
-          "Only .csv files are supported in this ingestion step.",
-          type = "error",
-          duration = 8
-        )
-        rv$raw <- NULL
-        rv$tidy <- NULL
-        rv$src_label <- p$label
-        rv$encoding_used <- NULL
-        rv$ingest_complete <- FALSE
-
-        pv$baseline <- NULL
-        pv$data <- NULL
-        pv$history <- list()
-        pv$history_labels <- character()
-        pv$is_pivoted <- FALSE
-        return()
-      }
 
       df <- tryCatch({
         read_any_table(
@@ -348,6 +329,13 @@ mod_ingest_server <- function(id, example_map) {
             )
           ),
           shiny::selectizeInput(
+            session$ns("pivot_id_cols"),
+            "ID columns",
+            choices = cols,
+            multiple = TRUE,
+            options = list(plugins = list("remove_button"))
+          ),
+          shiny::selectizeInput(
             session$ns("pivot_value_cols"),
             "Columns to pivot",
             choices = cols,
@@ -399,7 +387,7 @@ mod_ingest_server <- function(id, example_map) {
       df_after <- tryCatch({
         apply_pivot_longer(
           df = df_before,
-          id_cols = character(),
+          id_cols = input$pivot_id_cols %||% character(),
           pivot_cols = input$pivot_value_cols %||% character(),
           names_to = input$pivot_names_to,
           values_to = input$pivot_values_to,
