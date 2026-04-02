@@ -157,6 +157,10 @@ mod_dwc_mapping_ui <- function(id) {
         font-size: 0.92rem;
       }
 
+      .dwc-map-preview-wrap .dataTables_wrapper {
+        width: 100%;
+      }
+
       .selectize-dropdown {
         z-index: 5000 !important;
       }
@@ -205,8 +209,7 @@ mod_dwc_mapping_ui <- function(id) {
           shiny::h2("Field mapping to Darwin Core"),
           shiny::p(
             class = "dwc-map-muted",
-            "Configure formatting options, map columns to Darwin Core terms, ",
-            "create derived fields, and review the final cleaned dataset."
+            "Map columns to Darwin Core terms, create derived fields, configure formatting options, and review the cleaned dataset."
           ),
           shiny::tags$p(
             shiny::tags$a(
@@ -230,81 +233,6 @@ mod_dwc_mapping_ui <- function(id) {
 
           bslib::navset_tab(
             id = ns("main_tabs"),
-
-            bslib::nav_panel(
-              "Formatting",
-              value = "formatting",
-
-              shiny::div(
-                class = "p-3",
-
-                bslib::layout_columns(
-                  col_widths = c(6, 6),
-
-                  bslib::card(
-                    fill = FALSE,
-                    bslib::card_header("Coordinate system"),
-                    shiny::p(
-                      "Set the input CRS (EPSG). The target CRS will always be EPSG:[4326] (WGS84 lon/lat)."
-                    ),
-                    shiny::numericInput(
-                      ns("coord_epsg_in"),
-                      label = "Input CRS EPSG:[ ]",
-                      value = 4326,
-                      min = 1,
-                      width = "100%"
-                    ),
-                    shiny::checkboxInput(
-                      ns("coord_cols_are_messy"),
-                      label = "Force parsing (parzer) even if coordinates look numeric",
-                      value = TRUE
-                    ),
-                    shiny::checkboxInput(
-                      ns("preserve_original_coords"),
-                      label = "Preserve original coordinates in verbatimLatitude / verbatimLongitude",
-                      value = TRUE
-                    ),
-                    shiny::checkboxInput(
-                      ns("create_geodetic_datum"),
-                      label = "Create/fill geodeticDatum",
-                      value = TRUE
-                    ),
-                    shiny::textInput(
-                      ns("geodetic_datum_value"),
-                      label = "geodeticDatum value",
-                      value = "WGS84",
-                      width = "100%"
-                    ),
-                    shiny::tags$hr(),
-                    shiny::tags$b("Target CRS EPSG:[4326]"),
-                    shiny::p("Coordinates will be stored in decimal degrees.")
-                  ),
-
-                  bslib::card(
-                    fill = FALSE,
-                    bslib::card_header("Date formatting"),
-                    shiny::checkboxInput(
-                      ns("standardize_event_date"),
-                      label = "Standardize eventDate to ISO-8601",
-                      value = TRUE
-                    ),
-                    shiny::p(
-                      class = "text-muted",
-                      "eventDate will be normalized during the cleaning step."
-                    )
-                  )
-                ),
-
-                shiny::div(class = "dwc-map-section-gap"),
-
-                shiny::actionButton(
-                  ns("formatting_done"),
-                  "Continue to Mapping",
-                  icon = shiny::icon("arrow-right"),
-                  class = "btn-primary"
-                )
-              )
-            ),
 
             bslib::nav_panel(
               "Mapping",
@@ -433,24 +361,102 @@ mod_dwc_mapping_ui <- function(id) {
 
                 bslib::card(
                   fill = FALSE,
-                  bslib::card_header("Companion fields"),
+                  bslib::card_header(
+                    shiny::tagList(
+                      "Companion fields ",
+                      bslib::tooltip(
+                        shiny::tags$span(
+                          shiny::icon("info-circle"),
+                          style = "cursor: help;"
+                        ),
+                        "These are fields suggested because another mapped or created field usually requires a companion term."
+                      )
+                    )
+                  ),
                   shiny::uiOutput(ns("dependency_ui"))
                 ),
 
                 shiny::div(class = "dwc-map-section-gap"),
 
                 shiny::actionButton(
-                  ns("apply_create_fields"),
-                  "Apply created fields",
+                  ns("continue_to_formatting"),
+                  "Continue to formatting",
+                  icon = shiny::icon("arrow-right"),
+                  class = "btn-success"
+                )
+              )
+            ),
+
+            bslib::nav_panel(
+              "Formatting",
+              value = "formatting",
+
+              shiny::div(
+                class = "p-3",
+
+                bslib::layout_columns(
+                  col_widths = c(6, 6),
+
+                  bslib::card(
+                    fill = FALSE,
+                    bslib::card_header("Coordinate system"),
+                    shiny::p(
+                      "Set the input CRS (EPSG). The target CRS will always be EPSG:[4326] (WGS84 lon/lat)."
+                    ),
+                    shiny::numericInput(
+                      ns("coord_epsg_in"),
+                      label = "Input CRS EPSG:[ ]",
+                      value = 4326,
+                      min = 1,
+                      width = "100%"
+                    ),
+                    shiny::checkboxInput(
+                      ns("preserve_original_coords"),
+                      label = "Preserve original coordinates in verbatimLatitude / verbatimLongitude",
+                      value = TRUE
+                    ),
+                    shiny::checkboxInput(
+                      ns("create_geodetic_datum"),
+                      label = "Create/fill geodeticDatum",
+                      value = TRUE
+                    ),
+                    shiny::checkboxInput(
+                      ns("swap_auto_fix"),
+                      label = "Automatically fix clearly swapped coordinates",
+                      value = FALSE
+                    ),
+                    shiny::tags$hr(),
+                    shiny::tags$b("Target CRS EPSG:[4326]"),
+                    shiny::p("Coordinates will be stored in decimal degrees.")
+                  ),
+
+                  bslib::card(
+                    fill = FALSE,
+                    bslib::card_header("Date formatting"),
+                    shiny::checkboxInput(
+                      ns("standardize_event_date"),
+                      label = "Standardize eventDate to ISO-8601",
+                      value = TRUE
+                    ),
+                    shiny::checkboxInput(
+                      ns("event_date_mdy"),
+                      label = "Interpret ambiguous numeric dates as mm/dd (otherwise dd/mm)",
+                      value = FALSE
+                    ),
+                    shiny::p(
+                      class = "text-muted",
+                      "eventDate will be normalized during the cleaning step."
+                    )
+                  )
+                ),
+
+                shiny::div(class = "dwc-map-section-gap"),
+
+                shiny::actionButton(
+                  ns("apply_formatting"),
+                  "Apply formatting and preview",
                   icon = shiny::icon("check"),
                   class = "btn-primary"
-                ),
-                shiny::div(class = "dwc-map-section-gap-sm"),
-                shiny::actionButton(
-                  ns("complete_mapping"),
-                  "Complete field mapping",
-                  icon = shiny::icon("lock-open"),
-                  class = "btn-success"
                 )
               )
             ),
@@ -460,8 +466,8 @@ mod_dwc_mapping_ui <- function(id) {
               value = "preview",
 
               shiny::div(
-                class = "p-3",
-                shiny::p("Preview of the cleaned dataset after formatting, mapping, and create-fields."),
+                class = "p-3 dwc-map-preview-wrap",
+                shiny::p("Preview of the cleaned dataset after mapping, create-fields, and formatting."),
                 DT::DTOutput(ns("preview_tbl"))
               )
             ),
@@ -506,11 +512,11 @@ mod_dwc_mapping_ui <- function(id) {
 }
 
 .dwc_gate_terms <- function() {
-  c("eventDate", "occurrenceID", "basisOfRecord", "scientificName")
+  c("eventID", "eventDate", "occurrenceID", "basisOfRecord", "scientificName")
 }
 
 .dwc_validation_extra_terms <- function() {
-  c("eventID")
+  character(0)
 }
 
 .dwc_strongly_recommended_terms <- function() {
@@ -931,8 +937,15 @@ mod_dwc_mapping_server <- function(id, df_in) {
       NULL
     })
 
+    validation_df <- shiny::reactive({
+      if (!is.null(rv$cleaned)) return(rv$cleaned)
+      if (!is.null(rv$created)) return(rv$created)
+      if (!is.null(rv$mapped)) return(rv$mapped)
+      NULL
+    })
+
     current_validation <- shiny::reactive({
-      .validation_state(mapping_tbl(), current_preclean_df())
+      .validation_state(mapping_tbl(), validation_df())
     })
 
     run_clean_pipeline <- function(df_to_clean) {
@@ -944,11 +957,13 @@ mod_dwc_mapping_server <- function(id, df_in) {
       }
 
       epsg_in <- input$coord_epsg_in %||% 4326
-      force_parse <- isTRUE(input$coord_cols_are_messy)
+      force_parse <- TRUE
       preserve_original_coords_flag <- isTRUE(input$preserve_original_coords)
       create_geodetic_datum_flag <- isTRUE(input$create_geodetic_datum)
-      geodetic_datum_value_flag <- input$geodetic_datum_value %||% "WGS84"
+      geodetic_datum_value_flag <- "WGS84"
       standardize_event_date_flag <- isTRUE(input$standardize_event_date)
+      ambiguous_date_order_flag <- if (isTRUE(input$event_date_mdy)) "mdy" else "dmy"
+      swap_auto_fix_flag <- isTRUE(input$swap_auto_fix)
 
       clean_res <- tryCatch(
         clean_dwc_pipeline(
@@ -956,10 +971,12 @@ mod_dwc_mapping_server <- function(id, df_in) {
           coord_epsg_in = epsg_in,
           target_epsg = 4326,
           force_parzer = force_parse,
+          swap_auto_fix = swap_auto_fix_flag,
           preserve_original_coords = preserve_original_coords_flag,
           create_geodetic_datum = create_geodetic_datum_flag,
           geodetic_datum_value = geodetic_datum_value_flag,
-          standardize_event_date = standardize_event_date_flag
+          standardize_event_date = standardize_event_date_flag,
+          ambiguous_date_order = ambiguous_date_order_flag
         ),
         error = function(e) e
       )
@@ -1097,16 +1114,16 @@ mod_dwc_mapping_server <- function(id, df_in) {
     output$workflow_status <- shiny::renderUI({
       shiny::tagList(
         shiny::tags$p(
-          shiny::tags$b("Formatting completed: "),
-          if (isTRUE(rv$formatting_done)) "Yes" else "No"
-        ),
-        shiny::tags$p(
           shiny::tags$b("Mapping applied: "),
           if (!is.null(rv$mapped)) "Yes" else "No"
         ),
         shiny::tags$p(
           shiny::tags$b("Create fields applied: "),
           if (!is.null(rv$created)) "Yes" else "No"
+        ),
+        shiny::tags$p(
+          shiny::tags$b("Formatting applied: "),
+          if (isTRUE(rv$formatting_done)) "Yes" else "No"
         ),
         shiny::tags$p(
           shiny::tags$b("Field mapping complete: "),
@@ -1322,15 +1339,6 @@ mod_dwc_mapping_server <- function(id, df_in) {
       }
     })
 
-    shiny::observeEvent(input$formatting_done, {
-      rv$formatting_done <- TRUE
-      bslib::nav_select(
-        id = "main_tabs",
-        selected = "mapping",
-        session = session
-      )
-    })
-
     shiny::observeEvent(input$apply_mapping, {
       df <- df_in()
       shiny::req(df)
@@ -1339,21 +1347,24 @@ mod_dwc_mapping_server <- function(id, df_in) {
       rv$mapping <- map_df
       rv$mapped <- .apply_mapping(df, map_df)
       rv$created <- NULL
+      rv$cleaned <- NULL
+      rv$issues <- NULL
+      rv$clean_summary <- NULL
+      rv$formatting_done <- FALSE
       rv$ready <- FALSE
 
-      run_clean_pipeline(rv$mapped)
-
-      if (requireNamespace("corella", quietly = TRUE)) {
-        rv$corella_checks <- tryCatch(
-          corella::check_dataset(rv$mapped),
-          error = function(e) e
-        )
-
-        rv$corella_suggest <- tryCatch(
-          corella::suggest_workflow(rv$mapped),
-          error = function(e) e
-        )
-      }
+      # Temporarily disabled because it slows processing and is not currently used downstream.
+      # if (requireNamespace("corella", quietly = TRUE)) {
+      #   rv$corella_checks <- tryCatch(
+      #     corella::check_dataset(rv$mapped),
+      #     error = function(e) e
+      #   )
+      #
+      #   rv$corella_suggest <- tryCatch(
+      #     corella::suggest_workflow(rv$mapped),
+      #     error = function(e) e
+      #   )
+      # }
 
       bslib::nav_select(
         id = "main_tabs",
@@ -1393,7 +1404,17 @@ mod_dwc_mapping_server <- function(id, df_in) {
         )
       }
 
+      rv$cleaned <- NULL
+      rv$issues <- NULL
+      rv$clean_summary <- NULL
+      rv$formatting_done <- FALSE
       rv$ready <- FALSE
+
+      shiny::showNotification(
+        paste0(target_field, " created/updated."),
+        type = "message",
+        duration = 2.5
+      )
     })
 
     shiny::observeEvent(input$create_remarks_btn, {
@@ -1409,7 +1430,18 @@ mod_dwc_mapping_server <- function(id, df_in) {
         sep = input$remarks_sep %||% " | ",
         overwrite = isTRUE(input$remarks_overwrite)
       )
+
+      rv$cleaned <- NULL
+      rv$issues <- NULL
+      rv$clean_summary <- NULL
+      rv$formatting_done <- FALSE
       rv$ready <- FALSE
+
+      shiny::showNotification(
+        paste0(input$remarks_target, " created/updated."),
+        type = "message",
+        duration = 2.5
+      )
     })
 
     shiny::observeEvent(input$create_dependency_btn, {
@@ -1439,25 +1471,21 @@ mod_dwc_mapping_server <- function(id, df_in) {
         value = input$dependency_value %||% dep_row$suggested_value[1] %||% "",
         overwrite = FALSE
       )
-      rv$ready <- FALSE
-    })
 
-    shiny::observeEvent(input$apply_create_fields, {
-      df_final <- current_preclean_df()
-      shiny::req(df_final)
-
-      run_clean_pipeline(df_final)
+      rv$cleaned <- NULL
+      rv$issues <- NULL
+      rv$clean_summary <- NULL
+      rv$formatting_done <- FALSE
       rv$ready <- FALSE
 
-      bslib::nav_select(
-        id = "main_tabs",
-        selected = "preview",
-        session = session
+      shiny::showNotification(
+        paste0(dep_row$required_term[1], " created."),
+        type = "message",
+        duration = 2.5
       )
     })
 
-    shiny::observeEvent(input$complete_mapping, {
-      shiny::req(rv$formatting_done)
+    shiny::observeEvent(input$continue_to_formatting, {
       shiny::req(!is.null(rv$mapped))
 
       validation <- current_validation()
@@ -1466,7 +1494,7 @@ mod_dwc_mapping_server <- function(id, df_in) {
 
       if (length(missing_gate) > 0 || length(duplicate_terms) > 0) {
         modal_parts <- list(
-          shiny::p("Field mapping cannot be completed yet.")
+          shiny::p("Field mapping cannot continue to formatting yet.")
         )
 
         if (length(missing_gate) > 0) {
@@ -1491,7 +1519,7 @@ mod_dwc_mapping_server <- function(id, df_in) {
 
         shiny::showModal(
           shiny::modalDialog(
-            title = "Cannot complete field mapping yet",
+            title = "Cannot continue to formatting yet",
             easyClose = TRUE,
             footer = shiny::modalButton("Close"),
             modal_parts
@@ -1501,32 +1529,38 @@ mod_dwc_mapping_server <- function(id, df_in) {
         return()
       }
 
-      if (is.null(rv$cleaned)) {
-        df_final <- current_preclean_df()
-        shiny::req(df_final)
-        run_clean_pipeline(df_final)
-      }
-
       rv$ready <- TRUE
 
-      shiny::showModal(
-        shiny::modalDialog(
-          title = "Field mapping completed",
-          shiny::p("Minimum terms are present and duplicate mappings were not detected. The next modules can now be unlocked."),
-          easyClose = TRUE,
-          footer = shiny::modalButton("Close")
-        )
+      bslib::nav_select(
+        id = "main_tabs",
+        selected = "formatting",
+        session = session
+      )
+    })
+
+    shiny::observeEvent(input$apply_formatting, {
+      df_final <- current_preclean_df()
+      shiny::req(df_final)
+
+      run_clean_pipeline(df_final)
+      rv$formatting_done <- TRUE
+
+      bslib::nav_select(
+        id = "main_tabs",
+        selected = "preview",
+        session = session
       )
     })
 
     output$preview_tbl <- DT::renderDT({
       shiny::req(rv$cleaned)
       DT::datatable(
-        utils::head(rv$cleaned, 50),
+        utils::head(rv$cleaned, 200),
         rownames = FALSE,
         options = list(
           scrollX = TRUE,
-          pageLength = 10
+          scrollY = "500px",
+          pageLength = 25
         )
       )
     })

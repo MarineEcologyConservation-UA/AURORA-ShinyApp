@@ -16,6 +16,7 @@
 #' @param create_geodetic_datum logical; if TRUE, create/fill geodeticDatum
 #' @param geodetic_datum_value character; value used to fill geodeticDatum when enabled
 #' @param standardize_event_date logical; if TRUE, try to normalize eventDate to ISO-8601
+#' @param ambiguous_date_order character; "dmy" or "mdy" for ambiguous numeric dates
 #' @return list(data=cleaned_df, issues=issues_df, summary=summary_df)
 #' @export
 clean_dwc_pipeline <- function(df,
@@ -29,16 +30,22 @@ clean_dwc_pipeline <- function(df,
                                preserve_original_coords = FALSE,
                                create_geodetic_datum = FALSE,
                                geodetic_datum_value = "WGS84",
-                               standardize_event_date = TRUE) {
+                               standardize_event_date = TRUE,
+                               ambiguous_date_order = "dmy") {
   if (is.null(df) || !is.data.frame(df)) {
     return(list(data = df, issues = data.frame(), summary = data.frame()))
+  }
+
+  ambiguous_date_order <- tolower(trimws(as.character(ambiguous_date_order %||% "dmy")))
+  if (!(ambiguous_date_order %in% c("dmy", "mdy"))) {
+    ambiguous_date_order <- "dmy"
   }
 
   issues <- data.frame(
     row = integer(),
     field = character(),
     rule = character(),
-    severity = character(),  # "ERROR", "WARNING", "INFO"
+    severity = character(),
     message = character(),
     stringsAsFactors = FALSE
   )
@@ -92,7 +99,6 @@ clean_dwc_pipeline <- function(df,
 
   # ------------------------------------------------------------
   # 2) Dates to ISO-8601 (eventDate)
-  #    Política: tenta produzir YYYY-MM-DD / YYYY-MM / YYYY ou intervalos start/end
   # ------------------------------------------------------------
   if (isTRUE(standardize_event_date) && "eventDate" %in% names(out)) {
     x <- as.character(out$eventDate)
@@ -105,19 +111,18 @@ clean_dwc_pipeline <- function(df,
       s <- x[i]
       if (is.na(s)) return(NA_character_)
 
-      # intervalos já no formato "a/b"
       if (grepl("/", s, fixed = TRUE)) {
         parts <- strsplit(s, "/", fixed = TRUE)[[1]]
         parts <- trimws(parts)
         if (length(parts) == 2) {
-          a <- .coerce_date_iso(parts[1])
-          b <- .coerce_date_iso(parts[2])
+          a <- .coerce_date_iso(parts[1], ambiguous_date_order = ambiguous_date_order)
+          b <- .coerce_date_iso(parts[2], ambiguous_date_order = ambiguous_date_order)
           if (!is.na(a) && !is.na(b)) return(paste0(a, "/", b))
         }
         return(NA_character_)
       }
 
-      .coerce_date_iso(s)
+      .coerce_date_iso(s, ambiguous_date_order = ambiguous_date_order)
     }, character(1))
 
     out$eventDate <- iso
@@ -446,8 +451,7 @@ clean_dwc_pipeline <- function(df,
   }
 
   # ------------------------------------------------------------
-  # 4) Depth validation (minimumDepthInMeters/maximumDepthInMeters)
-  #    + optional bathymetry cross-reference with marmap
+  # 4) Depth validation
   # ------------------------------------------------------------
   has_min <- "minimumDepthInMeters" %in% names(out)
   has_max <- "maximumDepthInMeters" %in% names(out)
@@ -585,7 +589,6 @@ clean_dwc_pipeline <- function(df,
 
   # ------------------------------------------------------------
   # 5) Controlled vocabulary standardization
-  #    (basisOfRecord, sex, lifeStage)
   # ------------------------------------------------------------
 
   if ("basisOfRecord" %in% names(out)) {
@@ -715,7 +718,6 @@ clean_dwc_pipeline <- function(df,
 
   # ------------------------------------------------------------
   # 6) Duplicate detection
-  #    Regra: apenas linhas exatamente idênticas
   # ------------------------------------------------------------
   if (nrow(out) > 1) {
     dup <- duplicated(out)
@@ -728,7 +730,6 @@ clean_dwc_pipeline <- function(df,
     }
   }
 
-  # summary
   if (nrow(issues) == 0) {
     summary <- data.frame(severity = character(), n = integer(), stringsAsFactors = FALSE)
   } else {
@@ -739,17 +740,23 @@ clean_dwc_pipeline <- function(df,
   list(data = out, issues = issues, summary = summary)
 }
 
+# ---- internal: null coalesce ----
+`%||%` <- function(x, y) if (is.null(x)) y else x
+
 # ---- internal: convert single date token to ISO-8601 ----
-.coerce_date_iso <- function(s) {
+.coerce_date_iso <- function(s, ambiguous_date_order = "dmy") {
   s <- trimws(s)
   if (!nzchar(s)) return(NA_character_)
 
-  # already ISO
+  ambiguous_date_order <- tolower(trimws(as.character(ambiguous_date_order %||% "dmy")))
+  if (!(ambiguous_date_order %in% c("dmy", "mdy"))) {
+    ambiguous_date_order <- "dmy"
+  }
+
   if (grepl("^\\d{4}$", s)) return(s)
   if (grepl("^\\d{4}-\\d{2}$", s)) return(s)
   if (grepl("^\\d{4}-\\d{2}-\\d{2}$", s)) return(s)
 
-  # explicit month/year forms like 03/2024 or 3/2024
   if (grepl("^\\d{1,2}/\\d{4}$", s)) {
     p <- strsplit(s, "/", fixed = TRUE)[[1]]
     mm <- suppressWarnings(as.integer(p[1]))
@@ -759,14 +766,20 @@ clean_dwc_pipeline <- function(df,
     }
   }
 
-  # try lubridate
   if (requireNamespace("lubridate", quietly = TRUE)) {
-    candidates <- c(
-      suppressWarnings(lubridate::ymd(s, quiet = TRUE)),
-      suppressWarnings(lubridate::dmy(s, quiet = TRUE)),
-      suppressWarnings(lubridate::mdy(s, quiet = TRUE))
-    )
-    candidates <- candidates[!is.na(candidates)]
+    candidates <- list()
+
+    candidates[[length(candidates) + 1]] <- suppressWarnings(lubridate::ymd(s, quiet = TRUE))
+
+    if (identical(ambiguous_date_order, "dmy")) {
+      candidates[[length(candidates) + 1]] <- suppressWarnings(lubridate::dmy(s, quiet = TRUE))
+      candidates[[length(candidates) + 1]] <- suppressWarnings(lubridate::mdy(s, quiet = TRUE))
+    } else {
+      candidates[[length(candidates) + 1]] <- suppressWarnings(lubridate::mdy(s, quiet = TRUE))
+      candidates[[length(candidates) + 1]] <- suppressWarnings(lubridate::dmy(s, quiet = TRUE))
+    }
+
+    candidates <- candidates[!vapply(candidates, is.na, logical(1))]
     if (length(candidates) > 0) {
       return(format(candidates[[1]], "%Y-%m-%d"))
     }
