@@ -49,7 +49,6 @@ mod_ingest_ui <- function(id) {
         "Encoding",
         choices = c(
           "UTF-8" = "UTF-8",
-          "UTF-8-BOM" = "UTF-8",
           "Latin1 (ISO-8859-1)" = "Latin1",
           "Windows-1252" = "Windows-1252"
         ),
@@ -277,7 +276,6 @@ mod_ingest_server <- function(id, example_map) {
 
     # --------------------------------------------------
     # COLUMN SUMMARY
-    # Raw before pivot; current tidy/pivot after pivot
     # --------------------------------------------------
     output$col_stats <- DT::renderDT({
       shiny::req(rv$raw)
@@ -313,50 +311,85 @@ mod_ingest_server <- function(id, example_map) {
       cols <- names(df)
       num_cols <- cols[vapply(df, is.numeric, logical(1))]
 
-      shiny::fluidRow(
-        shiny::column(
-          4,
-          shiny::div(
-            class = "mb-3",
-            shiny::strong("Current dataset used for downstream steps"),
-            shiny::tags$br(),
-            shiny::tags$small(
-              if (isTRUE(pv$is_pivoted)) {
-                "Pivoted dataset"
-              } else {
-                "Minimal tidy dataset (no pivot applied yet)"
-              }
+      shiny::tagList(
+        shiny::tags$style(shiny::HTML(sprintf("
+          #%s .pivot-check-wrap {
+            max-height: 260px;
+            overflow-y: auto;
+            border: 1px solid #d1d5db;
+            border-radius: 0.5rem;
+            padding: 0.75rem 0.9rem;
+            background: #ffffff;
+          }
+          #%s .pivot-check-wrap .shiny-options-group {
+            display: block;
+            margin-bottom: 0;
+          }
+          #%s .pivot-check-wrap .checkbox {
+            margin-top: 0.15rem;
+            margin-bottom: 0.45rem;
+          }
+          #%s .pivot-check-wrap label {
+            font-weight: 400;
+            margin-bottom: 0;
+          }
+        ",
+          session$ns("pivot_block"),
+          session$ns("pivot_block"),
+          session$ns("pivot_block"),
+          session$ns("pivot_block")
+        ))),
+
+        shiny::fluidRow(
+          shiny::column(
+            4,
+            shiny::div(
+              id = session$ns("pivot_block"),
+              shiny::div(
+                class = "mb-3",
+                shiny::strong("Current dataset used for downstream steps"),
+                shiny::tags$br(),
+                shiny::tags$small(
+                  if (isTRUE(pv$is_pivoted)) {
+                    "Pivoted dataset"
+                  } else {
+                    "Minimal tidy dataset (no pivot applied yet)"
+                  }
+                )
+              ),
+
+              shiny::tags$label(
+                `for` = session$ns("pivot_value_cols"),
+                "Columns to pivot"
+              ),
+
+              shiny::div(
+                class = "pivot-check-wrap",
+                shiny::checkboxGroupInput(
+                  session$ns("pivot_value_cols"),
+                  label = NULL,
+                  choices = cols,
+                  selected = intersect(num_cols, cols)
+                )
+              ),
+
+              shiny::br(),
+              shiny::textInput(session$ns("pivot_names_to"), "names_to", "variable"),
+              shiny::textInput(session$ns("pivot_values_to"), "values_to", "value"),
+              shiny::checkboxInput(session$ns("pivot_drop_na"), "Drop NA", TRUE),
+              shiny::checkboxInput(session$ns("pivot_drop_zero"), "Drop zero", TRUE),
+              shiny::br(),
+              shiny::actionButton(session$ns("pivot_apply"), "Pivot"),
+              shiny::actionButton(session$ns("pivot_undo"), "Undo"),
+              shiny::actionButton(session$ns("pivot_reset"), "Reset")
             )
           ),
-          shiny::selectizeInput(
-            session$ns("pivot_id_cols"),
-            "ID columns",
-            choices = cols,
-            multiple = TRUE,
-            options = list(plugins = list("remove_button"))
-          ),
-          shiny::selectizeInput(
-            session$ns("pivot_value_cols"),
-            "Columns to pivot",
-            choices = cols,
-            selected = num_cols,
-            multiple = TRUE,
-            options = list(plugins = list("remove_button"))
-          ),
-          shiny::textInput(session$ns("pivot_names_to"), "names_to", "variable"),
-          shiny::textInput(session$ns("pivot_values_to"), "values_to", "value"),
-          shiny::checkboxInput(session$ns("pivot_drop_na"), "Drop NA", TRUE),
-          shiny::checkboxInput(session$ns("pivot_drop_zero"), "Drop zero", TRUE),
-          shiny::br(),
-          shiny::actionButton(session$ns("pivot_apply"), "Pivot"),
-          shiny::actionButton(session$ns("pivot_undo"), "Undo"),
-          shiny::actionButton(session$ns("pivot_reset"), "Reset")
-        ),
-        shiny::column(
-          8,
-          shiny::verbatimTextOutput(session$ns("pivot_info")),
-          shiny::h5("Current dataset preview"),
-          DT::DTOutput(session$ns("pivot_after"))
+          shiny::column(
+            8,
+            shiny::verbatimTextOutput(session$ns("pivot_info")),
+            shiny::h5("Current dataset preview"),
+            DT::DTOutput(session$ns("pivot_after"))
+          )
         )
       )
     })
@@ -383,12 +416,18 @@ mod_ingest_server <- function(id, example_map) {
       shiny::req(pv$data)
 
       df_before <- pv$data
+      pivot_cols <- input$pivot_value_cols %||% character()
+      id_cols <- setdiff(names(df_before), pivot_cols)
+
+      shiny::validate(
+        shiny::need(length(pivot_cols) > 0, "Select at least one column to pivot.")
+      )
 
       df_after <- tryCatch({
         apply_pivot_longer(
           df = df_before,
-          id_cols = input$pivot_id_cols %||% character(),
-          pivot_cols = input$pivot_value_cols %||% character(),
+          id_cols = id_cols,
+          pivot_cols = pivot_cols,
           names_to = input$pivot_names_to,
           values_to = input$pivot_values_to,
           drop_na = isTRUE(input$pivot_drop_na),

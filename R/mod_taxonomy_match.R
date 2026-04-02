@@ -1,7 +1,7 @@
 # =========================================================
 # Taxonomy Match Module (WoRMS / GBIF)
-# - GBIF continua disponível
-# - WoRMS usa APENAS worrms::wm_records_taxamatch()
+# - GBIF remains available
+# - WoRMS uses ONLY worrms::wm_records_taxamatch()
 # - input column configurable (default: verbatimIdentification if present)
 # - normalisedQuery explicit and always created
 # - one lookup row per unique inputName
@@ -16,21 +16,210 @@
 mod_taxonomy_match_ui <- function(id) {
   ns <- shiny::NS(id)
 
+  root_sel <- paste0("#", ns("root"))
+
+  tooltip_content <- shiny::tags$div(
+    class = "tax-tip-wrap",
+    shiny::tags$div(class = "tax-tip-title", "What this does"),
+    shiny::tags$div(
+      class = "tax-tip-text",
+      "Creates a cleaned version of the input name to improve database matching."
+    ),
+
+    shiny::tags$div(class = "tax-tip-title mt-2", "Current cleanup rules"),
+    shiny::tags$ul(
+      class = "tax-tip-list",
+      shiny::tags$li(
+        "removes text inside parentheses: ",
+        shiny::tags$span(class = "tax-tip-chip", "(...)")
+      ),
+      shiny::tags$li(
+        "removes text inside brackets: ",
+        shiny::tags$span(class = "tax-tip-chip", "[...]")
+      ),
+      shiny::tags$li(
+        "removes life-stage qualifiers: ",
+        shiny::tags$span(class = "tax-tip-chip", "juvenile"), ", ",
+        shiny::tags$span(class = "tax-tip-chip", "juveniles"), ", ",
+        shiny::tags$span(class = "tax-tip-chip", "adult"), ", ",
+        shiny::tags$span(class = "tax-tip-chip", "adults"), ", ",
+        shiny::tags$span(class = "tax-tip-chip", "larva"), ", ",
+        shiny::tags$span(class = "tax-tip-chip", "larvae"), ", ",
+        shiny::tags$span(class = "tax-tip-chip", "egg"), ", ",
+        shiny::tags$span(class = "tax-tip-chip", "eggs")
+      ),
+      shiny::tags$li(
+        "removes sex qualifiers: ",
+        shiny::tags$span(class = "tax-tip-chip", "male"), ", ",
+        shiny::tags$span(class = "tax-tip-chip", "female"), ", ",
+        shiny::tags$span(class = "tax-tip-chip", "unknown sex")
+      ),
+      shiny::tags$li(
+        "removes status words: ",
+        shiny::tags$span(class = "tax-tip-chip", "alive"), ", ",
+        shiny::tags$span(class = "tax-tip-chip", "dead")
+      ),
+      shiny::tags$li(
+        "removes informal qualifiers: ",
+        shiny::tags$span(class = "tax-tip-chip", "indet"), ", ",
+        shiny::tags$span(class = "tax-tip-chip", "indet."), ", ",
+        shiny::tags$span(class = "tax-tip-chip", "msp"), ", ",
+        shiny::tags$span(class = "tax-tip-chip", "msp."), ", ",
+        shiny::tags$span(class = "tax-tip-chip", "sp"), ", ",
+        shiny::tags$span(class = "tax-tip-chip", "sp."), ", ",
+        shiny::tags$span(class = "tax-tip-chip", "cf"), ", ",
+        shiny::tags$span(class = "tax-tip-chip", "cf."), ", ",
+        shiny::tags$span(class = "tax-tip-chip", "aff"), ", ",
+        shiny::tags$span(class = "tax-tip-chip", "aff."), ", ",
+        shiny::tags$span(class = "tax-tip-chip", "morphotype")
+      ),
+      shiny::tags$li(
+        "removes standalone numbers such as ",
+        shiny::tags$span(class = "tax-tip-chip", "1"), ", ",
+        shiny::tags$span(class = "tax-tip-chip", "2"), ", ",
+        shiny::tags$span(class = "tax-tip-chip", "3")
+      ),
+      shiny::tags$li(
+        "removes punctuation ",
+        shiny::tags$span(class = "tax-tip-chip", ","), " ",
+        shiny::tags$span(class = "tax-tip-chip", ";"), " ",
+        shiny::tags$span(class = "tax-tip-chip", ":")
+      ),
+      shiny::tags$li("collapses extra whitespace"),
+      shiny::tags$li("keeps only the first two name tokens when applicable")
+    ),
+
+    shiny::tags$div(class = "tax-tip-title mt-2", "Examples"),
+    shiny::tags$div(
+      class = "tax-tip-example",
+      shiny::tags$span(class = "tax-tip-chip", "Polynoidae msp 1"),
+      " \u2192 ",
+      shiny::tags$span(class = "tax-tip-chip", "Polynoidae")
+    ),
+    shiny::tags$div(
+      class = "tax-tip-example",
+      shiny::tags$span(class = "tax-tip-chip", "Abra alba (juveniles)"),
+      " \u2192 ",
+      shiny::tags$span(class = "tax-tip-chip", "Abra alba")
+    ),
+    shiny::tags$div(
+      class = "tax-tip-example",
+      shiny::tags$span(class = "tax-tip-chip", "Gammarus cf. salinus"),
+      " \u2192 ",
+      shiny::tags$span(class = "tax-tip-chip", "Gammarus salinus")
+    ),
+    shiny::tags$div(
+      class = "tax-tip-example",
+      shiny::tags$span(class = "tax-tip-chip", "Nephtys indet."),
+      " \u2192 ",
+      shiny::tags$span(class = "tax-tip-chip", "Nephtys")
+    )
+  )
+
+  info_icon <- shiny::tags$span(
+    class = "tax-info-icon",
+    tabindex = "0",
+    role = "button",
+    `aria-label` = "More information",
+    "i"
+  )
+
+  css <- paste0("
+    ", root_sel, " .tax-top .card-body { padding: 1rem; }
+    ", root_sel, " .tax-top .card { height: 100%; }
+    ", root_sel, " .tax-minh { min-height: 300px; }
+    ", root_sel, " .tax-actions .btn { margin-right: .5rem; }
+    ", root_sel, " .tax-scroll-note { color: #6b7280; font-size: .9rem; }
+    ", root_sel, " .tax-muted { color: #6b7280; }
+    ", root_sel, " .tax-small { font-size: .92rem; }
+    ", root_sel, " .tax-cols-wrap { max-height: 260px; overflow-y: auto; padding-right: .5rem; }
+    ", root_sel, " .tax-card-fill { height: 100%; }
+
+    ", root_sel, " .tax-check-help {
+      display: flex;
+      align-items: center;
+      gap: .45rem;
+      margin-bottom: 1rem;
+      flex-wrap: wrap;
+    }
+
+    ", root_sel, " .tax-check-help .form-group {
+      margin-bottom: 0;
+    }
+
+    ", root_sel, " .tax-check-help .form-check {
+      margin-bottom: 0;
+      min-height: auto;
+    }
+
+    ", root_sel, " .tax-check-help .form-check-label {
+      display: inline-flex;
+      align-items: center;
+      gap: .45rem;
+    }
+
+    ", root_sel, " .tax-info-icon {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      border: 1px solid #6b7280;
+      color: #6b7280;
+      font-size: 12px;
+      font-weight: 700;
+      line-height: 1;
+      cursor: help;
+      flex: 0 0 auto;
+      background: #fff;
+    }
+
+    ", root_sel, " .tooltip {
+      --bs-tooltip-max-width: 560px;
+    }
+
+    ", root_sel, " .tax-tip-wrap {
+      text-align: left;
+      line-height: 1.4;
+    }
+
+    ", root_sel, " .tax-tip-title {
+      font-weight: 700;
+      margin-bottom: .25rem;
+    }
+
+    ", root_sel, " .tax-tip-text {
+      margin-bottom: .25rem;
+    }
+
+    ", root_sel, " .tax-tip-list {
+      margin: 0 0 .5rem 1rem;
+      padding: 0;
+    }
+
+    ", root_sel, " .tax-tip-list li {
+      margin-bottom: .2rem;
+    }
+
+    ", root_sel, " .tax-tip-chip {
+      display: inline-block;
+      padding: .05rem .35rem;
+      border-radius: .35rem;
+      background: rgba(255,255,255,.14);
+      color: #fff;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace;
+      font-size: .92em;
+      white-space: nowrap;
+    }
+
+    ", root_sel, " .tax-tip-example {
+      margin-bottom: .2rem;
+    }
+  ")
+
   shiny::tagList(
-    shiny::tags$style(shiny::HTML(sprintf("
-      #%s .tax-top .card-body { padding: 1rem; }
-      #%s .tax-top .card { height: 100%%; }
-      #%s .tax-minh { min-height: 300px; }
-      #%s .tax-actions .btn { margin-right: .5rem; }
-      #%s .tax-scroll-note { color: #6b7280; font-size: .9rem; }
-      #%s .tax-muted { color: #6b7280; }
-      #%s .tax-small { font-size: .92rem; }
-      #%s .tax-cols-wrap { max-height: 260px; overflow-y: auto; padding-right: .5rem; }
-      #%s .tax-card-fill { height: 100%%; }
-    ",
-      ns("root"), ns("root"), ns("root"), ns("root"),
-      ns("root"), ns("root"), ns("root"), ns("root"), ns("root")
-    ))),
+    shiny::tags$style(shiny::HTML(css)),
 
     shiny::tags$div(
       id = ns("root"),
@@ -40,16 +229,16 @@ mod_taxonomy_match_ui <- function(id) {
         bslib::card_body(
 
           bslib::card(
-            bslib::card_header("Notas"),
+            bslib::card_header("Notes"),
             bslib::card_body(
               shiny::tags$ul(
-                shiny::tags$li("O match parte de uma coluna de entrada configurável, idealmente verbatimIdentification."),
-                shiny::tags$li("normalisedQuery é sempre criado e representa o texto efetivamente enviado à base selecionada."),
-                shiny::tags$li("WoRMS usa apenas worrms::wm_records_taxamatch()."),
-                shiny::tags$li("GBIF continua disponível para nomes terrestres."),
-                shiny::tags$li("A tabela mostra uma linha por inputName único."),
-                shiny::tags$li("Quando há ambiguidades, o utilizador pode escolher manualmente o candidato."),
-                shiny::tags$li("Ao aplicar ao dataset, o módulo escreve apenas as colunas selecionadas.")
+                shiny::tags$li("Matching starts from a configurable input column, ideally verbatimIdentification."),
+                shiny::tags$li("normalisedQuery is always created and represents the text actually submitted to the selected database."),
+                shiny::tags$li("WoRMS uses only worrms::wm_records_taxamatch()."),
+                shiny::tags$li("GBIF remains available for terrestrial names."),
+                shiny::tags$li("The lookup table shows one row per unique inputName."),
+                shiny::tags$li("When ambiguities exist, the user can manually choose the candidate."),
+                shiny::tags$li("When applying to the dataset, the module writes only the selected output columns.")
               )
             )
           ),
@@ -64,42 +253,41 @@ mod_taxonomy_match_ui <- function(id) {
 
               bslib::card(
                 class = "tax-minh tax-card-fill",
-                bslib::card_header("Configuração"),
+                bslib::card_header("Settings"),
                 bslib::card_body(
                   shiny::uiOutput(ns("input_col_ui")),
 
                   shiny::radioButtons(
                     inputId = ns("tax_db"),
-                    label = "Base de dados",
+                    label = "Database",
                     choices = c(
-                      "WoRMS (marinho)" = "worms",
-                      "GBIF Backbone (terrestre)" = "gbif"
+                      "WoRMS (marine)" = "worms",
+                      "GBIF Backbone (terrestrial)" = "gbif"
                     ),
                     selected = "worms",
                     inline = FALSE
                   ),
 
-                  shiny::checkboxInput(
-                    inputId = ns("try_truncate"),
-                    label = "Gerar normalisedQuery limpando qualificadores (ex.: 'msp 1', 'indet.', '(juveniles)')",
-                    value = TRUE
-                  ),
-
-                  shiny::checkboxInput(
-                    inputId = ns("auto_apply_unique"),
-                    label = "Marcar automaticamente quando houver candidato único",
-                    value = TRUE
-                  ),
-
-                  shiny::checkboxInput(
-                    inputId = ns("replace_scientificName"),
-                    label = "Ao aplicar: preencher/substituir scientificName com o nome resolvido (quando houver MATCHED)",
-                    value = FALSE
+                  shiny::tags$div(
+                    class = "tax-check-help",
+                    shiny::checkboxInput(
+                      inputId = ns("generate_normalised_query"),
+                      label = shiny::tagList(
+                        shiny::span("Generate normalisedQuery"),
+                        bslib::tooltip(
+                          trigger = info_icon,
+                          placement = "auto",
+                          tooltip_content
+                        )
+                      ),
+                      value = TRUE,
+                      width = NULL
+                    )
                   ),
 
                   shiny::numericInput(
                     inputId = ns("top_n"),
-                    label = "Top N candidatos (para revisão manual)",
+                    label = "Top N candidates (for manual review)",
                     value = 5,
                     min = 2,
                     max = 50,
@@ -108,20 +296,20 @@ mod_taxonomy_match_ui <- function(id) {
 
                   shiny::tags$div(
                     class = "tax-actions d-flex gap-2 flex-wrap",
-                    shiny::actionButton(ns("run_match"), "Executar match", class = "btn-primary"),
+                    shiny::actionButton(ns("run_match"), "Run match", class = "btn-primary"),
                     shiny::uiOutput(ns("apply_btn_ui"), inline = TRUE)
                   ),
 
                   shiny::hr(),
                   shiny::uiOutput(ns("pkg_status")),
                   shiny::hr(),
-                  shiny::downloadButton(ns("download_lookup"), "Exportar lookup (CSV)")
+                  shiny::downloadButton(ns("download_lookup"), "Export lookup (CSV)")
                 )
               ),
 
               bslib::card(
                 class = "tax-minh tax-card-fill",
-                bslib::card_header("Colunas a manter no dataset final"),
+                bslib::card_header("Columns to keep in final dataset"),
                 bslib::card_body(
                   shiny::tags$div(
                     class = "tax-cols-wrap",
@@ -129,14 +317,14 @@ mod_taxonomy_match_ui <- function(id) {
                   ),
                   shiny::tags$div(
                     class = "tax-scroll-note mt-2",
-                    "normalisedQuery, taxonMatchStatus, selectedID e nameAccordingTo são colunas técnicas e não entram por defeito no dataset final."
+                    "normalisedQuery, taxonMatchStatus, selectedID, and nameAccordingTo are technical columns and are not included in the final dataset by default."
                   )
                 )
               ),
 
               bslib::card(
                 class = "tax-minh tax-card-fill",
-                bslib::card_header("Resumo"),
+                bslib::card_header("Summary"),
                 bslib::card_body(
                   shiny::uiOutput(ns("summary_box"))
                 )
@@ -147,14 +335,14 @@ mod_taxonomy_match_ui <- function(id) {
       ),
 
       bslib::card(
-        bslib::card_header("Tabela de nomes (lookup)"),
+        bslib::card_header("Name lookup table"),
         bslib::card_body(
           DT::DTOutput(ns("lookup_tbl"))
         )
       ),
 
       bslib::card(
-        bslib::card_header("Issues (taxonomia)"),
+        bslib::card_header("Issues (taxonomy)"),
         bslib::card_body(
           DT::DTOutput(ns("issues_tbl"))
         )
@@ -173,6 +361,9 @@ mod_taxonomy_match_server <- function(id, df_in) {
     ns <- session$ns
 
     `%||%` <- function(x, y) if (is.null(x)) y else x
+
+    auto_apply_unique <- TRUE
+    replace_scientificName <- FALSE
 
     empty_issues <- function() {
       data.frame(
@@ -295,15 +486,15 @@ mod_taxonomy_match_server <- function(id, df_in) {
     output$pkg_status <- shiny::renderUI({
       if (identical(input$tax_db, "worms")) {
         if (has_needed_pkgs()) {
-          shiny::tags$div("Pacote OK: worrms.")
+          shiny::tags$div("Package available: worrms.")
         } else {
-          shiny::tags$div("Falta o pacote 'worrms' para usar WoRMS.")
+          shiny::tags$div("Package 'worrms' is required for WoRMS matching.")
         }
       } else {
         if (has_needed_pkgs()) {
-          shiny::tags$div("Pacote OK: rgbif.")
+          shiny::tags$div("Package available: rgbif.")
         } else {
-          shiny::tags$div("Falta o pacote 'rgbif' para usar GBIF.")
+          shiny::tags$div("Package 'rgbif' is required for GBIF matching.")
         }
       }
     })
@@ -329,13 +520,6 @@ mod_taxonomy_match_server <- function(id, df_in) {
       x
     }
 
-    safe_num1 <- function(x) {
-      if (is.null(x) || length(x) == 0) return(NA_real_)
-      z <- suppressWarnings(as.numeric(x[1]))
-      if (length(z) == 0 || is.na(z)) return(NA_real_)
-      z
-    }
-
     current_input_col <- shiny::reactive({
       df <- df_in()
       shiny::req(is.data.frame(df))
@@ -357,7 +541,7 @@ mod_taxonomy_match_server <- function(id, df_in) {
 
       cols <- names(df)
       if (length(cols) == 0) {
-        return(shiny::tags$div("Sem colunas disponíveis."))
+        return(shiny::tags$div("No columns available."))
       }
 
       selected <- input$input_col
@@ -373,7 +557,7 @@ mod_taxonomy_match_server <- function(id, df_in) {
 
       shiny::selectInput(
         inputId = ns("input_col"),
-        label = "Coluna de entrada para o match",
+        label = "Input column for matching",
         choices = cols,
         selected = selected
       )
@@ -384,7 +568,7 @@ mod_taxonomy_match_server <- function(id, df_in) {
 
       shiny::actionButton(
         ns("apply_match"),
-        "Aplicar ao dataset",
+        "Apply to dataset",
         class = "btn-success",
         disabled = if (!enabled) "disabled" else NULL
       )
@@ -433,7 +617,7 @@ mod_taxonomy_match_server <- function(id, df_in) {
       sort(unique(x))
     })
 
-    normalize_query_info <- function(name, try_truncate = TRUE) {
+    normalize_query_info <- function(name, generate_normalised_query = TRUE) {
       s0 <- normalize_ws(name)
 
       if (!nzchar(s0)) {
@@ -447,7 +631,7 @@ mod_taxonomy_match_server <- function(id, df_in) {
       low <- tolower(s0)
       out <- s0
 
-      if (isTRUE(try_truncate)) {
+      if (isTRUE(generate_normalised_query)) {
         out <- low
         out <- gsub("\\([^)]*\\)", " ", out)
         out <- gsub("\\[[^]]*\\]", " ", out)
@@ -526,9 +710,6 @@ mod_taxonomy_match_server <- function(id, df_in) {
     }
 
     normalize_worms_candidates <- function(x) {
-      # wm_records_taxamatch() nas versões atuais retorna lista
-      # com um data.frame/tibble por nome consultado
-
       df <- NULL
 
       if (is.null(x)) {
@@ -538,7 +719,6 @@ mod_taxonomy_match_server <- function(id, df_in) {
       if (is.data.frame(x)) {
         df <- x
       } else if (is.list(x)) {
-        # caso comum: lista de resultados, um por nome
         if (length(x) >= 1) {
           df <- x[[1]]
         }
@@ -935,7 +1115,7 @@ mod_taxonomy_match_server <- function(id, df_in) {
           )
         }
 
-        choices <- c("-- selecionar candidato --" = "", stats::setNames(ids, lab))
+        choices <- c("-- select candidate --" = "", stats::setNames(ids, lab))
         input_id <- ns(paste0("cand_", i))
         selected_val <- if (!is.na(disp$selectedID[i]) && disp$selectedID[i] != "") disp$selectedID[i] else ""
 
@@ -950,6 +1130,20 @@ mod_taxonomy_match_server <- function(id, df_in) {
         )
       }
 
+      disp$.choice_order <- 3L
+      disp$.choice_order[
+        disp$taxonMatchStatus == "AMBIGUOUS" &
+          (is.na(disp$selectedID) | disp$selectedID == "")
+      ] <- 0L
+      disp$.choice_order[
+        disp$taxonMatchStatus == "AMBIGUOUS" &
+          !is.na(disp$selectedID) & disp$selectedID != ""
+      ] <- 1L
+      disp$.choice_order[grepl("^MATCHED", disp$taxonMatchStatus)] <- 2L
+
+      disp <- disp[order(disp$.choice_order, disp$inputName), , drop = FALSE]
+      disp$.choice_order <- NULL
+
       disp
     }
 
@@ -958,7 +1152,7 @@ mod_taxonomy_match_server <- function(id, df_in) {
       src <- current_input_col()
 
       if (length(nms) == 0) {
-        return(shiny::tags$div("Nenhum nome disponível na coluna escolhida."))
+        return(shiny::tags$div("No names available in the selected input column."))
       }
 
       lk <- rv$lookup
@@ -966,17 +1160,17 @@ mod_taxonomy_match_server <- function(id, df_in) {
       if (is.null(lk) || !is.data.frame(lk) || nrow(lk) == 0) {
         unres <- vapply(
           nms,
-          function(x) is_blank(normalize_query_info(x, try_truncate = isTRUE(input$try_truncate))$query),
+          function(x) is_blank(normalize_query_info(x, generate_normalised_query = isTRUE(input$generate_normalised_query))$query),
           logical(1)
         )
 
         return(
           shiny::tags$div(
-            shiny::tags$p(paste0("Coluna de entrada: ", src)),
-            shiny::tags$p(paste0("Nomes únicos: ", length(nms))),
-            shiny::tags$p(paste0("UNRESOLVABLE (pré-match): ", sum(unres))),
+            shiny::tags$p(paste0("Input column: ", src)),
+            shiny::tags$p(paste0("Unique names: ", length(nms))),
+            shiny::tags$p(paste0("UNRESOLVABLE (pre-match): ", sum(unres))),
             shiny::tags$p("MATCHED: 0 | AMBIGUOUS: 0 | NOT_FOUND: 0"),
-            shiny::tags$p("Dataset aplicado: NÃO")
+            shiny::tags$p("Dataset applied: NO")
           )
         )
       }
@@ -988,14 +1182,14 @@ mod_taxonomy_match_server <- function(id, df_in) {
       n_unres <- sum(lk$taxonMatchStatus == "UNRESOLVABLE", na.rm = TRUE)
 
       shiny::tags$div(
-        shiny::tags$p(paste0("Coluna de entrada: ", src)),
-        shiny::tags$p(paste0("Nomes únicos: ", length(nms))),
+        shiny::tags$p(paste0("Input column: ", src)),
+        shiny::tags$p(paste0("Unique names: ", length(nms))),
         shiny::tags$p(paste0("UNRESOLVABLE: ", n_unres)),
         shiny::tags$p(paste0("MATCHED: ", n_matched, " | AMBIGUOUS: ", n_amb, " | NOT_FOUND: ", n_nf)),
         shiny::tags$p(
           paste0(
-            "Dataset aplicado: ",
-            if (!is.null(rv$applied_df) && is.data.frame(rv$applied_df)) "SIM" else "NÃO"
+            "Dataset applied: ",
+            if (!is.null(rv$applied_df) && is.data.frame(rv$applied_df)) "YES" else "NO"
           )
         )
       )
@@ -1014,37 +1208,37 @@ mod_taxonomy_match_server <- function(id, df_in) {
 
       shiny::showModal(
         shiny::modalDialog(
-          title = "Confirmar escolha taxonómica",
+          title = "Confirm taxonomic choice",
           shiny::tags$p(
             paste0(
-              "O candidato selecionado para '", nm,
-              "' irá marcar esta linha como MATCHED_MANUAL."
+              "The selected candidate for '", nm,
+              "' will mark this row as MATCHED_MANUAL."
             )
           ),
           shiny::tags$p(paste0("normalisedQuery: ", q)),
           if (length(same_nq) > 0) {
             shiny::tags$p(
               paste0(
-                "Existem ",
+                "There are ",
                 length(same_nq),
-                " outra(s) linha(s) com o mesmo normalisedQuery. Deseja aplicar a mesma escolha a todas elas?"
+                " other row(s) with the same normalisedQuery. Do you want to apply the same choice to all of them?"
               )
             )
           } else {
-            shiny::tags$p("Não existem outras linhas com o mesmo normalisedQuery.")
+            shiny::tags$p("There are no other rows with the same normalisedQuery.")
           },
           shiny::checkboxInput(
             ns("choice_popup_dont_show"),
-            "Não mostrar novamente nesta sessão",
+            "Do not show this again during this session",
             value = FALSE
           ),
           easyClose = FALSE,
           footer = shiny::tagList(
-            shiny::modalButton("Cancelar"),
-            shiny::actionButton(ns("choice_apply_this"), "Aplicar apenas nesta linha", class = "btn-primary"),
+            shiny::modalButton("Cancel"),
+            shiny::actionButton(ns("choice_apply_this"), "Apply only to this row", class = "btn-primary"),
             shiny::actionButton(
               ns("choice_apply_same"),
-              "Aplicar também aos mesmos normalisedQuery",
+              "Apply also to matching normalisedQuery rows",
               class = "btn-success"
             )
           )
@@ -1055,31 +1249,31 @@ mod_taxonomy_match_server <- function(id, df_in) {
     open_apply_pending_popup <- function(n_pending) {
       shiny::showModal(
         shiny::modalDialog(
-          title = "Existem casos AMBIGUOUS sem escolha",
+          title = "There are AMBIGUOUS cases without a selection",
           shiny::tags$p(
             paste0(
-              "Existem ",
+              "There are ",
               n_pending,
-              " linha(s) AMBIGUOUS ainda sem escolha manual."
+              " AMBIGUOUS row(s) still without a manual selection."
             )
           ),
           shiny::tags$p(
-            "Deseja usar automaticamente a primeira opção do dropdown para esses casos antes de aplicar ao dataset?"
+            "Do you want to automatically use the first dropdown option for these cases before applying to the dataset?"
           ),
           shiny::tags$p(
-            "Também é possível continuar e manter esses casos como AMBIGUOUS."
+            "You can also continue and keep those cases as AMBIGUOUS."
           ),
           easyClose = FALSE,
           footer = shiny::tagList(
-            shiny::modalButton("Cancelar"),
+            shiny::modalButton("Cancel"),
             shiny::actionButton(
               ns("apply_keep_ambiguous"),
-              "Manter AMBIGUOUS e aplicar",
+              "Keep AMBIGUOUS and apply",
               class = "btn-secondary"
             ),
             shiny::actionButton(
               ns("apply_first_choices"),
-              "Usar a primeira opção e aplicar",
+              "Use first option and apply",
               class = "btn-warning"
             )
           )
@@ -1107,7 +1301,7 @@ mod_taxonomy_match_server <- function(id, df_in) {
       if (!has_needed_pkgs()) {
         add_issue(
           NA_integer_, src, "taxonomy_missing_pkg", "ERROR",
-          "Pacote necessário não está instalado para a base selecionada."
+          "The required package is not installed for the selected database."
         )
         return()
       }
@@ -1116,13 +1310,13 @@ mod_taxonomy_match_server <- function(id, df_in) {
       if (length(nms) == 0) {
         add_issue(
           NA_integer_, src, "taxonomy_no_names", "WARNING",
-          "Sem nomes para validar na coluna selecionada."
+          "No names available for validation in the selected input column."
         )
         return()
       }
 
       qinfo <- lapply(nms, function(nm) {
-        normalize_query_info(nm, try_truncate = isTRUE(input$try_truncate))
+        normalize_query_info(nm, generate_normalised_query = isTRUE(input$generate_normalised_query))
       })
 
       normalised <- vapply(qinfo, `[[`, character(1), "query")
@@ -1148,7 +1342,7 @@ mod_taxonomy_match_server <- function(id, df_in) {
         for (nm in nms[unres]) {
           add_issue(
             NA_integer_, src, "taxonomy_unresolvable", "INFO",
-            paste0("Nome não resolvível automaticamente: '", nm, "'.")
+            paste0("Name could not be resolved automatically: '", nm, "'.")
           )
         }
       }
@@ -1156,7 +1350,7 @@ mod_taxonomy_match_server <- function(id, df_in) {
       to_do <- which(lookup$taxonMatchStatus == "PENDING")
 
       if (length(to_do) > 0) {
-        shiny::withProgress(message = "A validar nomes...", value = 0, {
+        shiny::withProgress(message = "Matching names...", value = 0, {
           for (k in seq_along(to_do)) {
             i <- to_do[k]
             nm <- lookup$inputName[i]
@@ -1168,14 +1362,14 @@ mod_taxonomy_match_server <- function(id, df_in) {
                 input_name = nm,
                 normalised_query = q,
                 top_n = input$top_n,
-                auto_apply_unique = input$auto_apply_unique
+                auto_apply_unique = auto_apply_unique
               )
             } else {
               match_one_gbif(
                 input_name = nm,
                 normalised_query = q,
                 top_n = input$top_n,
-                auto_apply_unique = input$auto_apply_unique
+                auto_apply_unique = auto_apply_unique
               )
             }
 
@@ -1189,14 +1383,14 @@ mod_taxonomy_match_server <- function(id, df_in) {
             if (lookup$taxonMatchStatus[i] == "NOT_FOUND") {
               add_issue(
                 NA_integer_, src, "taxonomy_not_found", "WARNING",
-                paste0("Não encontrado na base selecionada: '", nm, "' (query='", q, "').")
+                paste0("Not found in the selected database: '", nm, "' (query='", q, "').")
               )
             }
 
             if (lookup$taxonMatchStatus[i] == "AMBIGUOUS") {
               add_issue(
                 NA_integer_, src, "taxonomy_ambiguous", "WARNING",
-                paste0("Múltiplos candidatos para: '", nm, "' (query='", q, "'). Seleciona no dropdown.")
+                paste0("Multiple candidates found for: '", nm, "' (query='", q, "'). Select one in the dropdown.")
               )
             }
           }
@@ -1229,8 +1423,8 @@ mod_taxonomy_match_server <- function(id, df_in) {
                   NA_integer_, src, "taxonomy_manual_resolution",
                   "INFO",
                   paste0(
-                    "Linha '", rv$lookup$inputName[ii],
-                    "' resolvida manualmente e marcada como MATCHED_MANUAL."
+                    "Row '", rv$lookup$inputName[ii],
+                    "' was manually resolved and marked as MATCHED_MANUAL."
                   )
                 )
               } else {
@@ -1261,8 +1455,8 @@ mod_taxonomy_match_server <- function(id, df_in) {
         NA_integer_, src, "taxonomy_manual_resolution",
         "INFO",
         paste0(
-          "Linha '", rv$lookup$inputName[row_index],
-          "' resolvida manualmente e marcada como MATCHED_MANUAL."
+          "Row '", rv$lookup$inputName[row_index],
+          "' was manually resolved and marked as MATCHED_MANUAL."
         )
       )
 
@@ -1289,9 +1483,9 @@ mod_taxonomy_match_server <- function(id, df_in) {
         NA_integer_, src, "taxonomy_manual_resolution_same_normalised",
         "INFO",
         paste0(
-          "Escolha aplicada a ",
+          "Choice applied to ",
           length(same_rows),
-          " linha(s) com normalisedQuery='", q, "'."
+          " row(s) with normalisedQuery='", q, "'."
         )
       )
 
@@ -1342,7 +1536,7 @@ mod_taxonomy_match_server <- function(id, df_in) {
         matched_name <- lk_col("scientificName")
       }
 
-      if (isTRUE(input$replace_scientificName)) {
+      if (isTRUE(replace_scientificName)) {
         has_matched <- status_group == "MATCHED"
         fill_val <- ifelse(!is.na(resolved_name) & nzchar(resolved_name), resolved_name, matched_name)
         fill_ok <- has_matched & !is.na(fill_val) & nzchar(fill_val)
@@ -1476,9 +1670,9 @@ mod_taxonomy_match_server <- function(id, df_in) {
         NA_integer_, current_input_col(), "taxonomy_apply_first_choice_pending",
         "WARNING",
         paste0(
-          "Ao aplicar ao dataset, a primeira opção do dropdown foi usada automaticamente em ",
+          "When applying to the dataset, the first dropdown option was automatically used in ",
           applied_n,
-          " linha(s) AMBIGUOUS sem clique manual."
+          " AMBIGUOUS row(s) without manual selection."
         )
       )
 
@@ -1501,15 +1695,15 @@ mod_taxonomy_match_server <- function(id, df_in) {
         NA_integer_, current_input_col(), "taxonomy_applied",
         "INFO",
         paste0(
-          "Lookup de taxonomia aplicado ao dataset. ",
+          "Taxonomy lookup applied to dataset. ",
           "MATCHED=", n_matched,
           " | AMBIGUOUS=", n_amb,
           " | NOT_FOUND=", n_nf,
           " | UNRESOLVABLE=", n_unres,
-          if (isTRUE(input$replace_scientificName)) {
-            " | scientificName preenchido/substituído apenas para casos MATCHED."
+          if (isTRUE(replace_scientificName)) {
+            " | scientificName filled/replaced only for MATCHED cases."
           } else {
-            " | scientificName original preservado."
+            " | Original scientificName preserved."
           }
         )
       )
@@ -1522,7 +1716,7 @@ mod_taxonomy_match_server <- function(id, df_in) {
         add_issue(
           NA_integer_, current_input_col(), "taxonomy_apply_without_lookup",
           "WARNING",
-          "Executa primeiro o match antes de aplicar ao dataset."
+          "Run the taxonomy match before applying it to the dataset."
         )
         return()
       }
@@ -1553,9 +1747,9 @@ mod_taxonomy_match_server <- function(id, df_in) {
         NA_integer_, current_input_col(), "taxonomy_keep_ambiguous_on_apply",
         "WARNING",
         paste0(
-          "Aplicação ao dataset concluída mantendo ",
+          "Dataset application completed while keeping ",
           n_pending,
-          " linha(s) como AMBIGUOUS sem escolha manual."
+          " row(s) as AMBIGUOUS without manual selection."
         )
       )
 

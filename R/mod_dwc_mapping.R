@@ -1123,7 +1123,7 @@ mod_dwc_mapping_server <- function(id, df_in) {
         ),
         shiny::tags$p(
           shiny::tags$b("Field mapping complete: "),
-          if (isTRUE(rv$ready)) "Yes" else "No"
+          if (!is.null(rv$cleaned) && isTRUE(rv$formatting_done) && isTRUE(rv$ready)) "Yes" else "No"
         )
       )
     })
@@ -1525,8 +1525,6 @@ mod_dwc_mapping_server <- function(id, df_in) {
         return()
       }
 
-      rv$ready <- TRUE
-
       bslib::nav_select(
         id = "main_tabs",
         selected = "formatting",
@@ -1538,8 +1536,51 @@ mod_dwc_mapping_server <- function(id, df_in) {
       df_final <- current_preclean_df()
       shiny::req(df_final)
 
+      validation <- current_validation()
+      missing_gate <- validation$missing_gate
+      duplicate_terms <- validation$duplicate_terms
+
+      if (length(missing_gate) > 0 || length(duplicate_terms) > 0) {
+        modal_parts <- list(
+          shiny::p("Field mapping cannot be completed yet.")
+        )
+
+        if (length(missing_gate) > 0) {
+          modal_parts <- c(
+            modal_parts,
+            list(
+              shiny::tags$p("The following minimum terms are still missing:"),
+              shiny::tags$ul(lapply(missing_gate, shiny::tags$li))
+            )
+          )
+        }
+
+        if (length(duplicate_terms) > 0) {
+          modal_parts <- c(
+            modal_parts,
+            list(
+              shiny::tags$p("The following Darwin Core terms are duplicated and must be unique:"),
+              shiny::tags$ul(lapply(duplicate_terms, shiny::tags$li))
+            )
+          )
+        }
+
+        shiny::showModal(
+          shiny::modalDialog(
+            title = "Cannot complete field mapping yet",
+            easyClose = TRUE,
+            footer = shiny::modalButton("Close"),
+            modal_parts
+          )
+        )
+
+        rv$ready <- FALSE
+        return()
+      }
+
       run_clean_pipeline(df_final)
       rv$formatting_done <- TRUE
+      rv$ready <- TRUE
 
       bslib::nav_select(
         id = "main_tabs",
