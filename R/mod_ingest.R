@@ -68,6 +68,17 @@ mod_ingest_ui <- function(id) {
 
       shiny::hr(),
 
+      shiny::div(
+        style = "margin-bottom: 0.75rem;",
+        shiny::tags$strong("Note"),
+        shiny::tags$br(),
+        shiny::tags$small(
+          "If your dataset is already tidy, after loading it you can proceed directly by clicking ",
+          shiny::tags$em("Complete ingest"),
+          "."
+        )
+      ),
+
       shiny::actionButton(
         ns("complete_ingest"),
         "Complete ingest",
@@ -311,81 +322,177 @@ mod_ingest_server <- function(id, example_map) {
       cols <- names(df)
       num_cols <- cols[vapply(df, is.numeric, logical(1))]
 
+      block_id <- session$ns("pivot_block")
+
       shiny::tagList(
         shiny::tags$style(shiny::HTML(sprintf("
           #%s .pivot-check-wrap {
-            max-height: 260px;
+            max-height: 280px;
             overflow-y: auto;
+            overflow-x: hidden;
+            width: 100%%;
             border: 1px solid #d1d5db;
             border-radius: 0.5rem;
-            padding: 0.75rem 0.9rem;
+            padding: 0.85rem 1rem;
             background: #ffffff;
+            margin-bottom: 1rem;
           }
+
           #%s .pivot-check-wrap .shiny-options-group {
-            display: block;
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            column-gap: 1rem;
+            row-gap: 0.2rem;
             margin-bottom: 0;
+            width: 100%%;
           }
+
           #%s .pivot-check-wrap .checkbox {
-            margin-top: 0.15rem;
-            margin-bottom: 0.45rem;
+            margin-top: 0.1rem;
+            margin-bottom: 0.2rem;
           }
+
           #%s .pivot-check-wrap label {
             font-weight: 400;
             margin-bottom: 0;
+            word-break: break-word;
+          }
+
+          #%s .pivot-top-note {
+            margin-bottom: 0.85rem;
+          }
+
+          #%s .pivot-controls-row {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.75rem;
+            align-items: flex-end;
+            border: 1px solid #e5e7eb;
+            border-radius: 0.6rem;
+            padding: 0.9rem 1rem;
+            background: #fafafa;
+            margin-bottom: 1rem;
+          }
+
+          #%s .pivot-field {
+            min-width: 170px;
+            flex: 1 1 170px;
+          }
+
+          #%s .pivot-field-sm {
+            min-width: 140px;
+            flex: 0 1 160px;
+            padding-top: 1.9rem;
+          }
+
+          #%s .pivot-actions {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.45rem;
+            align-items: flex-end;
+            padding-top: 1.6rem;
+          }
+
+          #%s .pivot-actions .btn {
+            margin-right: 0;
+            margin-bottom: 0;
+          }
+
+          #%s .pivot-preview-card {
+            border: 1px solid #e5e7eb;
+            border-radius: 0.6rem;
+            padding: 0.9rem 1rem;
+            background: #ffffff;
+          }
+
+          #%s .pivot-preview-card .form-group {
+            margin-bottom: 0.75rem;
+          }
+
+          #%s .pivot-preview-card .dataTables_wrapper {
+            width: 100%%;
           }
         ",
-          session$ns("pivot_block"),
-          session$ns("pivot_block"),
-          session$ns("pivot_block"),
-          session$ns("pivot_block")
+          block_id,
+          block_id,
+          block_id,
+          block_id,
+          block_id,
+          block_id,
+          block_id,
+          block_id,
+          block_id,
+          block_id,
+          block_id,
+          block_id,
+          block_id
         ))),
 
-        shiny::fluidRow(
-          shiny::column(
-            4,
+        shiny::div(
+          id = block_id,
+
+          shiny::div(
+            class = "pivot-top-note",
+            shiny::strong("Current dataset used for downstream steps"),
+            shiny::tags$br(),
+            shiny::tags$small(
+              if (isTRUE(pv$is_pivoted)) {
+                "Pivoted dataset"
+              } else {
+                "Minimal tidy dataset (no pivot applied yet)"
+              }
+            )
+          ),
+
+          shiny::tags$label(
+            `for` = session$ns("pivot_value_cols"),
+            shiny::strong("Columns to pivot")
+          ),
+
+          shiny::div(
+            class = "pivot-check-wrap",
+            shiny::checkboxGroupInput(
+              session$ns("pivot_value_cols"),
+              label = NULL,
+              choices = cols,
+              selected = intersect(num_cols, cols),
+              width = "100%"
+            )
+          ),
+
+          shiny::div(
+            class = "pivot-controls-row",
+
             shiny::div(
-              id = session$ns("pivot_block"),
-              shiny::div(
-                class = "mb-3",
-                shiny::strong("Current dataset used for downstream steps"),
-                shiny::tags$br(),
-                shiny::tags$small(
-                  if (isTRUE(pv$is_pivoted)) {
-                    "Pivoted dataset"
-                  } else {
-                    "Minimal tidy dataset (no pivot applied yet)"
-                  }
-                )
-              ),
+              class = "pivot-field",
+              shiny::textInput(session$ns("pivot_names_to"), "names_to", "variable")
+            ),
 
-              shiny::tags$label(
-                `for` = session$ns("pivot_value_cols"),
-                "Columns to pivot"
-              ),
+            shiny::div(
+              class = "pivot-field",
+              shiny::textInput(session$ns("pivot_values_to"), "values_to", "value")
+            ),
 
-              shiny::div(
-                class = "pivot-check-wrap",
-                shiny::checkboxGroupInput(
-                  session$ns("pivot_value_cols"),
-                  label = NULL,
-                  choices = cols,
-                  selected = intersect(num_cols, cols)
-                )
-              ),
+            shiny::div(
+              class = "pivot-field-sm",
+              shiny::checkboxInput(session$ns("pivot_drop_na"), "Drop NA", TRUE)
+            ),
 
-              shiny::br(),
-              shiny::textInput(session$ns("pivot_names_to"), "names_to", "variable"),
-              shiny::textInput(session$ns("pivot_values_to"), "values_to", "value"),
-              shiny::checkboxInput(session$ns("pivot_drop_na"), "Drop NA", TRUE),
-              shiny::checkboxInput(session$ns("pivot_drop_zero"), "Drop zero", TRUE),
-              shiny::br(),
+            shiny::div(
+              class = "pivot-field-sm",
+              shiny::checkboxInput(session$ns("pivot_drop_zero"), "Drop zero", TRUE)
+            ),
+
+            shiny::div(
+              class = "pivot-actions",
               shiny::actionButton(session$ns("pivot_apply"), "Pivot"),
               shiny::actionButton(session$ns("pivot_undo"), "Undo"),
               shiny::actionButton(session$ns("pivot_reset"), "Reset")
             )
           ),
-          shiny::column(
-            8,
+
+          shiny::div(
+            class = "pivot-preview-card",
             shiny::verbatimTextOutput(session$ns("pivot_info")),
             shiny::h5("Current dataset preview"),
             DT::DTOutput(session$ns("pivot_after"))
