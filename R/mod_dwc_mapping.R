@@ -179,6 +179,12 @@ mod_dwc_mapping_ui <- function(id) {
         margin-top: 0.5rem;
       }
 
+      .dwc-map-date-help {
+        margin-top: 0.5rem;
+        color: #6c757d;
+        font-size: 0.92rem;
+      }
+
       .selectize-dropdown {
         z-index: 5000 !important;
       }
@@ -524,6 +530,13 @@ mod_dwc_mapping_ui <- function(id) {
                       ),
                       selected = "dmy",
                       inline = FALSE
+                    ),
+                    shiny::div(
+                      class = "dwc-map-date-help",
+                      "This option is only used for ambiguous numeric dates such as 01/02/2024. ",
+                      "If you choose dd/mm, that value is interpreted as 1 February 2024. ",
+                      "If you choose mm/dd, it is interpreted as 2 January 2024. ",
+                      "Dates already in ISO format, such as 2024-02-01 or 2019-10-01T22:39:12, are not affected."
                     )
                   )
                 ),
@@ -593,51 +606,97 @@ mod_dwc_mapping_ui <- function(id) {
   list(
     flat = list(
       label = "Flat table",
-      gate_terms = c("eventID", "eventDate", "occurrenceID", "basisOfRecord"),
-      optional_next_step_terms = c("scientificName"),
+      gate_terms = c(
+        "eventID",
+        "eventDate",
+        "decimalLatitude",
+        "decimalLongitude",
+        "occurrenceID",
+        "basisOfRecord"
+      ),
+      optional_next_step_terms = c(
+        "occurrenceStatus",
+        "scientificName"
+      ),
       extra_terms = character(0),
-      strongly_recommended = c("decimalLatitude", "decimalLongitude", "geodeticDatum"),
-      note = "Use this for datasets where event and occurrence information are stored together in a single flat table. scientificName is important, but it may be created or standardized later in the Taxonomy step."
-    ),
-    occurrence_core = list(
-      label = "Occurrence core",
-      gate_terms = c("occurrenceID", "basisOfRecord"),
-      optional_next_step_terms = c("scientificName", "eventID", "eventDate"),
-      extra_terms = character(0),
-      strongly_recommended = c("decimalLatitude", "decimalLongitude", "geodeticDatum"),
-      note = "Use this for occurrence records. scientificName is recommended for downstream taxonomy work but does not block this stage."
+      strongly_recommended = c("geodeticDatum"),
+      note = "Use this for flat datasets where event and occurrence information are stored together. scientificName remains important for the next module, but it does not block this stage."
     ),
     event_core = list(
       label = "Event core",
-      gate_terms = c("eventID", "eventDate"),
-      optional_next_step_terms = c("basisOfRecord", "scientificName"),
+      gate_terms = c(
+        "eventID",
+        "eventDate",
+        "decimalLatitude",
+        "decimalLongitude",
+        "datasetName",
+        "institutionCode",
+        "samplingProtocol"
+      ),
+      optional_next_step_terms = c(
+        "scientificName"
+      ),
       extra_terms = character(0),
-      strongly_recommended = c("decimalLatitude", "decimalLongitude", "geodeticDatum"),
-      note = "Use this for event-level tables. Occurrence terms are not required at this stage."
+      strongly_recommended = c("geodeticDatum"),
+      note = "Use this for event-level tables. Occurrence fields are not required here."
+    ),
+    occurrence_core = list(
+      label = "Occurrence core",
+      gate_terms = c(
+        "occurrenceID",
+        "basisOfRecord",
+        "eventDate",
+        "decimalLatitude",
+        "decimalLongitude"
+      ),
+      optional_next_step_terms = c(
+        "occurrenceStatus",
+        "scientificName"
+      ),
+      extra_terms = character(0),
+      strongly_recommended = c("geodeticDatum"),
+      note = "Use this for occurrence core tables. scientificName is expected later, but it does not block this step."
     ),
     occurrence_extension = list(
       label = "Occurrence extension",
       gate_terms = c("occurrenceID"),
-      optional_next_step_terms = c("basisOfRecord", "scientificName"),
+      optional_next_step_terms = c(
+        "occurrenceStatus",
+        "scientificName",
+        "scientificNameID"
+      ),
       extra_terms = character(0),
       strongly_recommended = character(0),
       note = "Use this for occurrence extension tables linked to another core."
     ),
     emof_extension = list(
       label = "eMoF extension",
-      gate_terms = c("occurrenceID", "measurementType", "measurementValue"),
-      optional_next_step_terms = c("measurementUnit", "measurementTypeID"),
+      gate_terms = c(
+        "eventID",
+        "occurrenceID",
+        "measurementType",
+        "measurementValue"
+      ),
+      optional_next_step_terms = c(
+        "measurementTypeID",
+        "measurementUnit"
+      ),
       extra_terms = character(0),
       strongly_recommended = character(0),
       note = "Use this for Extended MeasurementOrFact tables."
     ),
     taxon_core = list(
       label = "Taxon core",
-      gate_terms = c("taxonID", "scientificName"),
-      optional_next_step_terms = c("taxonRank"),
+      gate_terms = c(
+        "taxonID",
+        "taxonRank"
+      ),
+      optional_next_step_terms = c(
+        "scientificName"
+      ),
       extra_terms = character(0),
       strongly_recommended = character(0),
-      note = "Use this for taxon tables. scientificName is required here."
+      note = "Use this for taxon tables. scientificName is still important, but it does not block this mapping stage because taxonomy work may happen afterwards."
     )
   )
 }
@@ -1301,13 +1360,6 @@ mod_dwc_mapping_server <- function(id, df_in) {
     })
 
     output$scientific_name_note <- shiny::renderUI({
-      map_df <- mapping_tbl()
-      if (is.null(map_df) || !"dwc_term" %in% names(map_df)) return(NULL)
-
-      has_scientific_name_mapping <- any(map_df$dwc_term == "scientificName", na.rm = TRUE)
-
-      if (!isTRUE(has_scientific_name_mapping)) return(NULL)
-
       shiny::tags$div(
         class = "alert alert-warning",
         shiny::tags$b("Note about scientificName mapping: "),

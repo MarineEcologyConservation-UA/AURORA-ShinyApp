@@ -134,6 +134,12 @@ mod_taxonomy_match_ui <- function(id) {
     ", root_sel, " .tax-small { font-size: .92rem; }
     ", root_sel, " .tax-cols-wrap { max-height: 260px; overflow-y: auto; padding-right: .5rem; }
     ", root_sel, " .tax-card-fill { height: 100%; }
+    ", root_sel, " .tax-summary-list {
+      max-height: 120px;
+      overflow-y: auto;
+      margin-top: .5rem;
+      padding-left: 1rem;
+    }
 
     ", root_sel, " .tax-check-help {
       display: flex;
@@ -237,7 +243,7 @@ mod_taxonomy_match_ui <- function(id) {
                 shiny::tags$li("WoRMS uses only worrms::wm_records_taxamatch()."),
                 shiny::tags$li("GBIF remains available for terrestrial names."),
                 shiny::tags$li("The lookup table shows one row per unique inputName."),
-                shiny::tags$li("When ambiguities exist, the user can manually choose the candidate."),
+                shiny::tags$li("When ambiguities exist, the user must manually choose the candidate before applying results to the dataset."),
                 shiny::tags$li("When applying to the dataset, the module writes only the selected output columns.")
               )
             )
@@ -317,7 +323,7 @@ mod_taxonomy_match_ui <- function(id) {
                   ),
                   shiny::tags$div(
                     class = "tax-scroll-note mt-2",
-                    "normalisedQuery, taxonMatchStatus, selectedID, and nameAccordingTo are technical columns and are not included in the final dataset by default."
+                    "normalisedQuery, taxonMatchStatus, selectedID, and nameAccordingTo are technical columns and are not included in the final dataset by default. scientificNameID already stores the main identifier used for the selected database."
                   )
                 )
               ),
@@ -583,7 +589,7 @@ mod_taxonomy_match_server <- function(id, df_in) {
           "taxonomicStatus",
           "taxonRank",
           "authority",
-          worms_output_cols
+          setdiff(worms_output_cols, c("lsid"))
         )
       } else {
         c(
@@ -593,7 +599,7 @@ mod_taxonomy_match_server <- function(id, df_in) {
           "taxonomicStatus",
           "taxonRank",
           "authority",
-          gbif_output_cols
+          setdiff(gbif_output_cols, c("key"))
         )
       }
 
@@ -1049,19 +1055,6 @@ mod_taxonomy_match_server <- function(id, df_in) {
       rv$candidates_map[[nm]]
     }
 
-    get_first_candidate_id <- function(i) {
-      cand <- get_candidate_table(i)
-      if (is.null(cand) || !is.data.frame(cand) || nrow(cand) == 0) return(NA_character_)
-
-      if (identical(input$tax_db, "worms")) {
-        if (!("AphiaID" %in% names(cand))) return(NA_character_)
-        return(as.character(cand$AphiaID[1]))
-      }
-
-      if (!("key" %in% names(cand))) return(NA_character_)
-      as.character(cand$key[1])
-    }
-
     build_lookup_display <- function(lookup) {
       disp <- lookup
       disp$choice <- ""
@@ -1181,11 +1174,23 @@ mod_taxonomy_match_server <- function(id, df_in) {
       n_nf <- sum(lk$taxonMatchStatus == "NOT_FOUND", na.rm = TRUE)
       n_unres <- sum(lk$taxonMatchStatus == "UNRESOLVABLE", na.rm = TRUE)
 
+      nf_vals <- sort(unique(lk$inputName[lk$taxonMatchStatus == "NOT_FOUND"]))
+      nf_vals <- nf_vals[!is.na(nf_vals) & nzchar(nf_vals)]
+
       shiny::tags$div(
         shiny::tags$p(paste0("Input column: ", src)),
         shiny::tags$p(paste0("Unique names: ", length(nms))),
         shiny::tags$p(paste0("UNRESOLVABLE: ", n_unres)),
         shiny::tags$p(paste0("MATCHED: ", n_matched, " | AMBIGUOUS: ", n_amb, " | NOT_FOUND: ", n_nf)),
+        if (length(nf_vals) > 0) {
+          shiny::tagList(
+            shiny::tags$p("Not Found values:"),
+            shiny::tags$ul(
+              class = "tax-summary-list",
+              lapply(nf_vals, shiny::tags$li)
+            )
+          )
+        },
         shiny::tags$p(
           paste0(
             "Dataset applied: ",
@@ -1211,21 +1216,24 @@ mod_taxonomy_match_server <- function(id, df_in) {
           title = "Confirm taxonomic choice",
           shiny::tags$p(
             paste0(
-              "The selected candidate for '", nm,
-              "' will mark this row as MATCHED_MANUAL."
+              "You selected a candidate for '", nm, "'."
             )
           ),
-          shiny::tags$p(paste0("normalisedQuery: ", q)),
+          shiny::tags$p(
+            paste0("This will mark the row as MATCHED_MANUAL.")
+          ),
           if (length(same_nq) > 0) {
             shiny::tags$p(
               paste0(
-                "There are ",
                 length(same_nq),
-                " other row(s) with the same normalisedQuery. Do you want to apply the same choice to all of them?"
+                " other row(s) share the same normalisedQuery ('", q, "'). ",
+                "Choose whether to apply this selection only here or to all matching rows."
               )
             )
           } else {
-            shiny::tags$p("There are no other rows with the same normalisedQuery.")
+            shiny::tags$p(
+              paste0("No other rows share the same normalisedQuery ('", q, "').")
+            )
           },
           shiny::checkboxInput(
             ns("choice_popup_dont_show"),
@@ -1238,7 +1246,7 @@ mod_taxonomy_match_server <- function(id, df_in) {
             shiny::actionButton(ns("choice_apply_this"), "Apply only to this row", class = "btn-primary"),
             shiny::actionButton(
               ns("choice_apply_same"),
-              "Apply also to matching normalisedQuery rows",
+              "Apply to all rows with same normalisedQuery",
               class = "btn-success"
             )
           )
@@ -1246,37 +1254,21 @@ mod_taxonomy_match_server <- function(id, df_in) {
       )
     }
 
-    open_apply_pending_popup <- function(n_pending) {
+    open_pending_ambiguous_popup <- function(n_pending) {
       shiny::showModal(
         shiny::modalDialog(
-          title = "There are AMBIGUOUS cases without a selection",
+          title = "Resolve ambiguous taxonomy matches first",
           shiny::tags$p(
             paste0(
-              "There are ",
-              n_pending,
-              " AMBIGUOUS row(s) still without a manual selection."
+              "There are ", n_pending,
+              " ambiguous row(s) without a selected candidate."
             )
           ),
           shiny::tags$p(
-            "Do you want to automatically use the first dropdown option for these cases before applying to the dataset?"
+            "You must choose a candidate for every ambiguous row before applying taxonomy results to the dataset."
           ),
-          shiny::tags$p(
-            "You can also continue and keep those cases as AMBIGUOUS."
-          ),
-          easyClose = FALSE,
-          footer = shiny::tagList(
-            shiny::modalButton("Cancel"),
-            shiny::actionButton(
-              ns("apply_keep_ambiguous"),
-              "Keep AMBIGUOUS and apply",
-              class = "btn-secondary"
-            ),
-            shiny::actionButton(
-              ns("apply_first_choices"),
-              "Use first option and apply",
-              class = "btn-warning"
-            )
-          )
+          easyClose = TRUE,
+          footer = shiny::modalButton("Close")
         )
       )
     }
@@ -1570,7 +1562,6 @@ mod_taxonomy_match_server <- function(id, df_in) {
           family = lk_col("family"),
           genus = lk_col("genus"),
           citation = lk_col("citation"),
-          lsid = lk_col("lsid"),
           isMarine = lk_col("isMarine"),
           isBrackish = lk_col("isBrackish"),
           isFreshwater = lk_col("isFreshwater"),
@@ -1591,9 +1582,7 @@ mod_taxonomy_match_server <- function(id, df_in) {
           taxonomicStatus = lk_col("taxonomicStatus"),
           taxonRank = lk_col("rank"),
           authority = lk_col("authorship"),
-          key = lk_col("key"),
           nubKey = lk_col("nubKey"),
-          scientificName = out$scientificName,
           canonicalName = lk_col("canonicalName"),
           rank = lk_col("rank"),
           status = lk_col("status"),
@@ -1652,33 +1641,6 @@ mod_taxonomy_match_server <- function(id, df_in) {
       )
     }
 
-    apply_first_choice_to_pending_ambiguous <- function() {
-      rows <- unresolved_ambiguous_rows()
-      if (length(rows) == 0) return(invisible(FALSE))
-
-      applied_n <- 0L
-
-      for (i in rows) {
-        first_id <- get_first_candidate_id(i)
-        if (is_blank(first_id)) next
-
-        apply_choice_to_rows(i, first_id)
-        applied_n <- applied_n + 1L
-      }
-
-      add_issue(
-        NA_integer_, current_input_col(), "taxonomy_apply_first_choice_pending",
-        "WARNING",
-        paste0(
-          "When applying to the dataset, the first dropdown option was automatically used in ",
-          applied_n,
-          " AMBIGUOUS row(s) without manual selection."
-        )
-      )
-
-      invisible(TRUE)
-    }
-
     finalize_apply <- function() {
       out <- compute_out()
       shiny::req(is.data.frame(out))
@@ -1724,34 +1686,18 @@ mod_taxonomy_match_server <- function(id, df_in) {
       pending_rows <- unresolved_ambiguous_rows()
 
       if (length(pending_rows) > 0) {
-        open_apply_pending_popup(length(pending_rows))
+        open_pending_ambiguous_popup(length(pending_rows))
+        add_issue(
+          NA_integer_, current_input_col(), "taxonomy_apply_blocked_pending_ambiguous",
+          "WARNING",
+          paste0(
+            "Dataset application blocked because ",
+            length(pending_rows),
+            " ambiguous row(s) still need a manual choice."
+          )
+        )
         return()
       }
-
-      finalize_apply()
-    })
-
-    shiny::observeEvent(input$apply_first_choices, {
-      rv$ready <- FALSE
-      shiny::removeModal()
-      apply_first_choice_to_pending_ambiguous()
-      finalize_apply()
-    })
-
-    shiny::observeEvent(input$apply_keep_ambiguous, {
-      rv$ready <- FALSE
-      shiny::removeModal()
-
-      n_pending <- length(unresolved_ambiguous_rows())
-      add_issue(
-        NA_integer_, current_input_col(), "taxonomy_keep_ambiguous_on_apply",
-        "WARNING",
-        paste0(
-          "Dataset application completed while keeping ",
-          n_pending,
-          " row(s) as AMBIGUOUS without manual selection."
-        )
-      )
 
       finalize_apply()
     })
