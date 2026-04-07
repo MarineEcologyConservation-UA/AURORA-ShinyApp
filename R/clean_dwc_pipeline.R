@@ -111,7 +111,7 @@ clean_dwc_pipeline <- function(df,
       s <- x[i]
       if (is.na(s)) return(NA_character_)
 
-      if (grepl("/", s, fixed = TRUE)) {
+      if (grepl("/", s, fixed = TRUE) && !.looks_like_datetime(s)) {
         parts <- strsplit(s, "/", fixed = TRUE)[[1]]
         parts <- trimws(parts)
         if (length(parts) == 2) {
@@ -162,7 +162,6 @@ clean_dwc_pipeline <- function(df,
               "INFO", "decimalLongitude não existia e foi criada.")
   }
 
-  # 3.0) preservar coordenadas originais antes de qualquer transformação
   if (isTRUE(preserve_original_coords)) {
     if ("decimalLatitude" %in% names(out) && !("verbatimLatitude" %in% names(out))) {
       out$verbatimLatitude <- as.character(out$decimalLatitude)
@@ -250,7 +249,6 @@ clean_dwc_pipeline <- function(df,
     }
   }
 
-  # 3.1) explicit non-numeric coordinate detection
   lat_nonempty <- !is.na(lat_candidate) & lat_candidate != ""
   lon_nonempty <- !is.na(lon_candidate) & lon_candidate != ""
 
@@ -273,7 +271,6 @@ clean_dwc_pipeline <- function(df,
     }
   }
 
-  # 3.2) clear swapped coordinates detection / fix
   lat_in_range <- !is.na(lat) & lat >= -90 & lat <= 90
   lon_in_range <- !is.na(lon) & lon >= -180 & lon <= 180
 
@@ -320,7 +317,6 @@ clean_dwc_pipeline <- function(df,
     }
   }
 
-  # 3.3) missing coords
   miss <- is.na(lat) | is.na(lon)
   if (any(miss)) {
     idx <- which(miss)
@@ -330,7 +326,6 @@ clean_dwc_pipeline <- function(df,
     }
   }
 
-  # 3.4) zero-zero check
   zero_zero <- !is.na(lat) & !is.na(lon) & lat == 0 & lon == 0
   if (any(zero_zero)) {
     idx <- which(zero_zero)
@@ -345,7 +340,6 @@ clean_dwc_pipeline <- function(df,
     }
   }
 
-  # 3.5) range validation before reprojection
   epsg_in <- suppressWarnings(as.integer(coord_epsg_in))
   epsg_target <- suppressWarnings(as.integer(target_epsg))
 
@@ -362,7 +356,6 @@ clean_dwc_pipeline <- function(df,
     }
   }
 
-  # 3.6) reproject if needed
   if (!is.na(epsg_in) && !is.na(epsg_target) &&
       epsg_in != epsg_target) {
 
@@ -408,7 +401,6 @@ clean_dwc_pipeline <- function(df,
     }
   }
 
-  # 3.7) final range validation
   if (!is.na(epsg_target) && epsg_target == 4326) {
     oor_lat2 <- !is.na(lat) & (lat < -90 | lat > 90)
     oor_lon2 <- !is.na(lon) & (lon < -180 | lon > 180)
@@ -424,7 +416,6 @@ clean_dwc_pipeline <- function(df,
   out$decimalLatitude <- lat
   out$decimalLongitude <- lon
 
-  # 3.8) geodeticDatum
   if (isTRUE(create_geodetic_datum)) {
     if (!("geodeticDatum" %in% names(out))) {
       out$geodeticDatum <- NA_character_
@@ -485,7 +476,6 @@ clean_dwc_pipeline <- function(df,
     if (has_max) out$maximumDepthInMeters <- dmax
   }
 
-  # 4.1) optional bathymetry cross-reference
   bathy_obj <- bathy
   can_bathy <- requireNamespace("marmap", quietly = TRUE)
 
@@ -597,6 +587,12 @@ clean_dwc_pipeline <- function(df,
     x0 <- as.character(out$basisOfRecord)
 
     map <- c(
+      "materialentity" = "MaterialEntity",
+      "preservedspecimen" = "PreservedSpecimen",
+      "fossilspecimen" = "FossilSpecimen",
+      "livingspecimen" = "LivingSpecimen",
+      "materialsample" = "MaterialSample",
+      "event" = "Event",
       "humanobservation" = "HumanObservation",
       "observation" = "HumanObservation",
       "fieldobservation" = "HumanObservation",
@@ -604,16 +600,14 @@ clean_dwc_pipeline <- function(df,
       "machineobservation" = "MachineObservation",
       "sensorobservation" = "MachineObservation",
       "cameraobservation" = "MachineObservation",
-      "preservedspecimen" = "PreservedSpecimen",
+      "taxon" = "Taxon",
+      "occurrence" = "Occurrence",
+      "materialcitation" = "MaterialCitation",
       "museumspecimen" = "PreservedSpecimen",
       "voucher" = "PreservedSpecimen",
-      "fossilspecimen" = "FossilSpecimen",
-      "livingspecimen" = "LivingSpecimen",
       "livingcollection" = "LivingSpecimen",
-      "materialsample" = "MaterialSample",
       "sample" = "MaterialSample",
-      "genomicsample" = "MaterialSample",
-      "occurrence" = "Occurrence"
+      "genomicsample" = "MaterialSample"
     )
 
     y <- x
@@ -743,9 +737,30 @@ clean_dwc_pipeline <- function(df,
 # ---- internal: null coalesce ----
 `%||%` <- function(x, y) if (is.null(x)) y else x
 
+.looks_like_datetime <- function(s) {
+  s <- trimws(as.character(s %||% ""))
+  if (!nzchar(s)) return(FALSE)
+
+  grepl(
+    "^\\d{4}-\\d{2}-\\d{2}[T ]\\d{2}:\\d{2}(:\\d{2})?(\\.\\d+)?([zZ]|[+-]\\d{2}:?\\d{2})?$",
+    s
+  ) ||
+    grepl(
+      "^\\d{1,2}[/-]\\d{1,2}[/-]\\d{2,4}[ T]\\d{1,2}:\\d{2}(:\\d{2})?(\\.\\d+)?$",
+      s
+    )
+}
+
+.format_posix_iso <- function(x) {
+  if (inherits(x, c("POSIXct", "POSIXt")) && !is.na(x)) {
+    return(format(x, "%Y-%m-%dT%H:%M:%S", tz = "UTC"))
+  }
+  NA_character_
+}
+
 # ---- internal: convert single date token to ISO-8601 ----
 .coerce_date_iso <- function(s, ambiguous_date_order = "dmy") {
-  s <- trimws(s)
+  s <- trimws(as.character(s %||% ""))
   if (!nzchar(s)) return(NA_character_)
 
   ambiguous_date_order <- tolower(trimws(as.character(ambiguous_date_order %||% "dmy")))
@@ -756,9 +771,14 @@ clean_dwc_pipeline <- function(df,
   if (grepl("^\\d{4}$", s)) return(s)
   if (grepl("^\\d{4}-\\d{2}$", s)) return(s)
   if (grepl("^\\d{4}-\\d{2}-\\d{2}$", s)) return(s)
+  if (grepl("^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}$", s)) return(s)
 
-  if (grepl("^\\d{1,2}/\\d{4}$", s)) {
-    p <- strsplit(s, "/", fixed = TRUE)[[1]]
+  s_norm <- gsub("\\s+", " ", s)
+  s_norm <- sub("Z$", "+00:00", s_norm, ignore.case = FALSE)
+  s_norm <- sub("([+-]\\d{2})(\\d{2})$", "\\1:\\2", s_norm)
+
+  if (grepl("^\\d{1,2}/\\d{4}$", s_norm)) {
+    p <- strsplit(s_norm, "/", fixed = TRUE)[[1]]
     mm <- suppressWarnings(as.integer(p[1]))
     yy <- suppressWarnings(as.integer(p[2]))
     if (!is.na(mm) && !is.na(yy) && mm >= 1 && mm <= 12) {
@@ -767,21 +787,69 @@ clean_dwc_pipeline <- function(df,
   }
 
   if (requireNamespace("lubridate", quietly = TRUE)) {
-    candidates <- list()
-
-    candidates[[length(candidates) + 1]] <- suppressWarnings(lubridate::ymd(s, quiet = TRUE))
+    # 1) ISO datetime or similar datetime with time
+    dt_orders <- c(
+      "Ymd HMS",
+      "Ymd HM",
+      "Y-m-d H:M:S",
+      "Y-m-d H:M",
+      "Y-m-dTH:M:S",
+      "Y-m-dTH:M",
+      "YmdTHMS",
+      "YmdTHM"
+    )
 
     if (identical(ambiguous_date_order, "dmy")) {
-      candidates[[length(candidates) + 1]] <- suppressWarnings(lubridate::dmy(s, quiet = TRUE))
-      candidates[[length(candidates) + 1]] <- suppressWarnings(lubridate::mdy(s, quiet = TRUE))
+      dt_orders <- c(
+        dt_orders,
+        "dmy HMS", "dmy HM",
+        "d/m/Y H:M:S", "d/m/Y H:M",
+        "d-m-Y H:M:S", "d-m-Y H:M",
+        "dmyTHMS", "dmyTHM",
+        "m/d/Y H:M:S", "m/d/Y H:M",
+        "m-d-Y H:M:S", "m-d-Y H:M"
+      )
     } else {
-      candidates[[length(candidates) + 1]] <- suppressWarnings(lubridate::mdy(s, quiet = TRUE))
-      candidates[[length(candidates) + 1]] <- suppressWarnings(lubridate::dmy(s, quiet = TRUE))
+      dt_orders <- c(
+        dt_orders,
+        "mdy HMS", "mdy HM",
+        "m/d/Y H:M:S", "m/d/Y H:M",
+        "m-d-Y H:M:S", "m-d-Y H:M",
+        "mdyTHMS", "mdyTHM",
+        "d/m/Y H:M:S", "d/m/Y H:M",
+        "d-m-Y H:M:S", "d-m-Y H:M"
+      )
     }
 
-    candidates <- candidates[!vapply(candidates, is.na, logical(1))]
-    if (length(candidates) > 0) {
-      return(format(candidates[[1]], "%Y-%m-%d"))
+    dt_val <- suppressWarnings(
+      lubridate::parse_date_time(
+        s_norm,
+        orders = dt_orders,
+        tz = "UTC",
+        quiet = TRUE
+      )
+    )
+
+    if (!is.na(dt_val)) {
+      return(.format_posix_iso(dt_val))
+    }
+
+    # 2) Date-only formats
+    date_candidates <- list()
+
+    date_candidates[[length(date_candidates) + 1]] <- suppressWarnings(lubridate::ymd(s_norm, quiet = TRUE))
+
+    if (identical(ambiguous_date_order, "dmy")) {
+      date_candidates[[length(date_candidates) + 1]] <- suppressWarnings(lubridate::dmy(s_norm, quiet = TRUE))
+      date_candidates[[length(date_candidates) + 1]] <- suppressWarnings(lubridate::mdy(s_norm, quiet = TRUE))
+    } else {
+      date_candidates[[length(date_candidates) + 1]] <- suppressWarnings(lubridate::mdy(s_norm, quiet = TRUE))
+      date_candidates[[length(date_candidates) + 1]] <- suppressWarnings(lubridate::dmy(s_norm, quiet = TRUE))
+    }
+
+    date_candidates <- date_candidates[!vapply(date_candidates, is.na, logical(1))]
+    if (length(date_candidates) > 0) {
+      return(format(date_candidates[[1]], "%Y-%m-%d"))
     }
   }
 
