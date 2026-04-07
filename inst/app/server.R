@@ -57,7 +57,7 @@ server <- function(input, output, session) {
     taxonomy_done <- mapping_done && safe_flag(tax_match$ready())
     build_done    <- taxonomy_done && safe_flag(dwca$ready())
 
-    allowed_tabs <- c("home", "ingest")
+    allowed_tabs <- c("home", "ingest", "about")
 
     if (ingest_done) {
       allowed_tabs <- c(allowed_tabs, "field_mapping")
