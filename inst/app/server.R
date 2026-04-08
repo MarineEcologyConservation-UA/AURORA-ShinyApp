@@ -29,9 +29,15 @@ server <- function(input, output, session) {
     df_in = ingest$tidy
   )
 
+  id_cleaning <- mod_identification_cleaning_server(
+    "id_cleaning",
+    df_in = dwc_map$cleaned,
+    mapping_in = dwc_map$mapping
+  )
+
   tax_match <- mod_taxonomy_match_server(
     "tax_match",
-    df_in = dwc_map$cleaned
+    df_in = id_cleaning$df_out
   )
 
   # --- Build DwC-A -----------------------------------------------------------
@@ -53,8 +59,9 @@ server <- function(input, output, session) {
   # --- Sequential tab locking ------------------------------------------------
   shiny::observe({
     ingest_done   <- safe_flag(ingest$ready())
-    mapping_done  <- ingest_done  && safe_flag(dwc_map$ready())
-    taxonomy_done <- mapping_done && safe_flag(tax_match$ready())
+    mapping_done  <- ingest_done   && safe_flag(dwc_map$ready())
+    id_clean_done <- mapping_done  && safe_flag(id_cleaning$ready())
+    taxonomy_done <- id_clean_done && safe_flag(tax_match$ready())
     build_done    <- taxonomy_done && safe_flag(dwca$ready())
 
     allowed_tabs <- c("home", "ingest", "about")
@@ -63,6 +70,9 @@ server <- function(input, output, session) {
       allowed_tabs <- c(allowed_tabs, "field_mapping")
     }
     if (mapping_done) {
+      allowed_tabs <- c(allowed_tabs, "id_cleaning")
+    }
+    if (id_clean_done) {
       allowed_tabs <- c(allowed_tabs, "taxonomy")
     }
     if (taxonomy_done) {
@@ -80,7 +90,19 @@ server <- function(input, output, session) {
     current_tab <- input$main_nav %||% "home"
 
     if (!current_tab %in% allowed_tabs) {
-      fallback_tab <- tail(allowed_tabs, 1)
+      fallback_tab <- "home"
+
+      if (build_done) {
+        fallback_tab <- "darwin_tables"
+      } else if (taxonomy_done) {
+        fallback_tab <- "taxonomy"
+      } else if (id_clean_done) {
+        fallback_tab <- "id_cleaning"
+      } else if (mapping_done) {
+        fallback_tab <- "field_mapping"
+      } else if (ingest_done) {
+        fallback_tab <- "ingest"
+      }
 
       bslib::nav_select(
         id = "main_nav",
@@ -93,10 +115,11 @@ server <- function(input, output, session) {
   # --- QC & Diagnostics ------------------------------------------------------
   shiny::observe({
     cat("\n--- DEBUG WORKFLOW ---\n")
-    cat("ingest$ready():",   safe_flag(ingest$ready()), "\n")
-    cat("dwc_map$ready():",  safe_flag(dwc_map$ready()), "\n")
+    cat("ingest$ready():", safe_flag(ingest$ready()), "\n")
+    cat("dwc_map$ready():", safe_flag(dwc_map$ready()), "\n")
+    cat("id_cleaning$ready():", safe_flag(id_cleaning$ready()), "\n")
     cat("tax_match$ready():", safe_flag(tax_match$ready()), "\n")
-    cat("dwca$ready():",     safe_flag(dwca$ready()), "\n")
+    cat("dwca$ready():", safe_flag(dwca$ready()), "\n")
 
     cat("\n--- DEBUG DWCA ---\n")
     cat("dwca exists:", !is.null(dwca), "\n")
@@ -136,6 +159,7 @@ server <- function(input, output, session) {
   invisible(list(
     ingest = ingest,
     dwc_map = dwc_map,
+    id_cleaning = id_cleaning,
     dwca = dwca,
     qc = qc,
     tax_match = tax_match,

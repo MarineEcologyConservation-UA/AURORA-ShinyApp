@@ -2,10 +2,12 @@
 
 export(build_dwca_tables)
 export(clean_dwc_pipeline)
+export(mod_about_ui)
 export(mod_build_dwca_server)
 export(mod_build_dwca_ui)
 export(mod_dwc_mapping_server)
 export(mod_dwc_mapping_ui)
+export(mod_homepage_ui)
 export(mod_ingest_server)
 export(mod_ingest_ui)
 export(mod_metadata_server)

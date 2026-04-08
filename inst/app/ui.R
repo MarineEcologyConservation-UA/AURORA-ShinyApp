@@ -227,7 +227,7 @@ ui <- bslib::page_navbar(
     shiny::tags$script(shiny::HTML("
       Shiny.addCustomMessageHandler('toggleMainTabs', function(message) {
         var allowed = message.allowed || [];
-        var allTabs = ['home', 'ingest', 'field_mapping', 'taxonomy', 'darwin_tables', 'metadata', 'qc', 'about'];
+        var allTabs = ['home', 'ingest', 'field_mapping', 'id_cleaning', 'taxonomy', 'darwin_tables', 'metadata', 'qc', 'about'];
 
         allTabs.forEach(function(value) {
           var navLink = document.querySelector('[data-value=\"' + value + '\"]');
@@ -277,7 +277,16 @@ ui <- bslib::page_navbar(
   ),
 
   # -------------------------------------------------------
-  # 3 TAXONOMY
+  # 3 IDENTIFICATION DATA CLEANING
+  # -------------------------------------------------------
+  bslib::nav_panel(
+    title = "Identification Data Cleaning",
+    value = "id_cleaning",
+    mod_identification_cleaning_ui("id_cleaning")
+  ),
+
+  # -------------------------------------------------------
+  # 4 TAXONOMY
   # -------------------------------------------------------
   bslib::nav_panel(
     title = "Taxonomy",
@@ -286,7 +295,7 @@ ui <- bslib::page_navbar(
   ),
 
   # -------------------------------------------------------
-  # 4 BUILD DWC-A
+  # 5 BUILD DWC-A
   # -------------------------------------------------------
   bslib::nav_panel(
     title = "Darwin Tables",
@@ -295,17 +304,17 @@ ui <- bslib::page_navbar(
   ),
 
   # -------------------------------------------------------
-  # 5 METADATA
+  # 6 METADATA
   # -------------------------------------------------------
   mod_metadata_ui("metadata"),
 
   # -------------------------------------------------------
-  # 6 QC & DIAGNOSTICS
+  # 7 QC & DIAGNOSTICS
   # -------------------------------------------------------
   mod_qc_ui("qc"),
 
   # -------------------------------------------------------
-  # 7 ABOUT
+  # 8 ABOUT
   # -------------------------------------------------------
   bslib::nav_panel(
     title = "About",

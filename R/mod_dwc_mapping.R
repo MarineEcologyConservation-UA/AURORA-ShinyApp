@@ -185,6 +185,19 @@ mod_dwc_mapping_ui <- function(id) {
         font-size: 0.92rem;
       }
 
+      .dwc-map-repeat-note {
+        background: #f8fafc;
+        border: 1px solid #e2e8f0;
+        border-radius: 0.75rem;
+        padding: 0.85rem 1rem;
+        margin-bottom: 1rem;
+        color: #475569;
+      }
+
+      .dwc-map-repeat-note p:last-child {
+        margin-bottom: 0;
+      }
+
       .selectize-dropdown {
         z-index: 5000 !important;
       }
@@ -200,24 +213,17 @@ mod_dwc_mapping_ui <- function(id) {
 
         bslib::card(
           fill = FALSE,
-          bslib::card_header("Workflow setup"),
+          bslib::card_header("Target database"),
           shiny::selectInput(
-            ns("table_profile"),
-            "Dataset / table type",
-            choices = c(
-              "Flat table (event + occurrence fields together)" = "flat",
-              "Occurrence core" = "occurrence_core",
-              "Event core" = "event_core",
-              "Occurrence extension" = "occurrence_extension",
-              "eMoF extension" = "emof_extension",
-              "Taxon core" = "taxon_core"
-            ),
-            selected = "flat",
+            ns("target_database"),
+            "Database",
+            choices = c("GBIF", "OBIS", "EMODnet"),
+            selected = "GBIF",
             width = "100%"
           ),
           shiny::div(
             class = "dwc-map-inline-help",
-            "Validation rules change depending on the selected table type."
+            "Required and strongly recommended terms below follow the selected database."
           )
         ),
 
@@ -308,6 +314,14 @@ mod_dwc_mapping_ui <- function(id) {
 
               shiny::div(
                 class = "p-3",
+
+                shiny::div(
+                  class = "dwc-map-repeat-note",
+                  shiny::tags$p(
+                    shiny::tags$b("Note: "),
+                    "Create IDs and Create remarks can be used more than once."
+                  )
+                ),
 
                 bslib::layout_columns(
                   col_widths = c(6, 6),
@@ -407,61 +421,64 @@ mod_dwc_mapping_ui <- function(id) {
 
                 shiny::div(class = "dwc-map-section-gap"),
 
-                bslib::card(
-                  fill = FALSE,
-                  bslib::card_header("Create / fill basisOfRecord"),
-                  shiny::selectInput(
-                    ns("basis_of_record_value"),
-                    "basisOfRecord value",
-                    choices = c(
-                      "MaterialEntity",
-                      "PreservedSpecimen",
-                      "FossilSpecimen",
-                      "LivingSpecimen",
-                      "MaterialSample",
-                      "Event",
-                      "HumanObservation",
-                      "MachineObservation",
-                      "Taxon",
-                      "Occurrence",
-                      "MaterialCitation"
+                bslib::layout_columns(
+                  col_widths = c(6, 6),
+
+                  bslib::card(
+                    fill = FALSE,
+                    bslib::card_header("Create / fill basisOfRecord"),
+                    shiny::selectInput(
+                      ns("basis_of_record_value"),
+                      "basisOfRecord value",
+                      choices = c(
+                        "MaterialEntity",
+                        "PreservedSpecimen",
+                        "FossilSpecimen",
+                        "LivingSpecimen",
+                        "MaterialSample",
+                        "Event",
+                        "HumanObservation",
+                        "MachineObservation",
+                        "Taxon",
+                        "Occurrence",
+                        "MaterialCitation"
+                      ),
+                      selected = "HumanObservation",
+                      width = "100%"
                     ),
-                    selected = "HumanObservation",
-                    width = "100%"
-                  ),
-                  shiny::checkboxInput(
-                    ns("basis_of_record_overwrite"),
-                    "Overwrite existing basisOfRecord values",
-                    value = FALSE
-                  ),
-                  shiny::actionButton(
-                    ns("create_basis_of_record_btn"),
-                    "Create / fill basisOfRecord",
-                    icon = shiny::icon("plus")
-                  ),
-                  shiny::div(
-                    class = "dwc-map-bor-note",
-                    "Use this only when all records in the dataset share the same basisOfRecord. Otherwise, the field should be filled correctly before import."
-                  )
-                ),
-
-                shiny::div(class = "dwc-map-section-gap"),
-
-                bslib::card(
-                  fill = FALSE,
-                  bslib::card_header(
-                    shiny::tagList(
-                      "organismQuantity and sampleSizeValue Associated Fields ",
-                      bslib::tooltip(
-                        shiny::tags$span(
-                          shiny::icon("info-circle"),
-                          style = "cursor: help;"
-                        ),
-                        "These are fields suggested because another mapped or created field usually requires a companion term."
-                      )
+                    shiny::checkboxInput(
+                      ns("basis_of_record_overwrite"),
+                      "Overwrite existing basisOfRecord values",
+                      value = FALSE
+                    ),
+                    shiny::actionButton(
+                      ns("create_basis_of_record_btn"),
+                      "Create / fill basisOfRecord",
+                      icon = shiny::icon("plus"),
+                      class = "btn-primary"
+                    ),
+                    shiny::div(
+                      class = "dwc-map-bor-note",
+                      "Use this only when all records in the dataset share the same basisOfRecord. Otherwise, the field should be filled correctly before import."
                     )
                   ),
-                  shiny::uiOutput(ns("dependency_ui"))
+
+                  bslib::card(
+                    fill = FALSE,
+                    bslib::card_header(
+                      shiny::tagList(
+                        "organismQuantity and sampleSizeValue Associated Fields ",
+                        bslib::tooltip(
+                          shiny::tags$span(
+                            shiny::icon("info-circle"),
+                            style = "cursor: help;"
+                          ),
+                          "These are fields suggested because another mapped or created field usually requires a companion term."
+                        )
+                      )
+                    ),
+                    shiny::uiOutput(ns("dependency_ui"))
+                  )
                 ),
 
                 shiny::div(class = "dwc-map-section-gap"),
@@ -602,109 +619,129 @@ mod_dwc_mapping_ui <- function(id) {
   c("", terms)
 }
 
-.dwc_table_profiles <- function() {
+.dwc_database_profiles <- function() {
   list(
-    flat = list(
-      label = "Flat table",
-      gate_terms = c(
-        "eventID",
-        "eventDate",
-        "decimalLatitude",
-        "decimalLongitude",
-        "occurrenceID",
-        "basisOfRecord"
-      ),
-      optional_next_step_terms = c(
-        "occurrenceStatus",
-        "scientificName"
-      ),
-      extra_terms = character(0),
-      strongly_recommended = c("geodeticDatum"),
-      note = "Use this for flat datasets where event and occurrence information are stored together. scientificName remains important for the next module, but it does not block this stage."
-    ),
-    event_core = list(
-      label = "Event core",
-      gate_terms = c(
-        "eventID",
-        "eventDate",
-        "decimalLatitude",
-        "decimalLongitude",
-        "datasetName",
-        "institutionCode",
-        "samplingProtocol"
-      ),
-      optional_next_step_terms = c(
-        "scientificName"
-      ),
-      extra_terms = character(0),
-      strongly_recommended = c("geodeticDatum"),
-      note = "Use this for event-level tables. Occurrence fields are not required here."
-    ),
-    occurrence_core = list(
-      label = "Occurrence core",
-      gate_terms = c(
-        "occurrenceID",
+    GBIF = list(
+      label = "GBIF",
+      required = c(
         "basisOfRecord",
         "eventDate",
-        "decimalLatitude",
-        "decimalLongitude"
+        "eventID",
+        "occurrenceID",
+        "samplingProtocol",
+        "scientificName"
       ),
-      optional_next_step_terms = c(
+      strongly_recommended = c(
+        "decimalLatitude",
+        "decimalLongitude",
+        "kingdom",
+        "taxonRank",
+        "sampleSizeUnit",
+        "sampleSizeValue",
+        "samplingEffort",
+        "locationID",
+        "organismQuantity",
+        "organismQuantityType",
+        "parentEventID",
+        "footprintWKT",
+        "footprintSRS",
+        "individualCount"
+      ),
+      note = "Validation follows the flat-table matrix for GBIF. Dark blue terms are treated as required; light grey terms are treated as strongly recommended."
+    ),
+    OBIS = list(
+      label = "OBIS",
+      required = c(
+        "basisOfRecord",
+        "decimalLatitude",
+        "decimalLongitude",
+        "eventDate",
+        "eventID",
+        "occurrenceID",
         "occurrenceStatus",
         "scientificName"
       ),
-      extra_terms = character(0),
-      strongly_recommended = c("geodeticDatum"),
-      note = "Use this for occurrence core tables. scientificName is expected later, but it does not block this step."
+      strongly_recommended = c(
+        "measurementType",
+        "measurementTypeID",
+        "measurementUnit",
+        "measurementValue",
+        "scientificNameID",
+        "kingdom",
+        "taxonRank",
+        "sampleSizeUnit",
+        "sampleSizeValue",
+        "samplingEffort",
+        "locationID",
+        "organismQuantity",
+        "organismQuantityType",
+        "countryCode",
+        "geodeticDatum",
+        "coordinateUncertaintyInMeters",
+        "maximumDepthInMeters",
+        "minimumDepthInMeters",
+        "measurementUnitID",
+        "measurementValueID",
+        "type",
+        "eventType",
+        "month",
+        "year",
+        "continent",
+        "coordinatePrecision",
+        "license",
+        "genus",
+        "order"
+      ),
+      note = "Validation follows the flat-table matrix for OBIS. Dark blue terms are treated as required; light grey terms are treated as strongly recommended."
     ),
-    occurrence_extension = list(
-      label = "Occurrence extension",
-      gate_terms = c("occurrenceID"),
-      optional_next_step_terms = c(
+    EMODnet = list(
+      label = "EMODnet",
+      required = c(
+        "basisOfRecord",
+        "datasetName",
+        "decimalLatitude",
+        "decimalLongitude",
+        "eventDate",
+        "eventID",
+        "institutionCode",
+        "measurementType",
+        "measurementTypeID",
+        "measurementUnit",
+        "measurementValue",
+        "occurrenceID",
         "occurrenceStatus",
         "scientificName",
         "scientificNameID"
       ),
-      extra_terms = character(0),
-      strongly_recommended = character(0),
-      note = "Use this for occurrence extension tables linked to another core."
-    ),
-    emof_extension = list(
-      label = "eMoF extension",
-      gate_terms = c(
-        "eventID",
-        "occurrenceID",
-        "measurementType",
-        "measurementValue"
+      strongly_recommended = c(
+        "kingdom",
+        "taxonRank",
+        "parentEventID",
+        "footprintWKT",
+        "coordinateUncertaintyInMeters",
+        "maximumDepthInMeters",
+        "minimumDepthInMeters",
+        "measurementUnitID",
+        "measurementValueID",
+        "type",
+        "identificationQualifier",
+        "measurementAccuracy",
+        "measurementID",
+        "measurementRemarks",
+        "catalogNumber",
+        "collectionCode",
+        "modified",
+        "scientificNameAuthorship"
       ),
-      optional_next_step_terms = c(
-        "measurementTypeID",
-        "measurementUnit"
-      ),
-      extra_terms = character(0),
-      strongly_recommended = character(0),
-      note = "Use this for Extended MeasurementOrFact tables."
-    ),
-    taxon_core = list(
-      label = "Taxon core",
-      gate_terms = c(
-        "taxonID",
-        "taxonRank"
-      ),
-      optional_next_step_terms = c(
-        "scientificName"
-      ),
-      extra_terms = character(0),
-      strongly_recommended = character(0),
-      note = "Use this for taxon tables. scientificName is still important, but it does not block this mapping stage because taxonomy work may happen afterwards."
+      note = "Validation follows the flat-table matrix for EMODnet. Dark blue terms are treated as required; light grey terms are treated as strongly recommended."
     )
   )
 }
 
-.get_table_profile <- function(profile_name = "flat") {
-  profiles <- .dwc_table_profiles()
-  if (!profile_name %in% names(profiles)) profile_name <- "flat"
-  profiles[[profile_name]]
+.get_database_profile <- function(database_name = "GBIF") {
+  profiles <- .dwc_database_profiles()
+  if (!database_name %in% names(profiles)) database_name <- "GBIF"
+  profiles[[database_name]]
 }
 
 .dwc_term_dependencies <- function() {
@@ -835,13 +872,11 @@ mod_dwc_mapping_ui <- function(id) {
   )
 }
 
-.validation_state <- function(map_df, final_df = NULL, table_profile = "flat") {
-  prof <- .get_table_profile(table_profile)
+.validation_state <- function(map_df, final_df = NULL, target_database = "GBIF") {
+  prof <- .get_database_profile(target_database)
 
-  gate_terms <- prof$gate_terms %||% character(0)
-  extra_terms <- prof$extra_terms %||% character(0)
+  required_terms <- prof$required %||% character(0)
   strong_terms <- prof$strongly_recommended %||% character(0)
-  optional_terms <- prof$optional_next_step_terms %||% character(0)
 
   mapped <- map_df$dwc_term %||% character(0)
   mapped <- mapped[!is.na(mapped) & mapped != ""]
@@ -853,10 +888,8 @@ mod_dwc_mapping_ui <- function(id) {
     all_present <- unique(mapped)
   }
 
-  missing_gate <- setdiff(gate_terms, all_present)
-  missing_extra <- setdiff(extra_terms, all_present)
+  missing_required <- setdiff(required_terms, all_present)
   missing_strong <- setdiff(strong_terms, all_present)
-  missing_optional <- setdiff(optional_terms, all_present)
 
   dup <- mapped[duplicated(mapped)]
   dup <- unique(dup)
@@ -872,13 +905,13 @@ mod_dwc_mapping_ui <- function(id) {
   }
 
   list(
-    table_profile = table_profile,
-    table_profile_label = prof$label %||% table_profile,
+    target_database = target_database,
+    target_database_label = prof$label %||% target_database,
     profile_note = prof$note %||% "",
-    missing_gate = missing_gate,
-    missing_extra = missing_extra,
+    required_terms = required_terms,
+    strongly_recommended_terms = strong_terms,
+    missing_required = missing_required,
     missing_strong = missing_strong,
-    missing_optional = missing_optional,
     duplicate_terms = dup,
     dependency_messages = dep_msgs
   )
@@ -904,44 +937,24 @@ mod_dwc_mapping_ui <- function(id) {
     shiny::tags$div(
       class = "dwc-map-soft-note",
       shiny::tags$p(
-        shiny::tags$b("Validation profile: "),
-        v$table_profile_label
+        shiny::tags$b("Selected database: "),
+        v$target_database_label
       ),
       shiny::tags$p(v$profile_note)
     )
   )
 
-  if (length(v$missing_gate) > 0) {
+  if (length(v$missing_required) > 0) {
     tag_list <- c(tag_list, list(
       make_alert(
         "danger",
-        "Missing minimum terms required to continue:",
-        v$missing_gate
+        "Missing required terms:",
+        v$missing_required
       )
     ))
   } else {
     tag_list <- c(tag_list, list(
-      make_alert("success", "Minimum required terms for this table type are present.")
-    ))
-  }
-
-  if (length(v$missing_optional) > 0) {
-    tag_list <- c(tag_list, list(
-      make_alert(
-        "warning",
-        "Important terms still missing, but they do not block this stage:",
-        v$missing_optional
-      )
-    ))
-  }
-
-  if (length(v$missing_extra) > 0) {
-    tag_list <- c(tag_list, list(
-      make_alert(
-        "warning",
-        "Additional validation term(s) missing:",
-        v$missing_extra
-      )
+      make_alert("success", "All required terms for the selected database are present.")
     ))
   }
 
@@ -949,7 +962,7 @@ mod_dwc_mapping_ui <- function(id) {
     tag_list <- c(tag_list, list(
       make_alert(
         "warning",
-        "Strongly recommended term(s) missing:",
+        "Strongly recommended terms still missing:",
         v$missing_strong
       )
     ))
@@ -1080,6 +1093,58 @@ mod_dwc_mapping_ui <- function(id) {
   df
 }
 
+.show_missing_terms_modal <- function(session, validation, step_label = "this step") {
+  missing_required <- validation$missing_required %||% character(0)
+  duplicate_terms <- validation$duplicate_terms %||% character(0)
+
+  if (length(missing_required) == 0 && length(duplicate_terms) == 0) {
+    return(invisible(NULL))
+  }
+
+  body_parts <- list(
+    shiny::tags$div(
+      style = "color:#b91c1c; font-weight:700; margin-bottom:0.75rem;",
+      "Warning"
+    ),
+    shiny::tags$p(
+      paste0(
+        "Before or after ",
+        step_label,
+        ", please review the minimum required terms for the selected database."
+      )
+    )
+  )
+
+  if (length(missing_required) > 0) {
+    body_parts <- c(
+      body_parts,
+      list(
+        shiny::tags$p("Required terms still missing:"),
+        shiny::tags$ul(lapply(missing_required, shiny::tags$li))
+      )
+    )
+  }
+
+  if (length(duplicate_terms) > 0) {
+    body_parts <- c(
+      body_parts,
+      list(
+        shiny::tags$p("Duplicate Darwin Core mappings found:"),
+        shiny::tags$ul(lapply(duplicate_terms, shiny::tags$li))
+      )
+    )
+  }
+
+  shiny::showModal(
+    shiny::modalDialog(
+      title = shiny::tags$span(style = "color:#b91c1c;", "Validation warning"),
+      easyClose = TRUE,
+      footer = shiny::modalButton("Close"),
+      body_parts
+    )
+  )
+}
+
 #' Darwin Core mapping module server
 #'
 #' @param id Module id.
@@ -1161,7 +1226,7 @@ mod_dwc_mapping_server <- function(id, df_in) {
       .validation_state(
         map_df = mapping_tbl(),
         final_df = validation_df(),
-        table_profile = input$table_profile %||% "flat"
+        target_database = input$target_database %||% "GBIF"
       )
     })
 
@@ -1329,12 +1394,10 @@ mod_dwc_mapping_server <- function(id, df_in) {
     })
 
     output$workflow_status <- shiny::renderUI({
-      prof <- .get_table_profile(input$table_profile %||% "flat")
-
       shiny::tagList(
         shiny::tags$p(
-          shiny::tags$b("Validation profile: "),
-          prof$label %||% (input$table_profile %||% "flat")
+          shiny::tags$b("Target database: "),
+          input$target_database %||% "GBIF"
         ),
         shiny::tags$p(
           shiny::tags$b("Mapping applied: "),
@@ -1589,6 +1652,12 @@ mod_dwc_mapping_server <- function(id, df_in) {
       rv$formatting_done <- FALSE
       rv$ready <- FALSE
 
+      .show_missing_terms_modal(
+        session = session,
+        validation = current_validation(),
+        step_label = "applying mapping"
+      )
+
       bslib::nav_select(
         id = "main_tabs",
         selected = "create_fields",
@@ -1734,46 +1803,11 @@ mod_dwc_mapping_server <- function(id, df_in) {
     shiny::observeEvent(input$continue_to_formatting, {
       shiny::req(!is.null(rv$mapped))
 
-      validation <- current_validation()
-      missing_gate <- validation$missing_gate
-      duplicate_terms <- validation$duplicate_terms
-
-      if (length(missing_gate) > 0 || length(duplicate_terms) > 0) {
-        modal_parts <- list(
-          shiny::p("Field mapping cannot continue to formatting yet.")
-        )
-
-        if (length(missing_gate) > 0) {
-          modal_parts <- c(
-            modal_parts,
-            list(
-              shiny::tags$p("The following minimum terms are still missing for the selected table type:"),
-              shiny::tags$ul(lapply(missing_gate, shiny::tags$li))
-            )
-          )
-        }
-
-        if (length(duplicate_terms) > 0) {
-          modal_parts <- c(
-            modal_parts,
-            list(
-              shiny::tags$p("The following Darwin Core terms are duplicated and must be unique:"),
-              shiny::tags$ul(lapply(duplicate_terms, shiny::tags$li))
-            )
-          )
-        }
-
-        shiny::showModal(
-          shiny::modalDialog(
-            title = "Cannot continue to formatting yet",
-            easyClose = TRUE,
-            footer = shiny::modalButton("Close"),
-            modal_parts
-          )
-        )
-        rv$ready <- FALSE
-        return()
-      }
+      .show_missing_terms_modal(
+        session = session,
+        validation = current_validation(),
+        step_label = "continuing to formatting"
+      )
 
       bslib::nav_select(
         id = "main_tabs",
@@ -1786,47 +1820,11 @@ mod_dwc_mapping_server <- function(id, df_in) {
       df_final <- current_preclean_df()
       shiny::req(df_final)
 
-      validation <- current_validation()
-      missing_gate <- validation$missing_gate
-      duplicate_terms <- validation$duplicate_terms
-
-      if (length(missing_gate) > 0 || length(duplicate_terms) > 0) {
-        modal_parts <- list(
-          shiny::p("Field mapping cannot be completed yet.")
-        )
-
-        if (length(missing_gate) > 0) {
-          modal_parts <- c(
-            modal_parts,
-            list(
-              shiny::tags$p("The following minimum terms are still missing for the selected table type:"),
-              shiny::tags$ul(lapply(missing_gate, shiny::tags$li))
-            )
-          )
-        }
-
-        if (length(duplicate_terms) > 0) {
-          modal_parts <- c(
-            modal_parts,
-            list(
-              shiny::tags$p("The following Darwin Core terms are duplicated and must be unique:"),
-              shiny::tags$ul(lapply(duplicate_terms, shiny::tags$li))
-            )
-          )
-        }
-
-        shiny::showModal(
-          shiny::modalDialog(
-            title = "Cannot complete field mapping yet",
-            easyClose = TRUE,
-            footer = shiny::modalButton("Close"),
-            modal_parts
-          )
-        )
-
-        rv$ready <- FALSE
-        return()
-      }
+      .show_missing_terms_modal(
+        session = session,
+        validation = current_validation(),
+        step_label = "applying formatting"
+      )
 
       shiny::withProgress(
         message = "Applying formatting",
