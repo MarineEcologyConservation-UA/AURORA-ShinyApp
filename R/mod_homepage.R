@@ -21,7 +21,7 @@ mod_homepage_ui <- function(id) {
 
             shiny::div(
               shiny::tags$img(
-                src = "aurora_logo.png",
+                src = "aurora_logo_home.png",
                 alt = "AURORA logo",
                 class = "hero-logo"
               )
