@@ -2,7 +2,7 @@
 # Taxonomy Match Module (WoRMS / GBIF)
 # - GBIF remains available
 # - WoRMS uses ONLY worrms::wm_records_taxamatch()
-# - input column configurable (default: verbatimIdentification if present)
+# - input column configurable (default: scientificName at this stage)
 # - normalisedQuery explicit and always created
 # - one lookup row per unique inputName
 # - selectable output columns to keep in final dataset
@@ -93,25 +93,25 @@ mod_taxonomy_match_ui <- function(id) {
     shiny::tags$div(
       class = "tax-tip-example",
       shiny::tags$span(class = "tax-tip-chip", "Polynoidae msp 1"),
-      " \u2192 ",
+      " → ",
       shiny::tags$span(class = "tax-tip-chip", "Polynoidae")
     ),
     shiny::tags$div(
       class = "tax-tip-example",
       shiny::tags$span(class = "tax-tip-chip", "Abra alba (juveniles)"),
-      " \u2192 ",
+      " → ",
       shiny::tags$span(class = "tax-tip-chip", "Abra alba")
     ),
     shiny::tags$div(
       class = "tax-tip-example",
       shiny::tags$span(class = "tax-tip-chip", "Gammarus cf. salinus"),
-      " \u2192 ",
+      " → ",
       shiny::tags$span(class = "tax-tip-chip", "Gammarus salinus")
     ),
     shiny::tags$div(
       class = "tax-tip-example",
       shiny::tags$span(class = "tax-tip-chip", "Nephtys indet."),
-      " \u2192 ",
+      " → ",
       shiny::tags$span(class = "tax-tip-chip", "Nephtys")
     )
   )
@@ -238,7 +238,7 @@ mod_taxonomy_match_ui <- function(id) {
             bslib::card_header("Notes"),
             bslib::card_body(
               shiny::tags$ul(
-                shiny::tags$li("Matching starts from a configurable input column, ideally verbatimIdentification."),
+                shiny::tags$li("Matching starts from a configurable input column, ideally scientificName at this stage."),
                 shiny::tags$li("normalisedQuery is always created and represents the text actually submitted to the selected database."),
                 shiny::tags$li("WoRMS uses only worrms::wm_records_taxamatch()."),
                 shiny::tags$li("GBIF remains available for terrestrial names."),
@@ -428,7 +428,7 @@ mod_taxonomy_match_server <- function(id, df_in) {
       "phylum",
       "family",
       "genus",
-      "authority"
+      "scientificNameAuthorship"
     )
 
     rv <- shiny::reactiveValues(
@@ -438,11 +438,12 @@ mod_taxonomy_match_server <- function(id, df_in) {
       issues = empty_issues(),
       cache = new.env(parent = emptyenv()),
       candidates_map = list(),
-      choice_observers = list(),
       suppress_choice_popup = FALSE,
       pending_choice = NULL,
       ready = FALSE
     )
+
+    choice_observers <- list()
 
     add_issue <- function(idx, field, rule, severity, message) {
       rv$issues <- rbind(
@@ -459,14 +460,15 @@ mod_taxonomy_match_server <- function(id, df_in) {
     }
 
     destroy_choice_observers <- function() {
-      if (length(rv$choice_observers) > 0) {
-        for (obs in rv$choice_observers) {
+      if (length(choice_observers) > 0) {
+        for (obs in choice_observers) {
           if (!is.null(obs)) {
             try(obs$destroy(), silent = TRUE)
           }
         }
       }
-      rv$choice_observers <- list()
+      choice_observers <<- list()
+      invisible(TRUE)
     }
 
     shiny::observeEvent(df_in(), {
@@ -515,8 +517,10 @@ mod_taxonomy_match_server <- function(id, df_in) {
 
     is_blank <- function(x) {
       if (length(x) == 0 || is.null(x)) return(TRUE)
-      if (all(is.na(x))) return(TRUE)
-      !nzchar(trimws(as.character(x)))
+      x_chr <- as.character(x)
+      if (length(x_chr) == 0) return(TRUE)
+      if (all(is.na(x_chr))) return(TRUE)
+      all(!nzchar(trimws(x_chr[!is.na(x_chr)])))
     }
 
     to_chr1 <- function(x) {
@@ -531,10 +535,6 @@ mod_taxonomy_match_server <- function(id, df_in) {
       shiny::req(is.data.frame(df))
       cols <- names(df)
 
-      chosen <- input$input_col
-      if (!is.null(chosen) && nzchar(chosen) && chosen %in% cols) return(chosen)
-
-      if ("verbatimIdentification" %in% cols) return("verbatimIdentification")
       if ("scientificName" %in% cols) return("scientificName")
       if (length(cols) > 0) return(cols[1])
 
@@ -546,26 +546,27 @@ mod_taxonomy_match_server <- function(id, df_in) {
       shiny::req(is.data.frame(df))
 
       cols <- names(df)
-      if (length(cols) == 0) {
-        return(shiny::tags$div("No columns available."))
+
+      if (!("scientificName" %in% cols)) {
+        return(
+          shiny::tags$div(
+            class = "alert alert-warning",
+            "The current dataset does not contain a scientificName column. Taxonomy matching requires scientificName at this stage."
+          )
+        )
       }
 
-      selected <- input$input_col
-      if (is.null(selected) || !(selected %in% cols)) {
-        if ("verbatimIdentification" %in% cols) {
-          selected <- "verbatimIdentification"
-        } else if ("scientificName" %in% cols) {
-          selected <- "scientificName"
-        } else {
-          selected <- cols[1]
-        }
-      }
-
-      shiny::selectInput(
-        inputId = ns("input_col"),
-        label = "Input column for matching",
-        choices = cols,
-        selected = selected
+      shiny::tagList(
+        shiny::selectInput(
+          inputId = ns("input_col"),
+          label = "Input column for matching",
+          choices = c("scientificName"),
+          selected = "scientificName"
+        ),
+        shiny::div(
+          class = "text-muted small mt-1",
+          "This step always uses scientificName, because it should already have been reviewed in Identification Data Cleaning."
+        )
       )
     })
 
@@ -588,8 +589,24 @@ mod_taxonomy_match_server <- function(id, df_in) {
           "acceptedNameUsage",
           "taxonomicStatus",
           "taxonRank",
-          "authority",
-          setdiff(worms_output_cols, c("lsid"))
+          "scientificNameAuthorship",
+          "kingdom",
+          "phylum",
+          "class",
+          "order",
+          "family",
+          "genus",
+          "AphiaID",
+          "url",
+          "scientificname",
+          "unacceptreason",
+          "taxonRankID",
+          "valid_AphiaID",
+          "parentNameUsageID",
+          "originalNameUsageID",
+          "citation",
+          "match_type",
+          "modified"
         )
       } else {
         c(
@@ -598,18 +615,46 @@ mod_taxonomy_match_server <- function(id, df_in) {
           "acceptedNameUsage",
           "taxonomicStatus",
           "taxonRank",
-          "authority",
-          setdiff(gbif_output_cols, c("key"))
+          "scientificNameAuthorship",
+          "kingdom",
+          "phylum",
+          "order",
+          "family",
+          "genus",
+          "canonicalName",
+          "acceptedKey",
+          "matchType",
+          "confidence"
         )
       }
 
-      shiny::checkboxGroupInput(
-        inputId = ns("keep_output_cols"),
-        label = NULL,
-        choices = choices,
-        selected = intersect(final_match_cols_default, choices)
+      selected <- unique(c("scientificName", "scientificNameID", intersect(final_match_cols_default, choices)))
+
+      shiny::tagList(
+        shiny::checkboxGroupInput(
+          inputId = ns("keep_output_cols"),
+          label = NULL,
+          choices = choices,
+          selected = selected
+        ),
+        shiny::div(
+          class = "text-muted small",
+          shiny::tags$strong("scientificName"),
+          " and ",
+          shiny::tags$strong("scientificNameID"),
+          " are always kept."
+        )
       )
     })
+
+    shiny::observeEvent(input$keep_output_cols, {
+      mandatory <- c("scientificName", "scientificNameID")
+      current_sel <- input$keep_output_cols %||% character(0)
+      sel <- unique(c(current_sel, mandatory))
+      if (!identical(sort(sel), sort(current_sel))) {
+        shiny::updateCheckboxGroupInput(session, "keep_output_cols", selected = sel)
+      }
+    }, ignoreInit = TRUE)
 
     base_names <- shiny::reactive({
       df <- df_in()
@@ -724,10 +769,8 @@ mod_taxonomy_match_server <- function(id, df_in) {
 
       if (is.data.frame(x)) {
         df <- x
-      } else if (is.list(x)) {
-        if (length(x) >= 1) {
-          df <- x[[1]]
-        }
+      } else if (is.list(x) && length(x) >= 1) {
+        df <- x[[1]]
       }
 
       if (is.null(df) || !is.data.frame(df) || nrow(df) == 0) {
@@ -878,7 +921,7 @@ mod_taxonomy_match_server <- function(id, df_in) {
       }
 
       if (is.null(dat) || !is.data.frame(dat) || nrow(dat) == 0) {
-        return(data.frame())
+        return(data.frame(stringsAsFactors = FALSE))
       }
 
       keep <- intersect(
@@ -900,7 +943,7 @@ mod_taxonomy_match_server <- function(id, df_in) {
 
       sci <- if ("scientificName" %in% names(out)) lower_norm(out$scientificName) else rep("", nrow(out))
       can <- if ("canonicalName" %in% names(out)) lower_norm(out$canonicalName) else rep("", nrow(out))
-      qn  <- lower_norm(query)
+      qn <- lower_norm(query)
 
       score <- integer(nrow(out))
       score[sci == qn] <- score[sci == qn] + 3L
@@ -912,11 +955,10 @@ mod_taxonomy_match_server <- function(id, df_in) {
         score[mt == "FUZZY"] <- score[mt == "FUZZY"] + 1L
       }
 
+      conf <- rep(0, nrow(out))
       if ("confidence" %in% names(out)) {
         conf <- suppressWarnings(as.numeric(out$confidence))
         conf[is.na(conf)] <- 0
-      } else {
-        conf <- rep(0, nrow(out))
       }
 
       ord <- order(-score, -conf, sci)
@@ -1056,15 +1098,28 @@ mod_taxonomy_match_server <- function(id, df_in) {
     }
 
     build_lookup_display <- function(lookup) {
-      disp <- lookup
-      disp$choice <- ""
-
-      if (is.null(disp) || !is.data.frame(disp) || nrow(disp) == 0) {
-        return(disp)
+      if (is.null(lookup) || !is.data.frame(lookup) || nrow(lookup) == 0) {
+        return(data.frame(stringsAsFactors = FALSE))
       }
 
+      keep_display <- c(
+        "inputName", "taxonMatchStatus", "selectedID",
+        "AphiaID", "scientificname",
+        "authority", "status", "rank", "valid_name", "valid_authority",
+        "kingdom", "phylum", "class", "order", "family", "genus", "lsid"
+      )
+
+      disp <- lookup[, intersect(keep_display, names(lookup)), drop = FALSE]
+
+      if (!("selectedID" %in% names(disp))) {
+        disp$selectedID <- rep(NA_character_, nrow(disp))
+      }
+
+      disp$choice <- ""
+
       for (i in seq_len(nrow(disp))) {
-        if (!identical(disp$taxonMatchStatus[i], "AMBIGUOUS")) next
+        status_i <- as.character(disp$taxonMatchStatus[i] %||% "")
+        if (!identical(status_i, "AMBIGUOUS")) next
 
         nm <- disp$inputName[i]
         cand <- rv$candidates_map[[nm]]
@@ -1078,6 +1133,17 @@ mod_taxonomy_match_server <- function(id, df_in) {
           st  <- safe_col(cand, "status", "")
           vn  <- safe_col(cand, "valid_name", "")
           mt  <- safe_col(cand, "match_type", "")
+
+          keep_id <- !is.na(ids) & nzchar(trimws(ids))
+          ids <- ids[keep_id]
+          sci <- sci[keep_id]
+          rk  <- rk[keep_id]
+          au  <- au[keep_id]
+          st  <- st[keep_id]
+          vn  <- vn[keep_id]
+          mt  <- mt[keep_id]
+
+          if (length(ids) == 0) next
 
           lab <- paste0(
             ids, " — ",
@@ -1096,6 +1162,18 @@ mod_taxonomy_match_server <- function(id, df_in) {
           au  <- safe_col(cand, "authorship", "")
           st  <- safe_col(cand, "taxonomicStatus", "")
           mt  <- safe_col(cand, "matchType", "")
+
+          keep_id <- !is.na(ids) & nzchar(trimws(ids))
+          ids <- ids[keep_id]
+          sci <- sci[keep_id]
+          can <- can[keep_id]
+          rk  <- rk[keep_id]
+          au  <- au[keep_id]
+          st  <- st[keep_id]
+          mt  <- mt[keep_id]
+
+          if (length(ids) == 0) next
+
           primary_nm <- ifelse(sci != "", sci, can)
 
           lab <- paste0(
@@ -1110,7 +1188,11 @@ mod_taxonomy_match_server <- function(id, df_in) {
 
         choices <- c("-- select candidate --" = "", stats::setNames(ids, lab))
         input_id <- ns(paste0("cand_", i))
-        selected_val <- if (!is.na(disp$selectedID[i]) && disp$selectedID[i] != "") disp$selectedID[i] else ""
+        selected_val <- as.character(disp$selectedID[i])
+
+        if (is.na(selected_val) || !nzchar(trimws(selected_val))) {
+          selected_val <- ""
+        }
 
         disp$choice[i] <- as.character(
           shiny::selectInput(
@@ -1123,19 +1205,26 @@ mod_taxonomy_match_server <- function(id, df_in) {
         )
       }
 
+      selected_chr <- as.character(disp$selectedID)
+      selected_chr[is.na(selected_chr)] <- ""
+
+      status_chr <- as.character(disp$taxonMatchStatus)
+      status_chr[is.na(status_chr)] <- ""
+
       disp$.choice_order <- 3L
       disp$.choice_order[
-        disp$taxonMatchStatus == "AMBIGUOUS" &
-          (is.na(disp$selectedID) | disp$selectedID == "")
+        status_chr == "AMBIGUOUS" & selected_chr == ""
       ] <- 0L
       disp$.choice_order[
-        disp$taxonMatchStatus == "AMBIGUOUS" &
-          !is.na(disp$selectedID) & disp$selectedID != ""
+        status_chr == "AMBIGUOUS" & selected_chr != ""
       ] <- 1L
-      disp$.choice_order[grepl("^MATCHED", disp$taxonMatchStatus)] <- 2L
+      disp$.choice_order[grepl("^MATCHED", status_chr)] <- 2L
 
-      disp <- disp[order(disp$.choice_order, disp$inputName), , drop = FALSE]
+      ord <- order(disp$.choice_order, as.character(disp$inputName))
+      disp <- disp[ord, , drop = FALSE]
+
       disp$.choice_order <- NULL
+      disp$selectedID <- NULL
 
       disp
     }
@@ -1153,7 +1242,10 @@ mod_taxonomy_match_server <- function(id, df_in) {
       if (is.null(lk) || !is.data.frame(lk) || nrow(lk) == 0) {
         unres <- vapply(
           nms,
-          function(x) is_blank(normalize_query_info(x, generate_normalised_query = isTRUE(input$generate_normalised_query))$query),
+          function(x) is_blank(normalize_query_info(
+            x,
+            generate_normalised_query = isTRUE(input$generate_normalised_query)
+          )$query),
           logical(1)
         )
 
@@ -1215,13 +1307,9 @@ mod_taxonomy_match_server <- function(id, df_in) {
         shiny::modalDialog(
           title = "Confirm taxonomic choice",
           shiny::tags$p(
-            paste0(
-              "You selected a candidate for '", nm, "'."
-            )
+            paste0("You selected a candidate for '", nm, "'.")
           ),
-          shiny::tags$p(
-            paste0("This will mark the row as MATCHED_MANUAL.")
-          ),
+          shiny::tags$p("This will mark the row as MATCHED_MANUAL."),
           if (length(same_nq) > 0) {
             shiny::tags$p(
               paste0(
@@ -1250,25 +1338,6 @@ mod_taxonomy_match_server <- function(id, df_in) {
               class = "btn-success"
             )
           )
-        )
-      )
-    }
-
-    open_pending_ambiguous_popup <- function(n_pending) {
-      shiny::showModal(
-        shiny::modalDialog(
-          title = "Resolve ambiguous taxonomy matches first",
-          shiny::tags$p(
-            paste0(
-              "There are ", n_pending,
-              " ambiguous row(s) without a selected candidate."
-            )
-          ),
-          shiny::tags$p(
-            "You must choose a candidate for every ambiguous row before applying taxonomy results to the dataset."
-          ),
-          easyClose = TRUE,
-          footer = shiny::modalButton("Close")
         )
       )
     }
@@ -1426,7 +1495,7 @@ mod_taxonomy_match_server <- function(id, df_in) {
           })
         }
 
-        rv$choice_observers <- obs_list
+        choice_observers <<- obs_list
       }
     })
 
@@ -1513,7 +1582,7 @@ mod_taxonomy_match_server <- function(id, df_in) {
 
       lk_col <- function(col) {
         vals <- rep(NA_character_, nrow(out))
-        ok <- !is.na(map_idx) & map_idx >= 1 & map_idx <= nrow(rv$lookup)
+        ok <- !is.na(map_idx) & map_idx >= 1 & map_idx <= nrow(rv$lookup) & (col %in% names(rv$lookup))
         vals[ok] <- as.character(rv$lookup[[col]][map_idx[ok]])
         vals
       }
@@ -1528,10 +1597,16 @@ mod_taxonomy_match_server <- function(id, df_in) {
         matched_name <- lk_col("scientificName")
       }
 
+      fill_val <- ifelse(!is.na(resolved_name) & nzchar(resolved_name), resolved_name, matched_name)
+
+      fill_ok_blank <- status_group == "MATCHED" &
+        (is.na(out$scientificName) | !nzchar(trimws(as.character(out$scientificName)))) &
+        !is.na(fill_val) & nzchar(fill_val)
+
+      out$scientificName[fill_ok_blank] <- fill_val[fill_ok_blank]
+
       if (isTRUE(replace_scientificName)) {
-        has_matched <- status_group == "MATCHED"
-        fill_val <- ifelse(!is.na(resolved_name) & nzchar(resolved_name), resolved_name, matched_name)
-        fill_ok <- has_matched & !is.na(fill_val) & nzchar(fill_val)
+        fill_ok <- status_group == "MATCHED" & !is.na(fill_val) & nzchar(fill_val)
         out$scientificName[fill_ok] <- fill_val[fill_ok]
       }
 
@@ -1542,7 +1617,7 @@ mod_taxonomy_match_server <- function(id, df_in) {
           acceptedNameUsage = lk_col("valid_name"),
           taxonomicStatus = lk_col("status"),
           taxonRank = lk_col("rank"),
-          authority = lk_col("authority"),
+          scientificNameAuthorship = lk_col("authority"),
           AphiaID = lk_col("AphiaID"),
           url = lk_col("url"),
           scientificname = lk_col("scientificname"),
@@ -1581,7 +1656,7 @@ mod_taxonomy_match_server <- function(id, df_in) {
           acceptedNameUsage = lk_col("accepted"),
           taxonomicStatus = lk_col("taxonomicStatus"),
           taxonRank = lk_col("rank"),
-          authority = lk_col("authorship"),
+          scientificNameAuthorship = lk_col("authorship"),
           nubKey = lk_col("nubKey"),
           canonicalName = lk_col("canonicalName"),
           rank = lk_col("rank"),
@@ -1621,6 +1696,10 @@ mod_taxonomy_match_server <- function(id, df_in) {
         out[tech_not_selected] <- NULL
       }
 
+      keep_rows <- status_group == "MATCHED"
+      keep_rows[is.na(keep_rows)] <- FALSE
+      out <- out[keep_rows, , drop = FALSE]
+
       out
     }
 
@@ -1653,21 +1732,31 @@ mod_taxonomy_match_server <- function(id, df_in) {
       n_nf <- sum(rv$lookup$taxonMatchStatus == "NOT_FOUND", na.rm = TRUE)
       n_unres <- sum(rv$lookup$taxonMatchStatus == "UNRESOLVABLE", na.rm = TRUE)
 
+      discarded_n <- nrow(df_in()) - nrow(out)
+
       add_issue(
         NA_integer_, current_input_col(), "taxonomy_applied",
-        "INFO",
+        "WARNING",
         paste0(
           "Taxonomy lookup applied to dataset. ",
           "MATCHED=", n_matched,
           " | AMBIGUOUS=", n_amb,
           " | NOT_FOUND=", n_nf,
           " | UNRESOLVABLE=", n_unres,
-          if (isTRUE(replace_scientificName)) {
-            " | scientificName filled/replaced only for MATCHED cases."
-          } else {
-            " | Original scientificName preserved."
-          }
+          " | Rows kept=", nrow(out),
+          " | Rows discarded=", discarded_n,
+          ". Rows without a resolved taxonomy match were discarded. If you need to keep them, correct the original dataset and restart the workflow."
         )
+      )
+
+      shiny::showNotification(
+        paste0(
+          "Taxonomy results applied to dataset. ",
+          nrow(out), " row(s) kept and ",
+          max(0, discarded_n), " row(s) discarded."
+        ),
+        type = "message",
+        duration = 6
       )
     }
 
@@ -1686,17 +1775,14 @@ mod_taxonomy_match_server <- function(id, df_in) {
       pending_rows <- unresolved_ambiguous_rows()
 
       if (length(pending_rows) > 0) {
-        open_pending_ambiguous_popup(length(pending_rows))
         add_issue(
-          NA_integer_, current_input_col(), "taxonomy_apply_blocked_pending_ambiguous",
+          NA_integer_, current_input_col(), "taxonomy_apply_with_unresolved_rows",
           "WARNING",
           paste0(
-            "Dataset application blocked because ",
             length(pending_rows),
-            " ambiguous row(s) still need a manual choice."
+            " ambiguous row(s) still had no manual choice. Those observations will be discarded from the final dataset. If you need to keep them, correct the original dataset and restart the workflow."
           )
         )
-        return()
       }
 
       finalize_apply()

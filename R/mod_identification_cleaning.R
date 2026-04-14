@@ -1,10 +1,11 @@
 # =========================================================
 # Identification Data Cleaning Module
-# - Uses mapped/cleaned Darwin Core data from Field Mapping
+# - Uses mapped/cleaned DwC data from Field Mapping
 # - Builds one editable row per unique source identification value
 # - Source priority: verbatimIdentification -> scientificName
-# - Optional editable fields come ONLY from original columns that were
-#   left unmapped (dwc_term == "") in Field Mapping and survived in df_in
+# - Optional editable fields come from ALL DwC terms available in the
+#   Field Mapping dropdown, EXCEPT those already selected in mapping
+# - Keeps DT pagination/page length/state after cell edits
 # File: R/mod_identification_cleaning.R
 # =========================================================
 
@@ -85,7 +86,7 @@ mod_identification_cleaning_ui <- function(id) {
             shiny::tags$strong("Warning: "),
             "The ", shiny::tags$strong("scientificName"), " column (yellow) requires manual editing and review.",
             shiny::tags$br(),
-            "Optional fields shown below come from original columns left unmapped in Field Mapping and are filled from values already present in the dataset. ",
+            "Optional fields shown below are Darwin Core terms that were not selected during Field Mapping. They can be reviewed and filled here from values already present in the dataset. ",
             shiny::tags$strong("Please review all entries for accuracy.")
           ),
 
@@ -144,6 +145,7 @@ mod_identification_cleaning_ui <- function(id) {
 mod_identification_cleaning_server <- function(id, df_in, mapping_in) {
   shiny::moduleServer(id, function(input, output, session) {
 
+    ns <- session$ns
     `%||%` <- function(x, y) if (is.null(x)) y else x
 
     rv <- shiny::reactiveValues(
@@ -153,7 +155,9 @@ mod_identification_cleaning_server <- function(id, df_in, mapping_in) {
       source_col = NULL,
       applied_df = NULL,
       ready = FALSE,
-      fallback_used = FALSE
+      fallback_used = FALSE,
+      skipped = FALSE,
+      table_seed = 0L
     )
 
     normalize_text <- function(x) {
@@ -167,6 +171,29 @@ mod_identification_cleaning_server <- function(id, df_in, mapping_in) {
       x <- normalize_text(x)
       x <- x[nzchar(x)]
       if (length(x) == 0) "" else x[1]
+    }
+
+    get_all_dwc_terms <- function() {
+      if (!requireNamespace("corella", quietly = TRUE)) {
+        return(character(0))
+      }
+
+      x <- tryCatch(corella::darwin_core_terms, error = function(e) NULL)
+
+      if (is.null(x)) {
+        return(character(0))
+      }
+
+      x <- as.data.frame(x, stringsAsFactors = FALSE)
+
+      if (!("term" %in% names(x))) {
+        return(character(0))
+      }
+
+      x <- x[!is.na(x$term) & x$term != "", , drop = FALSE]
+      x <- x[!duplicated(x$term), , drop = FALSE]
+
+      sort(unique(x$term))
     }
 
     parse_identification_scientific_name <- function(txt) {
@@ -275,31 +302,42 @@ mod_identification_cleaning_server <- function(id, df_in, mapping_in) {
 
       dwc_term_chr <- as.character(map_df$dwc_term %||% "")
       dwc_term_chr[is.na(dwc_term_chr)] <- ""
+      dwc_term_chr <- trimws(dwc_term_chr)
 
-      user_col_chr <- as.character(map_df$user_column %||% "")
-      user_col_chr[is.na(user_col_chr)] <- ""
+      mapped_terms <- unique(dwc_term_chr[nzchar(dwc_term_chr)])
 
-      # Somente colunas originais deixadas em branco no Field Mapping
-      unmapped_original_cols <- user_col_chr[dwc_term_chr == ""]
-      unmapped_original_cols <- unique(unmapped_original_cols)
+      all_dwc_terms <- get_all_dwc_terms()
 
-      # Só oferecer as que realmente ainda existem em df_in()
-      available <- intersect(unmapped_original_cols, names(df))
+      if (length(all_dwc_terms) == 0) {
+        all_dwc_terms <- sort(unique(c(
+          mapped_terms,
+          "identificationQualifier", "taxonRank", "lifeStage", "sex",
+          "scientificName", "verbatimIdentification", "eventID", "occurrenceID",
+          "basisOfRecord", "eventDate", "decimalLatitude", "decimalLongitude"
+        )))
+      }
 
-      # Não oferecer as colunas-base do módulo
-      available <- setdiff(
-        available,
-        c("scientificName", "verbatimIdentification")
+      excluded_base_terms <- c(
+        "scientificName",
+        "verbatimIdentification"
+      )
+
+      available <- setdiff(all_dwc_terms, unique(c(mapped_terms, excluded_base_terms)))
+      available <- sort(unique(available))
+
+      default_selected <- intersect(
+        c("identificationQualifier", "taxonRank", "lifeStage", "sex"),
+        available
       )
 
       shiny::selectizeInput(
-        session$ns("other_cols"),
+        ns("other_cols"),
         label = "Optional fields to include/edit",
         choices = available,
-        selected = character(0),
+        selected = default_selected,
         multiple = TRUE,
         options = list(
-          placeholder = "Select original unmapped columns kept from Field Mapping"
+          placeholder = "Select Darwin Core terms not selected during Field Mapping"
         )
       )
     })
@@ -312,6 +350,8 @@ mod_identification_cleaning_server <- function(id, df_in, mapping_in) {
       rv$applied_df <- NULL
       rv$ready <- FALSE
       rv$fallback_used <- FALSE
+      rv$skipped <- FALSE
+      rv$table_seed <- 0L
     }, ignoreInit = FALSE)
 
     build_lookup <- function(df, selected_cols) {
@@ -321,19 +361,16 @@ mod_identification_cleaning_server <- function(id, df_in, mapping_in) {
       out <- df
       out$.row_id <- seq_len(nrow(out))
 
-      # garantir colunas-base
       for (col in c("scientificName", "verbatimIdentification")) {
         if (!col %in% names(out)) out[[col]] <- ""
         out[[col]] <- normalize_text(out[[col]])
       }
 
-      # garantir colunas opcionais selecionadas
       for (col in selected_cols) {
         if (!col %in% names(out)) out[[col]] <- ""
         out[[col]] <- normalize_text(out[[col]])
       }
 
-      # fallback técnico
       if (!any(nzchar(out$verbatimIdentification)) && any(nzchar(out$scientificName))) {
         out$verbatimIdentification <- out$scientificName
       } else {
@@ -393,7 +430,6 @@ mod_identification_cleaning_server <- function(id, df_in, mapping_in) {
           sci_current
         }
 
-        # campos opcionais vêm do conteúdo já existente da tabela
         for (col in selected_cols) {
           row[[col]] <- first_non_empty(block[[col]])
         }
@@ -418,6 +454,8 @@ mod_identification_cleaning_server <- function(id, df_in, mapping_in) {
       )
     }
 
+    table_proxy <- DT::dataTableProxy(outputId = ns("editable_table"))
+
     shiny::observeEvent(input$build_table, {
       df <- df_in()
       shiny::req(df)
@@ -432,6 +470,8 @@ mod_identification_cleaning_server <- function(id, df_in, mapping_in) {
       rv$applied_df <- NULL
       rv$ready <- FALSE
       rv$fallback_used <- identical(built$source_col, "scientificName")
+      rv$skipped <- FALSE
+      rv$table_seed <- rv$table_seed + 1L
     })
 
     output$table_note <- shiny::renderUI({
@@ -449,13 +489,15 @@ mod_identification_cleaning_server <- function(id, df_in, mapping_in) {
     })
 
     output$editable_table <- DT::renderDT({
-      req(rv$display_data)
-      df_disp <- rv$display_data
+      req(rv$table_seed > 0L)
+
+      df_disp <- isolate(rv$display_data)
+      req(df_disp)
 
       hide_idx <- which(names(df_disp) %in% c("sourceValue", ".row_ids")) - 1L
-      editable_names <- c("scientificName", input$other_cols %||% character(0))
+      editable_names <- c("scientificName", isolate(input$other_cols %||% character(0)))
       editable_cols <- which(names(df_disp) %in% editable_names) - 1L
-      yellow_col <- which(names(df_disp) == "scientificName")
+      yellow_col_name <- "scientificName"
 
       dt <- DT::datatable(
         df_disp,
@@ -470,23 +512,25 @@ mod_identification_cleaning_server <- function(id, df_in, mapping_in) {
         options = list(
           scrollX = TRUE,
           pageLength = 10,
+          stateSave = TRUE,
+          stateDuration = -1,
           columnDefs = list(
             list(visible = FALSE, targets = hide_idx)
           )
         )
       )
 
-      if (length(yellow_col) == 1) {
+      if (yellow_col_name %in% names(df_disp)) {
         dt <- DT::formatStyle(
           dt,
-          columns = yellow_col,
+          columns = yellow_col_name,
           backgroundColor = "#fff4ce",
           fontWeight = "600"
         )
       }
 
       dt
-    })
+    }, server = FALSE)
 
     shiny::observeEvent(input$editable_table_cell_edit, {
       req(rv$display_data, rv$full_data, rv$col_map)
@@ -495,10 +539,13 @@ mod_identification_cleaning_server <- function(id, df_in, mapping_in) {
       df_disp <- rv$display_data
       df_full <- rv$full_data
 
+      if (is.null(info$row) || is.null(info$col)) {
+        return(invisible(NULL))
+      }
+
       col_name <- names(df_disp)[info$col + 1L]
 
       if (!col_name %in% names(rv$col_map)) {
-        rv$display_data <- df_disp
         return(invisible(NULL))
       }
 
@@ -512,14 +559,29 @@ mod_identification_cleaning_server <- function(id, df_in, mapping_in) {
       rv$display_data <- df_disp
       rv$full_data <- df_full
       rv$ready <- FALSE
+
+      DT::replaceData(
+        proxy = table_proxy,
+        data = rv$display_data,
+        resetPaging = FALSE,
+        rownames = FALSE
+      )
     })
 
     output$apply_btn_ui <- shiny::renderUI({
       req(rv$display_data)
-      shiny::actionButton(
-        session$ns("apply_changes"),
-        "Apply changes to dataset",
-        class = "btn-success"
+
+      shiny::tagList(
+        shiny::actionButton(
+          ns("apply_changes"),
+          "Apply changes to dataset",
+          class = "btn-success"
+        ),
+        shiny::actionButton(
+          ns("skip_step"),
+          "Skip this step",
+          class = "btn-outline-warning"
+        )
       )
     })
 
@@ -532,10 +594,47 @@ mod_identification_cleaning_server <- function(id, df_in, mapping_in) {
 
       rv$applied_df <- out
       rv$ready <- TRUE
+      rv$skipped <- FALSE
 
       shiny::showNotification(
         "Identification cleaning changes applied to the dataset.",
         type = "message"
+      )
+    })
+
+    shiny::observeEvent(input$skip_step, {
+      shiny::showModal(
+        shiny::modalDialog(
+          title = "Important Notice",
+          shiny::tags$p(
+            "If you choose to skip this step, you must ensure that your scientificName field is fully compliant with the Darwin Core Standards:"
+          ),
+          shiny::tags$p(
+            shiny::tags$a(
+              href = "http://rs.tdwg.org/dwc/terms/scientificName",
+              target = "_blank",
+              "http://rs.tdwg.org/dwc/terms/scientificName"
+            )
+          ),
+          easyClose = TRUE,
+          footer = shiny::tagList(
+            shiny::modalButton("Cancel"),
+            shiny::actionButton(ns("confirm_skip"), "Skip this step", class = "btn-warning")
+          )
+        )
+      )
+    })
+
+    shiny::observeEvent(input$confirm_skip, {
+      shiny::removeModal()
+      rv$applied_df <- NULL
+      rv$ready <- TRUE
+      rv$skipped <- TRUE
+
+      shiny::showNotification(
+        "Identification cleaning was skipped. Please make sure scientificName is already Darwin Core compliant.",
+        type = "warning",
+        duration = 8
       )
     })
 
@@ -561,7 +660,8 @@ mod_identification_cleaning_server <- function(id, df_in, mapping_in) {
         shiny::tags$p(shiny::tags$b("Source column: "), shiny::tags$code(rv$source_col %||% "")),
         shiny::tags$p(shiny::tags$b("Unique entries: "), nrow(df)),
         shiny::tags$p(shiny::tags$b("scientificName values present in review table: "), edited_vals),
-        shiny::tags$p(shiny::tags$b("Applied to dataset: "), if (isTRUE(rv$ready)) "Yes" else "No")
+        shiny::tags$p(shiny::tags$b("Applied to dataset: "), if (!is.null(rv$applied_df) && !isTRUE(rv$skipped)) "Yes" else "No"),
+        shiny::tags$p(shiny::tags$b("Step skipped: "), if (isTRUE(rv$skipped)) "Yes" else "No")
       )
     })
 

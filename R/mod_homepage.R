@@ -52,7 +52,7 @@ mod_homepage_ui <- function(id) {
 
       bslib::card(
         class = "mb-4",
-        bslib::card_header("tool workflow"),
+        bslib::card_header("Tool workflow"),
         bslib::card_body(
           shiny::div(
             class = "step-grid",
@@ -80,17 +80,27 @@ mod_homepage_ui <- function(id) {
             shiny::div(
               class = "step-box",
               shiny::div(class = "step-n", "3"),
-              shiny::div(class = "step-title", "Taxonomy"),
+              shiny::div(class = "step-title", "Identification Data Cleaning"),
               shiny::div(
                 class = "step-text",
-                "Automatic matching of scientific names against taxonomic backbones of WoRMS or GBIF."
+                "Review and refine identification-related fields, especially scientificName and related Darwin Core terms, before taxonomic matching."
               )
             ),
 
             shiny::div(
               class = "step-box",
               shiny::div(class = "step-n", "4"),
-              shiny::div(class = "step-title", "Darwin Tables"),
+              shiny::div(class = "step-title", "Taxonomy"),
+              shiny::div(
+                class = "step-text",
+                "Automatic matching of scientific names against authoritative taxonomic backbones such as WoRMS or GBIF."
+              )
+            ),
+
+            shiny::div(
+              class = "step-box",
+              shiny::div(class = "step-n", "5"),
+              shiny::div(class = "step-title", "Darwin Core Tables"),
               shiny::div(
                 class = "step-text",
                 "Build structured Darwin Core tables for Event, Occurrence, and eMoF."
@@ -99,21 +109,115 @@ mod_homepage_ui <- function(id) {
 
             shiny::div(
               class = "step-box",
-              shiny::div(class = "step-n", "5"),
-              shiny::div(class = "step-title", "Metadata"),
+              shiny::div(class = "step-n", "6"),
+              shiny::div(class = "step-title", "QC & Diagnostics"),
               shiny::div(
                 class = "step-text",
-                "Streamline metadata creation and revision using an interface inspired by the GBIF IPT."
+                "Inspect issues, diagnostics, summary outputs, and validation results before final metadata preparation and export."
               )
             ),
 
             shiny::div(
               class = "step-box",
-              shiny::div(class = "step-n", "6"),
-              shiny::div(class = "step-title", "QC"),
+              shiny::div(class = "step-n", "7"),
+              shiny::div(class = "step-title", "Metadata"),
               shiny::div(
                 class = "step-text",
-                "Inspect issues, diagnostics, summary outputs, and validation results before exporting."
+                "Streamline metadata creation and revision using an interface inspired by the GBIF IPT."
+              )
+            )
+          )
+        )
+      ),
+
+      bslib::card(
+        class = "mb-4",
+        bslib::card_header("Examples of supported tasks"),
+        bslib::card_body(
+          shiny::div(
+            class = "feature-grid",
+
+            bslib::card(
+              class = "feature-card",
+              bslib::card_body(
+                shiny::div(class = "feature-icon", "📝"),
+                shiny::div(class = "feature-title", "Map to Darwin Core"),
+                shiny::div(
+                  class = "feature-text",
+                  "Align the original dataset fields with standardized Darwin Core (DwC) terms to ensure global interoperability."
+                )
+              )
+            ),
+
+            bslib::card(
+              class = "feature-card",
+              bslib::card_body(
+                shiny::div(class = "feature-icon", "📅"),
+                shiny::div(class = "feature-title", "Standardize Temporal Data"),
+                shiny::div(
+                  class = "feature-text",
+                  "Convert all event dates into ISO 8601 format for temporal consistency."
+                )
+              )
+            ),
+
+            bslib::card(
+              class = "feature-card",
+              bslib::card_body(
+                shiny::div(class = "feature-icon", "📍"),
+                shiny::div(class = "feature-title", "Normalize Coordinates"),
+                shiny::div(
+                  class = "feature-text",
+                  "Transform various coordinate formats into Decimal Degrees (WGS84)."
+                )
+              )
+            ),
+
+            bslib::card(
+              class = "feature-card",
+              bslib::card_body(
+                shiny::div(class = "feature-icon", "🍃"),
+                shiny::div(class = "feature-title", "Taxonomic Matching"),
+                shiny::div(
+                  class = "feature-text",
+                  "Cross-reference scientific names with authoritative taxonomic databases such as WoRMS and GBIF to validate names and retrieve accepted classifications."
+                )
+              )
+            ),
+
+            bslib::card(
+              class = "feature-card",
+              bslib::card_body(
+                shiny::div(class = "feature-icon", "🗂️"),
+                shiny::div(class = "feature-title", "Build Darwin Core Archives"),
+                shiny::div(
+                  class = "feature-text",
+                  "Structure the data into relational Event, Occurrence, and Extended Measurement or Fact (eMoF) tables to comply with the DwC-A star schema."
+                )
+              )
+            ),
+
+            bslib::card(
+              class = "feature-card",
+              bslib::card_body(
+                shiny::div(class = "feature-icon", "🔍"),
+                shiny::div(class = "feature-title", "Data Quality Inspection"),
+                shiny::div(
+                  class = "feature-text",
+                  "Review processed tables to identify inconsistencies, missing values, and other issues in the dataset."
+                )
+              )
+            ),
+
+            bslib::card(
+              class = "feature-card",
+              bslib::card_body(
+                shiny::div(class = "feature-icon", "📝"),
+                shiny::div(class = "feature-title", "Metadata Preparation"),
+                shiny::div(
+                  class = "feature-text",
+                  "Document dataset-level metadata to support revision, publication, and FAIR data sharing."
+                )
               )
             )
           )

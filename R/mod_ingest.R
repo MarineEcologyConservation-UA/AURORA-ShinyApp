@@ -269,6 +269,7 @@ mod_ingest_server <- function(id, example_map) {
         "Raw: ", nrow(rv$raw), " rows x ", ncol(rv$raw), " cols\n",
         "Current dataset: ", current_rows, " rows x ", current_cols, " cols\n",
         "Pivot applied: ", ifelse(isTRUE(pv$is_pivoted), "Yes", "No"), "\n",
+        "Undo steps available: ", length(pv$history), "\n",
         "Ingest complete: ", ifelse(isTRUE(rv$ingest_complete), "Yes", "No")
       )
     })
@@ -465,12 +466,12 @@ mod_ingest_server <- function(id, example_map) {
 
             shiny::div(
               class = "pivot-field",
-              shiny::textInput(session$ns("pivot_names_to"), "names_to", "variable")
+              shiny::textInput(session$ns("pivot_names_to"), "Name for the new column (e.g., species) of former headers", "variable")
             ),
 
             shiny::div(
               class = "pivot-field",
-              shiny::textInput(session$ns("pivot_values_to"), "values_to", "value")
+              shiny::textInput(session$ns("pivot_values_to"), "New column name (e.g., density) for previous cell values", "value")
             ),
 
             shiny::div(
@@ -556,8 +557,14 @@ mod_ingest_server <- function(id, example_map) {
 
       pv$history <- c(list(df_before), pv$history)
       pv$data <- df_after
-      pv$is_pivoted <- TRUE
+      pv$is_pivoted <- !identical(pv$data, pv$baseline)
       rv$ingest_complete <- FALSE
+
+      shiny::showNotification(
+        "Pivot applied to the current dataset.",
+        type = "message",
+        duration = 3
+      )
     })
 
     # --------------------------------------------------
@@ -574,8 +581,13 @@ mod_ingest_server <- function(id, example_map) {
       }
 
       pv$data <- pv$history[[1]]
-      pv$history <- pv$history[-1]
-      pv$is_pivoted <- length(pv$history) > 0
+      if (length(pv$history) > 1) {
+        pv$history <- pv$history[-1]
+      } else {
+        pv$history <- list()
+      }
+
+      pv$is_pivoted <- !is.null(pv$baseline) && !identical(pv$data, pv$baseline)
       rv$ingest_complete <- FALSE
     })
 

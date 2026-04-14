@@ -26,7 +26,7 @@ mod_build_dwca_ui <- function(id) {
       "))
     ),
 
-    shiny::h3("Build Darwin Core Archive"),
+    shiny::h3("Build Darwin Core Tables"),
 
     shiny::fluidRow(
       shiny::column(
@@ -53,7 +53,11 @@ mod_build_dwca_ui <- function(id) {
         shiny::selectInput(
           ns("occ_mode"),
           "OccurrenceID rule",
-          choices = c("event_seq", "use")
+          choices = c(
+            "Create one occurrenceID per row using eventID plus a running sequence" = "event_seq",
+            "Use an existing occurrenceID column from the dataset" = "use"
+          ),
+          selected = "event_seq"
         ),
 
         shiny::uiOutput(ns("occ_use_ui")),
@@ -315,7 +319,7 @@ mod_build_dwca_server <- function(id, df_in, dwc_terms) {
       }
       if (input$occ_mode == "use") {
         if (is.null(input$occ_column) || !nzchar(input$occ_column)) {
-          stop("Select the occurrenceID column (or use event_seq).")
+          stop("Select the existing occurrenceID column, or switch to the option that creates a new occurrenceID from eventID plus sequence.")
         }
       }
 
@@ -378,6 +382,12 @@ mod_build_dwca_server <- function(id, df_in, dwc_terms) {
     shiny::observeEvent(result(), {
       shiny::req(result())
       rv$ready <- TRUE
+
+      shiny::showNotification(
+        "Darwin Core Tables built successfully. QC & Diagnostics and Metadata are now available.",
+        type = "message",
+        duration = 5
+      )
     }, ignoreInit = TRUE)
 
     output$qc <- shiny::renderPrint({

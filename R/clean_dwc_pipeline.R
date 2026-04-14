@@ -92,7 +92,7 @@ clean_dwc_pipeline <- function(df,
       idx <- which(changed)
       for (i in idx) {
         add_issue(i, "scientificName", "name_trim",
-                  "INFO", "scientificName normalizado (trim/espaços).")
+                  "INFO", "scientificName normalized (trim/whitespace).")
       }
     }
   }
@@ -133,7 +133,7 @@ clean_dwc_pipeline <- function(df,
       for (i in idx) {
         add_issue(i, "eventDate", "date_parse",
                   "WARNING",
-                  paste0("Não foi possível normalizar eventDate: '", x[i], "'."))
+                  paste0("Could not normalize eventDate: '", x[i], "'."))
       }
     }
 
@@ -154,12 +154,12 @@ clean_dwc_pipeline <- function(df,
   if (!("decimalLatitude" %in% names(out))) {
     out$decimalLatitude <- NA_real_
     add_issue(NA_integer_, "decimalLatitude", "coord_missing_created",
-              "INFO", "decimalLatitude não existia e foi criada.")
+              "INFO", "decimalLatitude did not exist and was created.")
   }
   if (!("decimalLongitude" %in% names(out))) {
     out$decimalLongitude <- NA_real_
     add_issue(NA_integer_, "decimalLongitude", "coord_missing_created",
-              "INFO", "decimalLongitude não existia e foi criada.")
+              "INFO", "decimalLongitude did not exist and was created.")
   }
 
   if (isTRUE(preserve_original_coords)) {
@@ -170,7 +170,7 @@ clean_dwc_pipeline <- function(df,
         "verbatimLatitude",
         "verbatim_created_from_decimalLatitude",
         "INFO",
-        "verbatimLatitude criado a partir de decimalLatitude antes da transformação."
+        "verbatimLatitude created from decimalLatitude before transformation."
       )
     }
 
@@ -181,7 +181,7 @@ clean_dwc_pipeline <- function(df,
         "verbatimLongitude",
         "verbatim_created_from_decimalLongitude",
         "INFO",
-        "verbatimLongitude criado a partir de decimalLongitude antes da transformação."
+        "verbatimLongitude created from decimalLongitude before transformation."
       )
     }
   }
@@ -244,7 +244,7 @@ clean_dwc_pipeline <- function(df,
     if (length(idx) > 0) {
       for (i in idx) {
         add_issue(i, "decimalLatitude/decimalLongitude", "coord_parse_missing_pkg",
-                  "ERROR", "Não foi possível converter coordenadas. Instala o pacote 'parzer'.")
+                  "ERROR", "Could not parse coordinates. Install the 'parzer' package.")
       }
     }
   }
@@ -264,7 +264,7 @@ clean_dwc_pipeline <- function(df,
         "coord_non_numeric",
         "ERROR",
         paste0(
-          "Coordenadas não numéricas ou não parseáveis. latitude='",
+          "Coordinates are not numeric or could not be parsed. latitude='",
           lat_candidate[i], "', longitude='", lon_candidate[i], "'."
         )
       )
@@ -322,7 +322,7 @@ clean_dwc_pipeline <- function(df,
     idx <- which(miss)
     for (i in idx) {
       add_issue(i, "decimalLatitude/decimalLongitude", "empty_coordinates",
-                "WARNING", "Coordenadas ausentes (lat/lon) após tentativa de parsing.")
+                "WARNING", "Missing coordinates (lat/lon) after parsing attempt.")
     }
   }
 
@@ -335,7 +335,7 @@ clean_dwc_pipeline <- function(df,
         "decimalLatitude/decimalLongitude",
         "coords_zero_zero",
         "WARNING",
-        "Coordenadas 0,0 detectadas (Null Island). Rever se é um erro."
+        "Coordinates at 0,0 detected (Null Island). Review whether this is an error."
       )
     }
   }
@@ -351,7 +351,7 @@ clean_dwc_pipeline <- function(df,
       idx <- which(oor_lat | oor_lon)
       for (i in idx) {
         add_issue(i, "decimalLatitude/decimalLongitude", "out_of_range",
-                  "ERROR", "Coordenadas fora do intervalo válido para EPSG:[4326].")
+                  "ERROR", "Coordinates outside the valid range for EPSG:4326.")
       }
     }
   }
@@ -395,7 +395,7 @@ clean_dwc_pipeline <- function(df,
       if (length(idx) > 0) {
         for (i in idx) {
           add_issue(i, "decimalLatitude/decimalLongitude", "reproject_missing_pkg",
-                    "ERROR", "Para reprojetar CRS é necessário instalar o pacote 'sf'.")
+                    "ERROR", "The 'sf' package is required to reproject coordinates.")
         }
       }
     }
@@ -408,7 +408,7 @@ clean_dwc_pipeline <- function(df,
       idx <- which(oor_lat2 | oor_lon2)
       for (i in idx) {
         add_issue(i, "decimalLatitude/decimalLongitude", "out_of_range_after",
-                  "ERROR", "Coordenadas fora do intervalo válido após conversão/reprojeção.")
+                  "ERROR", "Coordinates outside the valid range after conversion/reprojection.")
       }
     }
   }
@@ -424,7 +424,7 @@ clean_dwc_pipeline <- function(df,
         "geodeticDatum",
         "geodeticDatum_created",
         "INFO",
-        "geodeticDatum não existia e foi criado."
+        "geodeticDatum did not exist and was created."
       )
     }
 
@@ -468,7 +468,7 @@ clean_dwc_pipeline <- function(df,
       idx <- which(neg_depth)
       for (i in idx) {
         add_issue(i, "minimumDepthInMeters/maximumDepthInMeters", "depth_negative",
-                  "WARNING", "Profundidade negativa encontrada. Rever convenção do dataset.")
+                  "WARNING", "Negative depth found. Review the dataset convention.")
       }
     }
 
@@ -531,7 +531,7 @@ clean_dwc_pipeline <- function(df,
           "bathymetry",
           "bathymetry_bbox_too_large",
           "WARNING",
-          "Bathymetry cross-reference automático ignorado porque a área do dataset é demasiado grande."
+          "Automatic bathymetry cross-reference was skipped because the dataset extent is too large."
         )
       }
     }
@@ -569,7 +569,7 @@ clean_dwc_pipeline <- function(df,
             paste0(
               "Profundidade reportada (~", round(reported_depth, 1),
               " m) difere da bathymetry (~", round(bathy_positive, 1),
-              " m) acima da tolerância de ", bathy_depth_tolerance_m, " m."
+              " m) above the tolerance of ", bathy_depth_tolerance_m, " m."
             )
           )
         }
@@ -621,7 +621,7 @@ clean_dwc_pipeline <- function(df,
       idx <- which(changed)
       for (i in idx) {
         add_issue(i, "basisOfRecord", "vocab_standardize",
-                  "INFO", "basisOfRecord normalizado (vocabulário controlado).")
+                  "INFO", "basisOfRecord normalized (controlled vocabulary).")
       }
     }
   }

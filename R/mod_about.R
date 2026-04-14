@@ -1,4 +1,4 @@
-# modules/mod_about.R
+# modules/mod_about.R 
 
 #' About module UI
 #'
@@ -13,6 +13,9 @@ mod_about_ui <- function(id) {
       id = ns("page"),
       class = "home-wrap",
 
+      # =========================
+      # PROJECT
+      # =========================
       bslib::card(
         class = "mb-4",
         bslib::card_header("The AURORA project"),
@@ -52,100 +55,9 @@ mod_about_ui <- function(id) {
         )
       ),
 
-      bslib::card(
-        class = "mb-4",
-        bslib::card_header("Examples of supported tasks"),
-        bslib::card_body(
-          shiny::div(
-            class = "feature-grid",
-
-            bslib::card(
-              class = "feature-card",
-              bslib::card_body(
-                shiny::div(class = "feature-icon", "📝"),
-                shiny::div(class = "feature-title", "Map to Darwin Core"),
-                shiny::div(
-                  class = "feature-text",
-                  "Align the original dataset fields with standardized Darwin Core (DwC) terms to ensure global interoperability."
-                )
-              )
-            ),
-
-            bslib::card(
-              class = "feature-card",
-              bslib::card_body(
-                shiny::div(class = "feature-icon", "📅"),
-                shiny::div(class = "feature-title", "Standardize Temporal Data"),
-                shiny::div(
-                  class = "feature-text",
-                  "Convert all event dates into the ISO 8601 format (e.g., YYYY-MM-DD) for temporal consistency."
-                )
-              )
-            ),
-
-            bslib::card(
-              class = "feature-card",
-              bslib::card_body(
-                shiny::div(class = "feature-icon", "📍"),
-                shiny::div(class = "feature-title", "Normalize Coordinates"),
-                shiny::div(
-                  class = "feature-text",
-                  "Transform various coordinate formats into Decimal Degrees (WGS84)."
-                )
-              )
-            ),
-
-            bslib::card(
-              class = "feature-card",
-              bslib::card_body(
-                shiny::div(class = "feature-icon", "🍃"),
-                shiny::div(class = "feature-title", "Taxonomic matching"),
-                shiny::div(
-                  class = "feature-text",
-                  "Cross-reference scientific names with authoritative taxonomic databases (e.g., WoRMS, GBIF Backbone) to validate and retrieve accepted names and current classifications."
-                )
-              )
-            ),
-
-            bslib::card(
-              class = "feature-card",
-              bslib::card_body(
-                shiny::div(class = "feature-icon", "🗂️"),
-                shiny::div(class = "feature-title", "Build Darwin Core Archives (DwC-A)"),
-                shiny::div(
-                  class = "feature-text",
-                  "Structure the data into relational Event, Occurrence, and Extended Measurement or Fact (eMoF) tables to comply with the DwC-A star schema."
-                )
-              )
-            ),
-
-            bslib::card(
-              class = "feature-card",
-              bslib::card_body(
-                shiny::div(class = "feature-icon", "🔍"),
-                shiny::div(class = "feature-title", "Data Quality Inspection"),
-                shiny::div(
-                  class = "feature-text",
-                  "Revise processed tables to identify inconsistencies or issues within the dataset."
-                )
-              )
-            ),
-
-            bslib::card(
-              class = "feature-card",
-              bslib::card_body(
-                shiny::div(class = "feature-icon", "📝"),
-                shiny::div(class = "feature-title", "Metadata Preparation"),
-                shiny::div(
-                  class = "feature-text",
-                  "Document the dataset’s metadata to facilitate revision and comply with FAIR principles."
-                )
-              )
-            )
-          )
-        )
-      ),
-
+      # =========================
+      # CITE + SUPPORT
+      # =========================
       bslib::layout_columns(
         col_widths = c(6, 6),
 
@@ -197,7 +109,7 @@ mod_about_ui <- function(id) {
             shiny::p(
               class = "home-note",
               shiny::strong("Bug reports: "),
-              "If you encounter any bugs or functional glitches, we kindly ask that you report them by opening a new issue on the AURORA GitHub repository: ",
+              "If you encounter any bugs or functional glitches, please report them by opening a new issue on the AURORA GitHub repository: ",
               shiny::tags$a(
                 href = "https://github.com/MarineEcologyConservation-UA/AURORA-ShinyApp",
                 target = "_blank",
@@ -210,13 +122,31 @@ mod_about_ui <- function(id) {
         )
       ),
 
+      # =========================
+      # FUNDING (COM LOGOS)
+      # =========================
       bslib::card(
         class = "mb-4",
         bslib::card_header("Funding"),
         bslib::card_body(
+
           shiny::p(
             class = "home-note",
             "AURORA project is funded by the Flanders Marine Institute (VLIZ) through the DTO-BioFlow project funded by the European Union."
+          ),
+
+          shiny::div(
+            style = "display:flex; gap:2rem; align-items:center; flex-wrap:wrap; margin-top:1rem;",
+
+            shiny::tags$img(
+              src = "https://dto-bioflow.eu/sites/default/files/2023-09/Logo_BIO-Flow2023_Positive.png",
+              height = "60px"
+            ),
+
+            shiny::tags$img(
+              src = "https://ec.europa.eu/regional_policy/images/information-sources/logo-download-center/eu_funded_en.jpg",
+              height = "60px"
+            )
           )
         )
       )

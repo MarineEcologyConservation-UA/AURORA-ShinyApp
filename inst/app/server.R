@@ -22,6 +22,11 @@ server <- function(input, output, session) {
     isTRUE(out)
   }
 
+  safe_df_ready <- function(rx) {
+    out <- try(rx(), silent = TRUE)
+    is.data.frame(out) && !inherits(out, "try-error")
+  }
+
   ingest <- mod_ingest_server("ingest", example_map = example_map)
 
   dwc_map <- mod_dwc_mapping_server(
@@ -62,7 +67,11 @@ server <- function(input, output, session) {
     mapping_done  <- ingest_done   && safe_flag(dwc_map$ready())
     id_clean_done <- mapping_done  && safe_flag(id_cleaning$ready())
     taxonomy_done <- id_clean_done && safe_flag(tax_match$ready())
-    build_done    <- taxonomy_done && safe_flag(dwca$ready())
+
+    dwca_ready_flag   <- safe_flag(dwca$ready())
+    dwca_tables_ready <- safe_df_ready(dwca$event) && safe_df_ready(dwca$occurrence)
+
+    build_done <- taxonomy_done && (dwca_ready_flag || dwca_tables_ready)
 
     allowed_tabs <- c("home", "ingest", "about")
 
@@ -79,7 +88,7 @@ server <- function(input, output, session) {
       allowed_tabs <- c(allowed_tabs, "darwin_tables")
     }
     if (build_done) {
-      allowed_tabs <- c(allowed_tabs, "metadata", "qc")
+      allowed_tabs <- c(allowed_tabs, "qc", "metadata")
     }
 
     session$sendCustomMessage(
@@ -93,9 +102,9 @@ server <- function(input, output, session) {
       fallback_tab <- "home"
 
       if (build_done) {
-        fallback_tab <- "darwin_tables"
+        fallback_tab <- "qc"
       } else if (taxonomy_done) {
-        fallback_tab <- "taxonomy"
+        fallback_tab <- "darwin_tables"
       } else if (id_clean_done) {
         fallback_tab <- "id_cleaning"
       } else if (mapping_done) {
@@ -120,6 +129,11 @@ server <- function(input, output, session) {
     cat("id_cleaning$ready():", safe_flag(id_cleaning$ready()), "\n")
     cat("tax_match$ready():", safe_flag(tax_match$ready()), "\n")
     cat("dwca$ready():", safe_flag(dwca$ready()), "\n")
+    cat(
+      "dwca tables ready:",
+      safe_df_ready(dwca$event) && safe_df_ready(dwca$occurrence),
+      "\n"
+    )
 
     cat("\n--- DEBUG DWCA ---\n")
     cat("dwca exists:", !is.null(dwca), "\n")

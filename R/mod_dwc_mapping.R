@@ -161,18 +161,6 @@ mod_dwc_mapping_ui <- function(id) {
         width: 100%;
       }
 
-      .dwc-map-soft-note {
-        background: #f8fafc;
-        border: 1px solid #e2e8f0;
-        border-radius: 0.75rem;
-        padding: 0.85rem 1rem;
-        margin-bottom: 1rem;
-      }
-
-      .dwc-map-soft-note p:last-child {
-        margin-bottom: 0;
-      }
-
       .dwc-map-bor-note {
         color: #6c757d;
         font-size: 0.92rem;
@@ -213,10 +201,10 @@ mod_dwc_mapping_ui <- function(id) {
 
         bslib::card(
           fill = FALSE,
-          bslib::card_header("Target database"),
+          bslib::card_header("Target data repository"),
           shiny::selectInput(
             ns("target_database"),
-            "Database",
+            "Data repository",
             choices = c("GBIF", "OBIS", "EMODnet"),
             selected = "GBIF",
             width = "100%"
@@ -473,7 +461,7 @@ mod_dwc_mapping_ui <- function(id) {
                             shiny::icon("info-circle"),
                             style = "cursor: help;"
                           ),
-                          "These are fields suggested because another mapped or created field usually requires a companion term."
+                          "These are fields suggested because another mapped or created field usually requires an associated term."
                         )
                       )
                     ),
@@ -504,13 +492,13 @@ mod_dwc_mapping_ui <- function(id) {
 
                   bslib::card(
                     fill = FALSE,
-                    bslib::card_header("Coordinate system"),
+                    bslib::card_header("Original coordinate system"),
                     shiny::p(
-                      "Set the input CRS (EPSG). The target CRS will always be EPSG:[4326] (WGS84 lon/lat)."
+                      "Identify the original CRS (EPSG) of the dataset. Coordinates will be transformed into EPSG:4326 (WGS 84)."
                     ),
                     shiny::numericInput(
                       ns("coord_epsg_in"),
-                      label = "Input CRS EPSG:[ ]",
+                      label = "Input CRS EPSG:",
                       value = 4326,
                       min = 1,
                       width = "100%"
@@ -647,7 +635,7 @@ mod_dwc_mapping_ui <- function(id) {
         "footprintSRS",
         "individualCount"
       ),
-      note = "Validation follows the flat-table matrix for GBIF. Dark blue terms are treated as required; light grey terms are treated as strongly recommended."
+      note = "Test"
     ),
     OBIS = list(
       label = "OBIS",
@@ -692,7 +680,7 @@ mod_dwc_mapping_ui <- function(id) {
         "genus",
         "order"
       ),
-      note = "Validation follows the flat-table matrix for OBIS. Dark blue terms are treated as required; light grey terms are treated as strongly recommended."
+      note = "Test"
     ),
     EMODnet = list(
       label = "EMODnet",
@@ -733,7 +721,7 @@ mod_dwc_mapping_ui <- function(id) {
         "modified",
         "scientificNameAuthorship"
       ),
-      note = "Validation follows the flat-table matrix for EMODnet. Dark blue terms are treated as required; light grey terms are treated as strongly recommended."
+      note = "Test"
     )
   )
 }
@@ -933,16 +921,7 @@ mod_dwc_mapping_ui <- function(id) {
     )
   }
 
-  tag_list <- list(
-    shiny::tags$div(
-      class = "dwc-map-soft-note",
-      shiny::tags$p(
-        shiny::tags$b("Selected database: "),
-        v$target_database_label
-      ),
-      shiny::tags$p(v$profile_note)
-    )
-  )
+  tag_list <- list()
 
   if (length(v$missing_required) > 0) {
     tag_list <- c(tag_list, list(
@@ -1396,7 +1375,7 @@ mod_dwc_mapping_server <- function(id, df_in) {
     output$workflow_status <- shiny::renderUI({
       shiny::tagList(
         shiny::tags$p(
-          shiny::tags$b("Target database: "),
+          shiny::tags$b("Target data repository: "),
           input$target_database %||% "GBIF"
         ),
         shiny::tags$p(
@@ -1543,7 +1522,7 @@ mod_dwc_mapping_server <- function(id, df_in) {
         return(
           shiny::tags$div(
             class = "alert alert-light",
-            "Apply mapping first to detect companion fields."
+            "Apply mapping first to detect associated fields."
           )
         )
       }

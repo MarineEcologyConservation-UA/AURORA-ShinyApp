@@ -227,7 +227,7 @@ ui <- bslib::page_navbar(
     shiny::tags$script(shiny::HTML("
       Shiny.addCustomMessageHandler('toggleMainTabs', function(message) {
         var allowed = message.allowed || [];
-        var allTabs = ['home', 'ingest', 'field_mapping', 'id_cleaning', 'taxonomy', 'darwin_tables', 'metadata', 'qc', 'about'];
+        var allTabs = ['home', 'ingest', 'field_mapping', 'id_cleaning', 'taxonomy', 'darwin_tables', 'qc', 'metadata', 'about'];
 
         allTabs.forEach(function(value) {
           var navLink = document.querySelector('[data-value=\"' + value + '\"]');
@@ -298,20 +298,20 @@ ui <- bslib::page_navbar(
   # 5 BUILD DWC-A
   # -------------------------------------------------------
   bslib::nav_panel(
-    title = "Darwin Tables",
+    title = "Darwin Core Tables",
     value = "darwin_tables",
     mod_build_dwca_ui("dwca")
   ),
 
   # -------------------------------------------------------
-  # 6 METADATA
-  # -------------------------------------------------------
-  mod_metadata_ui("metadata"),
-
-  # -------------------------------------------------------
-  # 7 QC & DIAGNOSTICS
+  # 6 QC & DIAGNOSTICS
   # -------------------------------------------------------
   mod_qc_ui("qc"),
+
+  # -------------------------------------------------------
+  # 7 METADATA
+  # -------------------------------------------------------
+  mod_metadata_ui("metadata"),
 
   # -------------------------------------------------------
   # 8 ABOUT
