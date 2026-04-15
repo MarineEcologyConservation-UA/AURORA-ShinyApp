@@ -93,25 +93,25 @@ mod_taxonomy_match_ui <- function(id) {
     shiny::tags$div(
       class = "tax-tip-example",
       shiny::tags$span(class = "tax-tip-chip", "Polynoidae msp 1"),
-      " → ",
+      " \u2192 ",
       shiny::tags$span(class = "tax-tip-chip", "Polynoidae")
     ),
     shiny::tags$div(
       class = "tax-tip-example",
       shiny::tags$span(class = "tax-tip-chip", "Abra alba (juveniles)"),
-      " → ",
+      " \u2192 ",
       shiny::tags$span(class = "tax-tip-chip", "Abra alba")
     ),
     shiny::tags$div(
       class = "tax-tip-example",
       shiny::tags$span(class = "tax-tip-chip", "Gammarus cf. salinus"),
-      " → ",
+      " \u2192 ",
       shiny::tags$span(class = "tax-tip-chip", "Gammarus salinus")
     ),
     shiny::tags$div(
       class = "tax-tip-example",
       shiny::tags$span(class = "tax-tip-chip", "Nephtys indet."),
-      " → ",
+      " \u2192 ",
       shiny::tags$span(class = "tax-tip-chip", "Nephtys")
     )
   )
@@ -222,6 +222,26 @@ mod_taxonomy_match_ui <- function(id) {
     ", root_sel, " .tax-tip-example {
       margin-bottom: .2rem;
     }
+
+    ", root_sel, " .tax-warning-box {
+      border: 1px solid #dc3545;
+      background: #fff5f5;
+      border-radius: .5rem;
+      padding: .75rem 1rem;
+      margin-bottom: .75rem;
+    }
+
+    ", root_sel, " .tax-warning-title {
+      color: #b42318;
+      font-weight: 700;
+      margin-bottom: .35rem;
+    }
+
+    ", root_sel, " .tax-warning-list {
+      margin: .25rem 0 0 1rem;
+      max-height: 180px;
+      overflow-y: auto;
+    }
   ")
 
   shiny::tagList(
@@ -243,8 +263,9 @@ mod_taxonomy_match_ui <- function(id) {
                 shiny::tags$li("WoRMS uses only worrms::wm_records_taxamatch()."),
                 shiny::tags$li("GBIF remains available for terrestrial names."),
                 shiny::tags$li("The lookup table shows one row per unique inputName."),
-                shiny::tags$li("When ambiguities exist, the user must manually choose the candidate before applying results to the dataset."),
-                shiny::tags$li("When applying to the dataset, the module writes only the selected output columns.")
+                shiny::tags$li("When ambiguities exist, the user may manually choose one candidate before applying results to the dataset."),
+                shiny::tags$li("Rows without a resolved taxonomy match are discarded when results are applied to the final dataset."),
+                shiny::tags$li("If unresolved names need to be kept, the original file should be corrected and the workflow restarted.")
               )
             )
           ),
@@ -289,15 +310,6 @@ mod_taxonomy_match_ui <- function(id) {
                       value = TRUE,
                       width = NULL
                     )
-                  ),
-
-                  shiny::numericInput(
-                    inputId = ns("top_n"),
-                    label = "Top N candidates (for manual review)",
-                    value = 5,
-                    min = 2,
-                    max = 50,
-                    step = 1
                   ),
 
                   shiny::tags$div(
@@ -440,7 +452,8 @@ mod_taxonomy_match_server <- function(id, df_in) {
       candidates_map = list(),
       suppress_choice_popup = FALSE,
       pending_choice = NULL,
-      ready = FALSE
+      ready = FALSE,
+      pending_apply = FALSE
     )
 
     choice_observers <- list()
@@ -481,6 +494,7 @@ mod_taxonomy_match_server <- function(id, df_in) {
       rv$suppress_choice_popup <- FALSE
       rv$pending_choice <- NULL
       rv$ready <- FALSE
+      rv$pending_apply <- FALSE
     }, ignoreInit = FALSE)
 
     has_needed_pkgs <- shiny::reactive({
@@ -743,8 +757,8 @@ mod_taxonomy_match_server <- function(id, df_in) {
       out
     }
 
-    cache_key <- function(db, query, top_n, auto_apply_unique) {
-      paste(db, as.integer(top_n), as.character(auto_apply_unique), query, sep = "||")
+    cache_key <- function(db, query, auto_apply_unique) {
+      paste(db, as.character(auto_apply_unique), query, sep = "||")
     }
 
     cache_get <- function(key) {
@@ -814,7 +828,7 @@ mod_taxonomy_match_server <- function(id, df_in) {
       out
     }
 
-    worms_taxamatch_candidates <- function(query, top_n = 5) {
+    worms_taxamatch_candidates <- function(query) {
       res <- tryCatch(
         worrms::wm_records_taxamatch(name = query),
         error = function(e) NULL
@@ -837,7 +851,7 @@ mod_taxonomy_match_server <- function(id, df_in) {
       score[toupper(out$match_type) == "EXACT"] <- score[toupper(out$match_type) == "EXACT"] + 2L
 
       ord <- order(-score, sci, vnm)
-      utils::head(out[ord, , drop = FALSE], as.integer(top_n))
+      out[ord, , drop = FALSE]
     }
 
     worms_find_candidate_row <- function(input_name, selected_id) {
@@ -851,8 +865,8 @@ mod_taxonomy_match_server <- function(id, df_in) {
       cand[idx[1], , drop = FALSE]
     }
 
-    match_one_worms <- function(input_name, normalised_query, top_n = 5, auto_apply_unique = TRUE) {
-      key <- cache_key("worms", normalised_query, top_n, auto_apply_unique)
+    match_one_worms <- function(input_name, normalised_query, auto_apply_unique = TRUE) {
+      key <- cache_key("worms", normalised_query, auto_apply_unique)
       cached <- cache_get(key)
 
       if (!is.null(cached)) {
@@ -873,7 +887,7 @@ mod_taxonomy_match_server <- function(id, df_in) {
         return(res)
       }
 
-      cand <- worms_taxamatch_candidates(normalised_query, top_n = top_n)
+      cand <- worms_taxamatch_candidates(normalised_query)
 
       if (!is.data.frame(cand) || nrow(cand) == 0) {
         blank_row$taxonMatchStatus <- "NOT_FOUND"
@@ -909,9 +923,9 @@ mod_taxonomy_match_server <- function(id, df_in) {
       res
     }
 
-    gbif_candidates <- function(query, top_n = 5) {
+    gbif_candidates <- function(query) {
       res <- tryCatch(
-        rgbif::name_lookup(q = query, limit = as.integer(top_n)),
+        rgbif::name_lookup(q = query, limit = 100),
         error = function(e) NULL
       )
 
@@ -962,7 +976,7 @@ mod_taxonomy_match_server <- function(id, df_in) {
       }
 
       ord <- order(-score, -conf, sci)
-      utils::head(out[ord, , drop = FALSE], as.integer(top_n))
+      out[ord, , drop = FALSE]
     }
 
     gbif_find_candidate_row <- function(input_name, selected_id) {
@@ -976,8 +990,8 @@ mod_taxonomy_match_server <- function(id, df_in) {
       cand[idx[1], , drop = FALSE]
     }
 
-    match_one_gbif <- function(input_name, normalised_query, top_n = 5, auto_apply_unique = TRUE) {
-      key <- cache_key("gbif", normalised_query, top_n, auto_apply_unique)
+    match_one_gbif <- function(input_name, normalised_query, auto_apply_unique = TRUE) {
+      key <- cache_key("gbif", normalised_query, auto_apply_unique)
       cached <- cache_get(key)
 
       if (!is.null(cached)) {
@@ -998,7 +1012,7 @@ mod_taxonomy_match_server <- function(id, df_in) {
         return(res)
       }
 
-      cand <- gbif_candidates(normalised_query, top_n = top_n)
+      cand <- gbif_candidates(normalised_query)
 
       if (!is.data.frame(cand) || nrow(cand) == 0) {
         blank_row$taxonMatchStatus <- "NOT_FOUND"
@@ -1091,12 +1105,6 @@ mod_taxonomy_match_server <- function(id, df_in) {
       invisible(TRUE)
     }
 
-    get_candidate_table <- function(i) {
-      if (is.null(rv$lookup) || nrow(rv$lookup) < i) return(NULL)
-      nm <- rv$lookup$inputName[i]
-      rv$candidates_map[[nm]]
-    }
-
     build_lookup_display <- function(lookup) {
       if (is.null(lookup) || !is.data.frame(lookup) || nrow(lookup) == 0) {
         return(data.frame(stringsAsFactors = FALSE))
@@ -1146,13 +1154,13 @@ mod_taxonomy_match_server <- function(id, df_in) {
           if (length(ids) == 0) next
 
           lab <- paste0(
-            ids, " — ",
+            ids, " \u2014 ",
             sci,
             ifelse(rk != "", paste0(" [", rk, "]"), ""),
             ifelse(st != "", paste0(" (", st, ")"), ""),
             ifelse(vn != "", paste0(" | valid: ", vn), ""),
             ifelse(mt != "", paste0(" <", mt, ">"), ""),
-            ifelse(au != "", paste0(" — ", au), "")
+            ifelse(au != "", paste0(" \u2014 ", au), "")
           )
         } else {
           ids <- as.character(cand$key)
@@ -1177,12 +1185,12 @@ mod_taxonomy_match_server <- function(id, df_in) {
           primary_nm <- ifelse(sci != "", sci, can)
 
           lab <- paste0(
-            ids, " — ",
+            ids, " \u2014 ",
             primary_nm,
             ifelse(rk != "", paste0(" [", rk, "]"), ""),
             ifelse(st != "", paste0(" (", st, ")"), ""),
             ifelse(mt != "", paste0(" <", mt, ">"), ""),
-            ifelse(au != "", paste0(" — ", au), "")
+            ifelse(au != "", paste0(" \u2014 ", au), "")
           )
         }
 
@@ -1342,6 +1350,124 @@ mod_taxonomy_match_server <- function(id, df_in) {
       )
     }
 
+    unresolved_apply_summary <- function() {
+      df <- df_in()
+      shiny::req(is.data.frame(df))
+
+      src <- current_input_col()
+      shiny::req(!is.null(src), src %in% names(df))
+
+      lk <- rv$lookup
+      if (is.null(lk) || !is.data.frame(lk) || nrow(lk) == 0) {
+        return(NULL)
+      }
+
+      src_vals <- normalize_ws(df[[src]])
+
+      unresolved_amb <- lk$taxonMatchStatus == "AMBIGUOUS" &
+        (is.na(lk$selectedID) | lk$selectedID == "")
+
+      idx_nf <- which(lk$taxonMatchStatus == "NOT_FOUND")
+      idx_unres <- which(lk$taxonMatchStatus == "UNRESOLVABLE")
+      idx_amb <- which(unresolved_amb)
+      idx_all <- sort(unique(c(idx_nf, idx_unres, idx_amb)))
+
+      if (length(idx_all) == 0) {
+        return(NULL)
+      }
+
+      names_nf <- sort(unique(lk$inputName[idx_nf]))
+      names_unres <- sort(unique(lk$inputName[idx_unres]))
+      names_amb <- sort(unique(lk$inputName[idx_amb]))
+      names_all <- sort(unique(lk$inputName[idx_all]))
+
+      counts_by_name <- table(src_vals[src_vals %in% names_all])
+
+      obs_nf <- sum(counts_by_name[names(counts_by_name) %in% names_nf], na.rm = TRUE)
+      obs_unres <- sum(counts_by_name[names(counts_by_name) %in% names_unres], na.rm = TRUE)
+      obs_amb <- sum(counts_by_name[names(counts_by_name) %in% names_amb], na.rm = TRUE)
+      obs_all <- sum(counts_by_name, na.rm = TRUE)
+
+      list(
+        idx_all = idx_all,
+        names_nf = names_nf,
+        names_unres = names_unres,
+        names_amb = names_amb,
+        names_all = names_all,
+        n_lookup_nf = length(names_nf),
+        n_lookup_unres = length(names_unres),
+        n_lookup_amb = length(names_amb),
+        n_obs_nf = as.integer(obs_nf),
+        n_obs_unres = as.integer(obs_unres),
+        n_obs_amb = as.integer(obs_amb),
+        n_obs_all = as.integer(obs_all)
+      )
+    }
+
+    limited_name_list_ui <- function(x, limit = 20) {
+      x <- x[!is.na(x) & nzchar(x)]
+      if (length(x) == 0) return(NULL)
+
+      shown <- utils::head(x, limit)
+      shiny::tagList(
+        shiny::tags$ul(
+          class = "tax-warning-list",
+          lapply(shown, shiny::tags$li)
+        ),
+        if (length(x) > limit) {
+          shiny::tags$div(
+            class = "text-muted small",
+            paste0("... and ", length(x) - limit, " more.")
+          )
+        }
+      )
+    }
+
+    open_apply_warning_modal <- function(info) {
+      shiny::showModal(
+        shiny::modalDialog(
+          title = "Warning before applying taxonomy results",
+          shiny::tags$div(
+            class = "tax-warning-box",
+            shiny::tags$div(
+              class = "tax-warning-title",
+              "Some observations do not have a resolved taxonomy match and will be discarded."
+            ),
+            shiny::tags$p(
+              "If you need to keep these observations, correct the original file and restart the workflow."
+            ),
+            shiny::tags$ul(
+              shiny::tags$li(paste0("NOT_FOUND names: ", info$n_lookup_nf, " | affected observations: ", info$n_obs_nf)),
+              shiny::tags$li(paste0("UNRESOLVABLE names: ", info$n_lookup_unres, " | affected observations: ", info$n_obs_unres)),
+              shiny::tags$li(paste0("AMBIGUOUS names without a selected choice: ", info$n_lookup_amb, " | affected observations: ", info$n_obs_amb)),
+              shiny::tags$li(paste0("Total observations to be discarded: ", info$n_obs_all))
+            )
+          ),
+          if (length(info$names_nf) > 0) shiny::tagList(
+            shiny::tags$strong("Not Found values:"),
+            limited_name_list_ui(info$names_nf)
+          ),
+          if (length(info$names_unres) > 0) shiny::tagList(
+            shiny::tags$strong("Unresolvable values:"),
+            limited_name_list_ui(info$names_unres)
+          ),
+          if (length(info$names_amb) > 0) shiny::tagList(
+            shiny::tags$strong("Ambiguous values without manual choice:"),
+            limited_name_list_ui(info$names_amb)
+          ),
+          easyClose = FALSE,
+          footer = shiny::tagList(
+            shiny::modalButton("Cancel"),
+            shiny::actionButton(
+              ns("confirm_apply_discard"),
+              "Apply and discard unresolved rows",
+              class = "btn-danger"
+            )
+          )
+        )
+      )
+    }
+
     shiny::observeEvent(input$run_match, {
       destroy_choice_observers()
 
@@ -1352,6 +1478,7 @@ mod_taxonomy_match_server <- function(id, df_in) {
       rv$applied_df <- NULL
       rv$pending_choice <- NULL
       rv$ready <- FALSE
+      rv$pending_apply <- FALSE
 
       df <- df_in()
       shiny::req(is.data.frame(df))
@@ -1422,14 +1549,12 @@ mod_taxonomy_match_server <- function(id, df_in) {
               match_one_worms(
                 input_name = nm,
                 normalised_query = q,
-                top_n = input$top_n,
                 auto_apply_unique = auto_apply_unique
               )
             } else {
               match_one_gbif(
                 input_name = nm,
                 normalised_query = q,
-                top_n = input$top_n,
                 auto_apply_unique = auto_apply_unique
               )
             }
@@ -1710,21 +1835,12 @@ mod_taxonomy_match_server <- function(id, df_in) {
       df_in()
     })
 
-    unresolved_ambiguous_rows <- function() {
-      if (is.null(rv$lookup) || !is.data.frame(rv$lookup) || nrow(rv$lookup) == 0) {
-        return(integer())
-      }
-      which(
-        rv$lookup$taxonMatchStatus == "AMBIGUOUS" &
-          (is.na(rv$lookup$selectedID) | rv$lookup$selectedID == "")
-      )
-    }
-
     finalize_apply <- function() {
       out <- compute_out()
       shiny::req(is.data.frame(out))
       rv$applied_df <- out
       rv$ready <- TRUE
+      rv$pending_apply <- FALSE
 
       stat_grp <- tax_status_group(rv$lookup$taxonMatchStatus)
       n_matched <- sum(stat_grp == "MATCHED", na.rm = TRUE)
@@ -1772,19 +1888,27 @@ mod_taxonomy_match_server <- function(id, df_in) {
         return()
       }
 
-      pending_rows <- unresolved_ambiguous_rows()
+      info <- unresolved_apply_summary()
 
-      if (length(pending_rows) > 0) {
+      if (!is.null(info) && isTRUE(info$n_obs_all > 0)) {
+        rv$pending_apply <- TRUE
         add_issue(
           NA_integer_, current_input_col(), "taxonomy_apply_with_unresolved_rows",
           "WARNING",
           paste0(
-            length(pending_rows),
-            " ambiguous row(s) still had no manual choice. Those observations will be discarded from the final dataset. If you need to keep them, correct the original dataset and restart the workflow."
+            info$n_obs_all,
+            " observation(s) will be discarded because they are NOT_FOUND, UNRESOLVABLE, or still AMBIGUOUS without a selected candidate."
           )
         )
+        open_apply_warning_modal(info)
+        return()
       }
 
+      finalize_apply()
+    })
+
+    shiny::observeEvent(input$confirm_apply_discard, {
+      shiny::removeModal()
       finalize_apply()
     })
 
