@@ -2,7 +2,7 @@
 
 #' Darwin Core mapping module UI
 #'
-#' Shiny module UI for mapping user columns to Darwin Core terms.
+#' Shiny module UI for mapping user columns to DwC terms.
 #'
 #' @param id Module id.
 #' @return A Shiny UI definition.
@@ -186,6 +186,10 @@ mod_dwc_mapping_ui <- function(id) {
         margin-bottom: 0;
       }
 
+      .dwc-map-mapping-actions {
+        margin-bottom: 1rem;
+      }
+
       .selectize-dropdown {
         z-index: 5000 !important;
       }
@@ -218,13 +222,6 @@ mod_dwc_mapping_ui <- function(id) {
         bslib::card(
           fill = FALSE,
           bslib::card_header("Actions"),
-          shiny::actionButton(
-            ns("auto_suggest"),
-            "Auto-suggest",
-            icon = shiny::icon("magic"),
-            class = "btn-primary"
-          ),
-          shiny::div(class = "dwc-map-section-gap"),
           shiny::downloadButton(
             ns("download_issues_csv"),
             "Download Warning/Issues (CSV)",
@@ -282,6 +279,18 @@ mod_dwc_mapping_ui <- function(id) {
               shiny::div(
                 class = "p-3",
                 shiny::h4("Map each column to a Darwin Core term"),
+
+                shiny::div(
+                  class = "dwc-map-mapping-actions",
+                  shiny::actionButton(
+                    ns("auto_suggest"),
+                    "Auto-suggest",
+                    icon = shiny::icon("magic"),
+                    class = "btn-primary"
+                  )
+                ),
+
+                shiny::uiOutput(ns("mapping_export_note")),
                 shiny::uiOutput(ns("scientific_name_note")),
                 shiny::uiOutput(ns("mapping_ui")),
                 shiny::div(class = "dwc-map-section-gap"),
@@ -1399,6 +1408,14 @@ mod_dwc_mapping_server <- function(id, df_in) {
 
     output$validation_ui <- shiny::renderUI({
       .validation_ui_block(current_validation())
+    })
+
+    output$mapping_export_note <- shiny::renderUI({
+      shiny::tags$div(
+        class = "alert alert-info",
+        shiny::tags$b("Note: "),
+        "Only columns mapped to Darwin Core terms will be exported to the Darwin Core final tables."
+      )
     })
 
     output$scientific_name_note <- shiny::renderUI({
