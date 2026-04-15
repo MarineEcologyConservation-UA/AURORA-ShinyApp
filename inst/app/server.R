@@ -122,45 +122,45 @@ server <- function(input, output, session) {
   })
 
   # --- QC & Diagnostics ------------------------------------------------------
-  shiny::observe({
-    cat("\n--- DEBUG WORKFLOW ---\n")
-    cat("ingest$ready():", safe_flag(ingest$ready()), "\n")
-    cat("dwc_map$ready():", safe_flag(dwc_map$ready()), "\n")
-    cat("id_cleaning$ready():", safe_flag(id_cleaning$ready()), "\n")
-    cat("tax_match$ready():", safe_flag(tax_match$ready()), "\n")
-    cat("dwca$ready():", safe_flag(dwca$ready()), "\n")
-    cat(
-      "dwca tables ready:",
-      safe_df_ready(dwca$event) && safe_df_ready(dwca$occurrence),
-      "\n"
-    )
+  #shiny::observe({
+    # cat("\n--- DEBUG WORKFLOW ---\n")
+    # cat("ingest$ready():", safe_flag(ingest$ready()), "\n")
+    # cat("dwc_map$ready():", safe_flag(dwc_map$ready()), "\n")
+    # cat("id_cleaning$ready():", safe_flag(id_cleaning$ready()), "\n")
+    # cat("tax_match$ready():", safe_flag(tax_match$ready()), "\n")
+    # cat("dwca$ready():", safe_flag(dwca$ready()), "\n")
+    # cat(
+    #   "dwca tables ready:",
+    #   safe_df_ready(dwca$event) && safe_df_ready(dwca$occurrence),
+    #   "\n"
+    # )
 
-    cat("\n--- DEBUG DWCA ---\n")
-    cat("dwca exists:", !is.null(dwca), "\n")
-    cat("dwca$event is reactive:", shiny::is.reactive(dwca$event), "\n")
-    cat("dwca$occurrence is reactive:", shiny::is.reactive(dwca$occurrence), "\n")
-    cat("dwca$emof is reactive:", shiny::is.reactive(dwca$emof), "\n")
+  #   cat("\n--- DEBUG DWCA ---\n")
+  #   cat("dwca exists:", !is.null(dwca), "\n")
+  #   cat("dwca$event is reactive:", shiny::is.reactive(dwca$event), "\n")
+  #   cat("dwca$occurrence is reactive:", shiny::is.reactive(dwca$occurrence), "\n")
+  #   cat("dwca$emof is reactive:", shiny::is.reactive(dwca$emof), "\n")
 
-    ev <- try(dwca$event(), silent = TRUE)
-    oc <- try(dwca$occurrence(), silent = TRUE)
-    em <- try(dwca$emof(), silent = TRUE)
+  #   ev <- try(dwca$event(), silent = TRUE)
+  #   oc <- try(dwca$occurrence(), silent = TRUE)
+  #   em <- try(dwca$emof(), silent = TRUE)
 
-    cat(
-      "event():",
-      if (inherits(ev, "try-error")) "ERROR/req blocked" else paste(dim(ev), collapse = " x "),
-      "\n"
-    )
-    cat(
-      "occurrence():",
-      if (inherits(oc, "try-error")) "ERROR/req blocked" else paste(dim(oc), collapse = " x "),
-      "\n"
-    )
-    cat(
-      "emof():",
-      if (inherits(em, "try-error")) "ERROR/req blocked" else paste(dim(em), collapse = " x "),
-      "\n"
-    )
-  })
+  #   cat(
+  #     "event():",
+  #     if (inherits(ev, "try-error")) "ERROR/req blocked" else paste(dim(ev), collapse = " x "),
+  #     "\n"
+  #   )
+  #   cat(
+  #     "occurrence():",
+  #     if (inherits(oc, "try-error")) "ERROR/req blocked" else paste(dim(oc), collapse = " x "),
+  #     "\n"
+  #   )
+  #   cat(
+  #     "emof():",
+  #     if (inherits(em, "try-error")) "ERROR/req blocked" else paste(dim(em), collapse = " x "),
+  #     "\n"
+  #   )
+  # })
 
   qc <- mod_qc_server(
     "qc",
