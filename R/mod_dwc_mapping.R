@@ -227,7 +227,7 @@ mod_dwc_mapping_ui <- function(id) {
           shiny::div(class = "dwc-map-section-gap"),
           shiny::downloadButton(
             ns("download_issues_csv"),
-            "Download issues (CSV)",
+            "Download Warning/Issues (CSV)",
             class = "btn-outline-secondary download-btn"
           )
         ),
@@ -569,7 +569,7 @@ mod_dwc_mapping_ui <- function(id) {
             ),
 
             bslib::nav_panel(
-              "Issues",
+              "Warnings/Issues",
               value = "issues",
 
               shiny::div(
