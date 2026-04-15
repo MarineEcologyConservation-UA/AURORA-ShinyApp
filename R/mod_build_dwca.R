@@ -9,7 +9,68 @@ mod_build_dwca_ui <- function(id) {
   shiny::fluidPage(
     shiny::tags$head(
       shiny::tags$style(shiny::HTML("
-        /* Espaço e alinhamento para o 'footer' abaixo de cada DT */
+        .dwca-page {
+          padding: 1rem 1.25rem 2rem 1.25rem;
+        }
+
+        .dwca-title-wrap {
+          margin-bottom: 1.25rem;
+        }
+
+        .dwca-title {
+          margin-bottom: 0.35rem;
+          font-weight: 700;
+        }
+
+        .dwca-subtitle {
+          color: #6c757d;
+          margin-bottom: 0;
+        }
+
+        .dwca-top-card,
+        .dwca-preview-card,
+        .dwca-qc-card {
+          border: 1px solid #e5e7eb;
+          border-radius: 16px;
+          box-shadow: 0 4px 14px rgba(15, 23, 42, 0.04);
+          background: #ffffff;
+        }
+
+        .dwca-top-card .card-header,
+        .dwca-preview-card .card-header,
+        .dwca-qc-card .card-header {
+          background: #f8fafc;
+          border-bottom: 1px solid #e5e7eb;
+          font-weight: 700;
+          border-top-left-radius: 16px;
+          border-top-right-radius: 16px;
+        }
+
+        .dwca-section-note {
+          color: #6c757d;
+          font-size: 0.95rem;
+          margin-bottom: 0;
+        }
+
+        .dwca-build-actions {
+          display: flex;
+          justify-content: flex-end;
+          align-items: flex-start;
+          height: 100%;
+        }
+
+        .dwca-build-btn {
+          min-width: 160px;
+          padding: 0.7rem 1.1rem;
+          font-weight: 600;
+          border-radius: 12px;
+        }
+
+        .dwca-divider {
+          margin: 1rem 0 1.25rem 0;
+          border-top: 1px solid #e5e7eb;
+        }
+
         .dwca-tab-footer {
           margin-top: 12px;
           margin-bottom: 6px;
@@ -19,128 +80,163 @@ mod_build_dwca_ui <- function(id) {
           align-items: center;
         }
 
-        /* Garante que o DT não 'cola' no footer */
         .dwca-dt-wrap {
           padding-bottom: 8px;
+        }
+
+        .dwca-qc-pre {
+          background: #f8fafc;
+          border: 1px solid #e5e7eb;
+          border-radius: 12px;
+          padding: 0.85rem 1rem;
+          min-height: 120px;
+        }
+
+        .dwca-preview-card .nav-tabs .nav-link {
+          font-weight: 500;
+        }
+
+        .dwca-preview-card .tab-content {
+          padding-top: 0.5rem;
+        }
+
+        .selectize-dropdown {
+          z-index: 5000 !important;
+        }
+
+        @media (max-width: 991.98px) {
+          .dwca-build-actions {
+            justify-content: flex-start;
+            margin-top: 1rem;
+          }
         }
       "))
     ),
 
-    shiny::h3("Build Darwin Core Tables"),
+    shiny::div(
+      class = "dwca-page",
 
-    shiny::fluidRow(
-      shiny::column(
-        4,
-        shiny::selectInput(
-          ns("event_mode"),
-          "EventID rule",
-          choices = c("use", "concat", "auto_row")
-        ),
-
-        shiny::uiOutput(ns("event_column_ui")),
-        shiny::uiOutput(ns("event_concat_ui")),
-
-        shiny::checkboxInput(
-          ns("enable_parent"),
-          "Create parentEventID",
-          FALSE
-        ),
-        shiny::uiOutput(ns("parent_cols_ui"))
+      shiny::div(
+        class = "dwca-title-wrap",
+        shiny::h3(class = "dwca-title", "Build Darwin Core Tables"),
+        shiny::p(
+          class = "dwca-subtitle",
+          "Generate the Darwin Core tables and choose which measurement-related columns should be exported to eMoF."
+        )
       ),
 
-      shiny::column(
-        4,
-        shiny::selectInput(
-          ns("occ_mode"),
-          "OccurrenceID rule",
-          choices = c(
-            "Create one occurrenceID per row using eventID plus a running sequence" = "event_seq",
-            "Use an existing occurrenceID column from the dataset" = "use"
+      bslib::card(
+        class = "dwca-top-card mb-4",
+        bslib::card_header("Build settings"),
+        bslib::card_body(
+          shiny::fluidRow(
+            shiny::column(
+              8,
+              shiny::p(
+                class = "dwca-section-note",
+                "Select columns to move to eMoF and build the Darwin Core tables."
+              )
+            ),
+            shiny::column(
+              4,
+              shiny::div(
+                class = "dwca-build-actions",
+                shiny::actionButton(
+                  ns("build"),
+                  "Build DwC-A",
+                  class = "btn-primary dwca-build-btn"
+                )
+              )
+            )
           ),
-          selected = "event_seq"
-        ),
 
-        shiny::uiOutput(ns("occ_use_ui")),
+          shiny::div(class = "dwca-divider"),
 
-        shiny::hr(),
-
-        shiny::h4("eMoF columns"),
-
-        shiny::selectizeInput(
-          ns("emof_cols_event"),
-          "Columns to move to eMoF (event level)",
-          choices = NULL,
-          multiple = TRUE
-        ),
-
-        shiny::selectizeInput(
-          ns("emof_cols_occ"),
-          "Columns to move to eMoF (occurrence level)",
-          choices = NULL,
-          multiple = TRUE
-        ),
-
-        shiny::hr(),
-
-        shiny::checkboxInput(
-          ns("enable_remarks"),
-          "Create remarks column (join with '|')",
-          FALSE
-        ),
-        shiny::uiOutput(ns("remarks_ui"))
-      ),
-
-      shiny::column(
-        4,
-        shiny::actionButton(
-          ns("build"),
-          "Build DwC-A",
-          class = "btn-primary"
-        )
-      )
-    ),
-
-    shiny::hr(),
-
-    shiny::h4("Quality report"),
-    shiny::verbatimTextOutput(ns("qc")),
-
-    shiny::hr(),
-
-    shiny::tabsetPanel(
-      shiny::tabPanel(
-        "Event",
-        shiny::div(
-          class = "dwca-dt-wrap",
-          DT::DTOutput(ns("event_preview"))
-        ),
-        shiny::div(
-          class = "dwca-tab-footer",
-          shiny::downloadButton(ns("download_event"), "Download Event CSV")
+          shiny::fluidRow(
+            shiny::column(
+              6,
+              shiny::h4("eMoF columns"),
+              shiny::selectizeInput(
+                ns("emof_cols_event"),
+                "Columns to move to eMoF (event level)",
+                choices = NULL,
+                multiple = TRUE,
+                options = list(
+                  plugins = list("remove_button"),
+                  dropdownParent = "body"
+                )
+              )
+            ),
+            shiny::column(
+              6,
+              shiny::h4("\u00A0"),
+              shiny::selectizeInput(
+                ns("emof_cols_occ"),
+                "Columns to move to eMoF (occurrence level)",
+                choices = NULL,
+                multiple = TRUE,
+                options = list(
+                  plugins = list("remove_button"),
+                  dropdownParent = "body"
+                )
+              )
+            )
+          )
         )
       ),
 
-      shiny::tabPanel(
-        "Occurrence",
-        shiny::div(
-          class = "dwca-dt-wrap",
-          DT::DTOutput(ns("occ_preview"))
-        ),
-        shiny::div(
-          class = "dwca-tab-footer",
-          shiny::downloadButton(ns("download_occ"), "Download Occurrence CSV")
+      bslib::card(
+        class = "dwca-qc-card mb-4",
+        bslib::card_header("Quality report"),
+        bslib::card_body(
+          shiny::div(
+            class = "dwca-qc-pre",
+            shiny::verbatimTextOutput(ns("qc"))
+          )
         )
       ),
 
-      shiny::tabPanel(
-        "eMoF",
-        shiny::div(
-          class = "dwca-dt-wrap",
-          DT::DTOutput(ns("emof_preview"))
-        ),
-        shiny::div(
-          class = "dwca-tab-footer",
-          shiny::downloadButton(ns("download_emof"), "Download eMoF CSV")
+      bslib::card(
+        class = "dwca-preview-card",
+        bslib::card_header("Table previews"),
+        bslib::card_body(
+          shiny::tabsetPanel(
+            shiny::tabPanel(
+              "Event",
+              shiny::div(
+                class = "dwca-dt-wrap",
+                DT::DTOutput(ns("event_preview"))
+              ),
+              shiny::div(
+                class = "dwca-tab-footer",
+                shiny::downloadButton(ns("download_event"), "Download Event CSV")
+              )
+            ),
+
+            shiny::tabPanel(
+              "Occurrence",
+              shiny::div(
+                class = "dwca-dt-wrap",
+                DT::DTOutput(ns("occ_preview"))
+              ),
+              shiny::div(
+                class = "dwca-tab-footer",
+                shiny::downloadButton(ns("download_occ"), "Download Occurrence CSV")
+              )
+            ),
+
+            shiny::tabPanel(
+              "eMoF",
+              shiny::div(
+                class = "dwca-dt-wrap",
+                DT::DTOutput(ns("emof_preview"))
+              ),
+              shiny::div(
+                class = "dwca-tab-footer",
+                shiny::downloadButton(ns("download_emof"), "Download eMoF CSV")
+              )
+            )
+          )
         )
       )
     )
@@ -151,8 +247,6 @@ mod_build_dwca_ui <- function(id) {
 mod_build_dwca_server <- function(id, df_in, dwc_terms) {
   shiny::moduleServer(id, function(input, output, session) {
 
-    ns <- session$ns
-
     rv <- shiny::reactiveValues(
       ready = FALSE
     )
@@ -161,74 +255,15 @@ mod_build_dwca_server <- function(id, df_in, dwc_terms) {
       shiny::req(df_in())
       cols <- names(df_in())
 
-      shiny::updateSelectizeInput(session, "emof_cols_event", choices = cols)
-      shiny::updateSelectizeInput(session, "emof_cols_occ", choices = cols)
-      shiny::updateSelectizeInput(session, "remarks_cols", choices = cols)
-    })
-
-    output$event_column_ui <- shiny::renderUI({
-      shiny::req(df_in())
-      if (input$event_mode == "use") {
-        shiny::selectInput(
-          ns("event_column"),
-          "Select eventID column",
-          choices = names(df_in())
-        )
-      }
-    })
-
-    output$event_concat_ui <- shiny::renderUI({
-      shiny::req(df_in())
-      if (input$event_mode == "concat") {
-        shiny::selectizeInput(
-          ns("event_concat_cols"),
-          "Columns to build eventID (concat with ':')",
-          choices = names(df_in()),
-          multiple = TRUE
-        )
-      }
-    })
-
-    output$parent_cols_ui <- shiny::renderUI({
-      shiny::req(df_in())
-      if (isTRUE(input$enable_parent)) {
-        shiny::selectizeInput(
-          ns("parent_cols"),
-          "Columns for parentEventID (concat with ':')",
-          choices = names(df_in()),
-          multiple = TRUE
-        )
-      }
-    })
-
-    output$occ_use_ui <- shiny::renderUI({
-      shiny::req(df_in())
-      if (input$occ_mode == "use") {
-        shiny::selectInput(
-          ns("occ_column"),
-          "Select occurrenceID column",
-          choices = names(df_in()),
-          selected = if ("occurrenceID" %in% names(df_in())) "occurrenceID" else NULL
-        )
-      }
-    })
-
-    output$remarks_ui <- shiny::renderUI({
-      shiny::req(df_in())
-      if (!isTRUE(input$enable_remarks)) return(NULL)
-
-      shiny::tagList(
-        shiny::selectizeInput(
-          ns("remarks_cols"),
-          "Columns to join into remarks",
-          choices = names(df_in()),
-          multiple = TRUE
-        ),
-        shiny::textInput(
-          ns("remarks_target"),
-          "Target remarks column name",
-          value = "occurrenceRemarks"
-        )
+      shiny::updateSelectizeInput(
+        session, "emof_cols_event",
+        choices = cols,
+        server = TRUE
+      )
+      shiny::updateSelectizeInput(
+        session, "emof_cols_occ",
+        choices = cols,
+        server = TRUE
       )
     })
 
@@ -250,39 +285,9 @@ mod_build_dwca_server <- function(id, df_in, dwc_terms) {
       levs
     })
 
-    # reset ready if upstream data changes
     shiny::observeEvent(df_in(), {
       rv$ready <- FALSE
     }, ignoreInit = FALSE)
-
-    # reset ready if user changes any build-relevant option
-    shiny::observeEvent(input$event_mode, {
-      rv$ready <- FALSE
-    }, ignoreInit = TRUE)
-
-    shiny::observeEvent(input$event_column, {
-      rv$ready <- FALSE
-    }, ignoreInit = TRUE)
-
-    shiny::observeEvent(input$event_concat_cols, {
-      rv$ready <- FALSE
-    }, ignoreInit = TRUE)
-
-    shiny::observeEvent(input$enable_parent, {
-      rv$ready <- FALSE
-    }, ignoreInit = TRUE)
-
-    shiny::observeEvent(input$parent_cols, {
-      rv$ready <- FALSE
-    }, ignoreInit = TRUE)
-
-    shiny::observeEvent(input$occ_mode, {
-      rv$ready <- FALSE
-    }, ignoreInit = TRUE)
-
-    shiny::observeEvent(input$occ_column, {
-      rv$ready <- FALSE
-    }, ignoreInit = TRUE)
 
     shiny::observeEvent(input$emof_cols_event, {
       rv$ready <- FALSE
@@ -292,44 +297,16 @@ mod_build_dwca_server <- function(id, df_in, dwc_terms) {
       rv$ready <- FALSE
     }, ignoreInit = TRUE)
 
-    shiny::observeEvent(input$enable_remarks, {
-      rv$ready <- FALSE
-    }, ignoreInit = TRUE)
-
-    shiny::observeEvent(input$remarks_cols, {
-      rv$ready <- FALSE
-    }, ignoreInit = TRUE)
-
-    shiny::observeEvent(input$remarks_target, {
-      rv$ready <- FALSE
-    }, ignoreInit = TRUE)
-
     result <- shiny::eventReactive(input$build, {
       shiny::req(df_in())
 
-      if (input$event_mode == "concat") {
-        if (is.null(input$event_concat_cols) || length(input$event_concat_cols) == 0) {
-          stop("Select at least 1 column to build eventID by concat.")
-        }
-      }
-      if (isTRUE(input$enable_parent)) {
-        if (is.null(input$parent_cols) || length(input$parent_cols) == 0) {
-          stop("Select at least 1 column to build parentEventID.")
-        }
-      }
-      if (input$occ_mode == "use") {
-        if (is.null(input$occ_column) || !nzchar(input$occ_column)) {
-          stop("Select the existing occurrenceID column, or switch to the option that creates a new occurrenceID from eventID plus sequence.")
-        }
-      }
+      df <- df_in()
+      cols <- names(df)
 
-      if (isTRUE(input$enable_remarks)) {
-        if (is.null(input$remarks_cols) || length(input$remarks_cols) == 0) {
-          stop("Select at least 1 column for remarks (or disable remarks).")
-        }
-        if (is.null(input$remarks_target) || !nzchar(input$remarks_target)) {
-          stop("Provide a target column name for remarks.")
-        }
+      event_column <- if ("eventID" %in% cols) "eventID" else NULL
+
+      if (is.null(event_column)) {
+        stop("The dataset must contain an eventID column before building the Darwin Core tables.")
       }
 
       ev <- input$emof_cols_event
@@ -349,20 +326,20 @@ mod_build_dwca_server <- function(id, df_in, dwc_terms) {
       levs <- emof_levels()
 
       build_dwca_tables(
-        df = df_in(),
+        df = df,
         dwc_terms = dwc_terms,
 
         id_spec = list(
-          event_mode = input$event_mode,
-          event_column = input$event_column,
-          event_concat = input$event_concat_cols,
-          occ_mode = input$occ_mode,
-          occ_column = input$occ_column
+          event_mode = "use",
+          event_column = event_column,
+          event_concat = NULL,
+          occ_mode = "event_seq",
+          occ_column = NULL
         ),
 
         parent_spec = list(
-          enabled = isTRUE(input$enable_parent),
-          columns = input$parent_cols
+          enabled = FALSE,
+          columns = NULL
         ),
 
         emof_spec = list(
@@ -370,15 +347,10 @@ mod_build_dwca_server <- function(id, df_in, dwc_terms) {
           levels = levs
         ),
 
-        remarks_spec = if (isTRUE(input$enable_remarks)) {
-          list(columns = input$remarks_cols, target = input$remarks_target)
-        } else {
-          NULL
-        }
+        remarks_spec = NULL
       )
     })
 
-    # mark ready only after a successful build
     shiny::observeEvent(result(), {
       shiny::req(result())
       rv$ready <- TRUE
@@ -400,7 +372,10 @@ mod_build_dwca_server <- function(id, df_in, dwc_terms) {
       DT::datatable(
         utils::head(result()$event, 50),
         rownames = FALSE,
-        options = list(scrollX = TRUE, pageLength = 10)
+        options = list(
+          scrollX = TRUE,
+          pageLength = 10
+        )
       )
     })
 
@@ -409,7 +384,10 @@ mod_build_dwca_server <- function(id, df_in, dwc_terms) {
       DT::datatable(
         utils::head(result()$occurrence, 50),
         rownames = FALSE,
-        options = list(scrollX = TRUE, pageLength = 10)
+        options = list(
+          scrollX = TRUE,
+          pageLength = 10
+        )
       )
     })
 
@@ -420,7 +398,10 @@ mod_build_dwca_server <- function(id, df_in, dwc_terms) {
       DT::datatable(
         utils::head(x, 50),
         rownames = FALSE,
-        options = list(scrollX = TRUE, pageLength = 10)
+        options = list(
+          scrollX = TRUE,
+          pageLength = 10
+        )
       )
     })
 
@@ -447,9 +428,6 @@ mod_build_dwca_server <- function(id, df_in, dwc_terms) {
       }
     )
 
-    # -----------------------------------------------------
-    # Return reactives so other pages (QC/Export) can consume
-    # -----------------------------------------------------
     list(
       result = result,
       event = shiny::reactive({
