@@ -209,7 +209,7 @@ mod_dwc_mapping_ui <- function(id) {
           shiny::selectInput(
             ns("target_database"),
             "Data repository",
-            choices = c("GBIF", "OBIS", "EMODnet"),
+            choices = c("GBIF", "OBIS"),
             selected = "GBIF",
             width = "100%"
           ),
@@ -578,7 +578,7 @@ mod_dwc_mapping_ui <- function(id) {
             ),
 
             bslib::nav_panel(
-              "Warnings/Issues",
+              "Warnings/Errors",
               value = "issues",
 
               shiny::div(
@@ -688,47 +688,6 @@ mod_dwc_mapping_ui <- function(id) {
         "license",
         "genus",
         "order"
-      ),
-      note = "Test"
-    ),
-    EMODnet = list(
-      label = "EMODnet",
-      required = c(
-        "basisOfRecord",
-        "datasetName",
-        "decimalLatitude",
-        "decimalLongitude",
-        "eventDate",
-        "eventID",
-        "institutionCode",
-        "measurementType",
-        "measurementTypeID",
-        "measurementUnit",
-        "measurementValue",
-        "occurrenceID",
-        "occurrenceStatus",
-        "scientificName",
-        "scientificNameID"
-      ),
-      strongly_recommended = c(
-        "kingdom",
-        "taxonRank",
-        "parentEventID",
-        "footprintWKT",
-        "coordinateUncertaintyInMeters",
-        "maximumDepthInMeters",
-        "minimumDepthInMeters",
-        "measurementUnitID",
-        "measurementValueID",
-        "type",
-        "identificationQualifier",
-        "measurementAccuracy",
-        "measurementID",
-        "measurementRemarks",
-        "catalogNumber",
-        "collectionCode",
-        "modified",
-        "scientificNameAuthorship"
       ),
       note = "Test"
     )
