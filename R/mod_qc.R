@@ -3,793 +3,173 @@
 # File: R/mod_qc.R
 # =========================================================
 
-#' QC page UI (BioCheck-like)
-#'
-#' @param id Module id
-#' @return Shiny UI
-#' @export
-mod_qc_ui <- function(id) {
-  ns <- shiny::NS(id)
 
-  has_leaflet <- requireNamespace("leaflet", quietly = TRUE)
-
-  bslib::nav_panel(
-    title = "QC & Diagnostics",
-    value = "qc",
-
-    shiny::tags$style(shiny::HTML("
-      .qc-title { margin-top: 8px; margin-bottom: 12px; }
-      .qc-muted { color: #6b7280; }
-      .qc-box { border: 1px solid #e5e7eb; border-radius: 10px; padding: 12px 14px; background: #fff; }
-      .qc-kpi { font-size: 26px; font-weight: 700; }
-      .qc-kpi-label { font-size: 12px; color: #6b7280; text-transform: uppercase; letter-spacing: .04em; }
-      .qc-warn { color: #b45309; }
-      .qc-err { color: #b91c1c; }
-      .qc-ok { color: #047857; }
-
-      /* ---- DT “report style” (overview tables) ---- */
-      .qc-dt-report .dataTables_wrapper .dataTables_length,
-      .qc-dt-report .dataTables_wrapper .dataTables_filter,
-      .qc-dt-report .dataTables_wrapper .dataTables_info,
-      .qc-dt-report .dataTables_wrapper .dataTables_paginate {
-        display: none !important;
-      }
-
-      .qc-dt-report table.dataTable {
-        border-collapse: collapse !important;
-        width: auto !important;
-      }
-
-      .qc-dt-report table.dataTable thead th {
-        font-weight: 600;
-        border-bottom: 1px solid #e5e7eb !important;
-        padding: 10px 12px !important;
-      }
-
-      .qc-dt-report table.dataTable tbody td {
-        border-top: 1px solid #f1f5f9 !important;
-        padding: 10px 12px !important;
-      }
-
-      .qc-dt-report .dataTables_wrapper {
-        padding-top: 6px;
-      }
-
-      /* Wrapper com altura fixa */
-      .qc-map-wrap {
-        height: 420px !important;
-        min-height: 420px !important;
-        width: 100%;
-      }
-
-      /* O widget do leaflet deve preencher o wrapper */
-      .qc-map-wrap .leaflet.html-widget,
-      .qc-map-wrap .leaflet-container {
-        height: 100% !important;
-        min-height: 420px !important;
-      }
-
-      /* Proteção contra colapso por html-fill-item do bslib */
-      .qc-map-wrap.html-fill-item,
-      .qc-map-wrap .html-fill-item {
-        flex: 0 0 auto !important;
-      }
-
-      /* DT normal (Issues found): ocupa 100% e evita controles “a flutuar” */
-      .qc-dt { width: 100%; overflow-x: auto; clear: both; }
-      .qc-dt .dataTables_wrapper { width: 100% !important; }
-      .qc-dt table.dataTable { width: 100% !important; border-collapse: collapse !important; }
-
-
-      td.dt-control {
-      cursor: pointer;
-      text-align: center;
-    }
-
-    td.dt-control::before {
-      content: '+';
-      font-weight: bold;
-      color: white;
-      background: #2c7be5;
-      border-radius: 50%;
-      padding: 2px 6px;
-      display: inline-block;
-    }
-
-    tr.shown td.dt-control::before {
-      content: '-';
-      background: #e63757;
-    }
-
-
-    ")),
-
-    bslib::navset_card_tab(
-      id = ns("qc_tabs"),
-      selected = "data_overview",
-      title = "Quality Control",
-
-      bslib::nav_panel(
-        "Data overview",
-        value = "data_overview",
-
-        shiny::div(
-          class = "qc-title",
-          shiny::h3("Quality Control & Diagnostics"),
-          shiny::p(
-            class = "qc-muted",
-            "Esta página avalia a qualidade do DwC-A gerado (Event / Occurrence / eMoF). ",
-            "O export será bloqueado se existirem erros (ERROR)."
-          )
-        ),
-
-        shiny::hr(),
-        shiny::h5("DEBUG: colunas recebidas no QC"),
-        shiny::verbatimTextOutput(ns("debug_cols")),
-        shiny::hr(),
-
-        shiny::h5("DEBUG: overview_event_occ"),
-        shiny::verbatimTextOutput(ns("debug_overview_event_occ")),
-        shiny::hr(),
-
-        shiny::h5("DEBUG: overview_map"),
-        shiny::verbatimTextOutput(ns("debug_overview_map")),
-        shiny::hr(),
-
-        shiny::fluidRow(
-          shiny::column(
-            3,
-            shiny::div(
-              class = "qc-box",
-              shiny::div(class = "qc-kpi-label", "Export status"),
-              shiny::div(shiny::uiOutput(ns("export_status_ui")))
-            )
-          ),
-          shiny::column(
-            3,
-            shiny::div(
-              class = "qc-box",
-              shiny::div(class = "qc-kpi-label", "Errors"),
-              shiny::div(class = "qc-kpi qc-err", shiny::textOutput(ns("kpi_errors")))
-            )
-          ),
-          shiny::column(
-            3,
-            shiny::div(
-              class = "qc-box",
-              shiny::div(class = "qc-kpi-label", "Warnings"),
-              shiny::div(class = "qc-kpi qc-warn", shiny::textOutput(ns("kpi_warnings")))
-            )
-          ),
-          shiny::column(
-            3,
-            shiny::div(
-              class = "qc-box",
-              shiny::div(class = "qc-kpi-label", "Records (occurrence)"),
-              shiny::div(class = "qc-kpi", shiny::textOutput(ns("kpi_n_occ")))
-            )
-          )
-        ),
-
-        shiny::hr(),
-
-        shiny::h4("Overview of event and occurrence records"),
-        shiny::div(class = "qc-dt-report", DT::DTOutput(ns("overview_event_occ_tbl"))),
-
-        shiny::hr(),
-
-        shiny::h4("Overview of measurement or fact records (types and units)"),
-        shiny::div(
-          style = "max-width: 1100px; margin: 0 auto;",
-          class = "qc-dt-report",
-          DT::DTOutput(ns("overview_emof_types_tbl"))
-        ),
-
-        shiny::hr(),
-
-        shiny::h4("Geographical cover of the dataset"),
-        if (has_leaflet) {
-          shiny::div(
-            class = "qc-map-wrap",
-            leaflet::leafletOutput(ns("overview_map"), height = "100%")
-          )
-        } else {
-          shiny::div(
-            class = "qc-muted",
-            "Mapa indisponível: instala o pacote 'leaflet' para ativar esta secção."
-          )
-        },
-
-        shiny::hr(),
-
-        shiny::h4("Taxonomic cover of the dataset"),
-        shiny::fluidRow(
-          shiny::column(4, shiny::uiOutput(ns("kingdom_ui"))),
-          shiny::column(8, shiny::plotOutput(ns("overview_tax_plot"), height = "320px"))
-        )
-      ),
-
-      bslib::nav_panel(
-        "Issues found",
-        value = "issues_found",
-
-        shiny::h4("Overview of all issues"),
-        shiny::div(class = "qc-dt", DT::DTOutput(ns("issues_summary_tbl"))),
-
-        shiny::hr(),
-        shiny::h4("Details (filterable)"),
-        shiny::div(class = "qc-dt", DT::DTOutput(ns("issues_detailed_tbl"))),
-
-        shiny::hr(),
-        shiny::h4("Taxonomic issues"),
-        shiny::div(class = "qc-dt", DT::DTOutput(ns("tax_issues_tbl"))),
-
-        shiny::hr(),
-        shiny::h4("eMoF issues"),
-        shiny::div(class = "qc-dt", DT::DTOutput(ns("emof_issues_tbl")))
-      ),
-
-      bslib::nav_panel(
-        "Issues on map",
-        value = "issues_map",
-        shiny::p(
-          class = "qc-muted",
-          "Mostra apenas issues que possuem coordenadas válidas (em Event ou Occurrence)."
-        ),
-        if (has_leaflet) {
-          leaflet::leafletOutput(ns("issues_map"), height = 560)
-        } else {
-          shiny::div(
-            class = "qc-muted",
-            "Mapa indisponível: instala o pacote 'leaflet' para ativar esta secção."
-          )
-        }
-      ),
-
-      bslib::nav_panel("Invalid Event Records", value = "invalid_event", DT::DTOutput(ns("invalid_event_tbl"))),
-      bslib::nav_panel("Invalid Occurrence Records", value = "invalid_occ", DT::DTOutput(ns("invalid_occ_tbl"))),
-      bslib::nav_panel("Invalid eMoF Records", value = "invalid_emof", DT::DTOutput(ns("invalid_emof_tbl"))),
-
-      bslib::nav_panel(
-        "OBIS Event Hierarchy tree",
-        value = "event_hierarchy",
-        shiny::p(
-          class = "qc-muted",
-          "Primeira versão (Fase 1): lista de inconsistências parentEventID e amostra de edges."
-        ),
-        DT::DTOutput(ns("hierarchy_issues_tbl")),
-        shiny::hr(),
-        DT::DTOutput(ns("hierarchy_edges_tbl"))
-      ),
-
-      bslib::nav_panel(
-        "About",
-        value = "about",
-        shiny::h4("Checks implemented"),
-        shiny::uiOutput(ns("about_ui"))
-      )
-    )
-  )
-}
-
-# =========================================================
-# QC engine helpers
-# =========================================================
+#' @importFrom rlang %||%
+NULL
 
 `%||%` <- rlang::`%||%`
 
-.qc_issue <- function(table, row_id, field, rule, message,
-                      severity = "ERROR", extra = list()) {
+# =========================================================
+# Helpers
+# =========================================================
+
+.qc_empty_issues <- function() {
+  data.frame(
+    table = character(),
+    row_id = character(),
+    field = character(),
+    rule = character(),
+    message = character(),
+    severity = character(),
+    stringsAsFactors = FALSE
+  )
+}
+
+.qc_issue <- function(table, row_id, field, rule, message, severity = "ERROR") {
   data.frame(
     table = as.character(table),
     row_id = as.character(row_id),
     field = as.character(field),
     rule = as.character(rule),
     message = as.character(message),
-    severity = as.character(severity),
+    severity = toupper(as.character(severity)),
     stringsAsFactors = FALSE
   )
 }
 
 .qc_bind <- function(x) {
-  if (length(x) == 0) {
-    return(data.frame(
-      table = character(),
-      row_id = character(),
-      field = character(),
-      rule = character(),
-      message = character(),
-      severity = character(),
-      stringsAsFactors = FALSE
-    ))
+  # Handle NULL or non-list inputs
+  if (is.null(x)) {
+    return(.qc_empty_issues())
   }
-  x <- Filter(function(z) is.data.frame(z) && nrow(z) > 0, x)
-  if (length(x) == 0) {
-    return(data.frame(
-      table = character(),
-      row_id = character(),
-      field = character(),
-      rule = character(),
-      message = character(),
-      severity = character(),
-      stringsAsFactors = FALSE
-    ))
+  
+  # If x is already a data frame, return it as-is
+  if (is.data.frame(x)) {
+    if (nrow(x) == 0) {
+      return(.qc_empty_issues())
+    }
+    return(x)
   }
-  out <- do.call(rbind, x)
-  rownames(out) <- NULL
-  out
+  
+  # If x is not a list, return empty issues
+  if (!is.list(x)) {
+    return(.qc_empty_issues())
+  }
+  
+  # If list is empty, return empty issues
+  if (length(x) == 0) {
+    return(.qc_empty_issues())
+  }
+  
+  # Filter to keep only data frames with rows
+  x_filtered <- Filter(function(z) {
+    is.data.frame(z) && nrow(z) > 0
+  }, x)
+  
+  if (length(x_filtered) == 0) {
+    return(.qc_empty_issues())
+  }
+  
+  # Use rbind with explicit list argument
+  tryCatch(
+    {
+      out <- do.call(rbind, x_filtered)
+      if (!is.data.frame(out)) {
+        out <- .qc_empty_issues()
+      }
+      rownames(out) <- NULL
+      out
+    },
+    error = function(e) {
+      # If rbind fails, return empty
+      .qc_empty_issues()
+    }
+  )
 }
 
 .qc_is_blank <- function(x) {
   if (is.null(x)) return(TRUE)
-
   if (is.factor(x)) x <- as.character(x)
-
-  if (is.character(x)) {
-    return(is.na(x) | trimws(x) == "")
-  }
-
+  if (is.character(x)) return(is.na(x) | trimws(x) == "")
   is.na(x)
 }
 
-.qc_num <- function(x) suppressWarnings(as.numeric(x))
-
-.qc_parse_year <- function(x) {
-  if (is.null(x)) return(rep(NA_integer_, 0))
-  if (inherits(x, "Date")) return(as.integer(format(x, "%Y")))
-  xi <- suppressWarnings(as.integer(x))
-  ifelse(is.na(xi), NA_integer_, xi)
+.qc_num <- function(x) {
+  if (is.null(x)) return(numeric(0))
+  x <- trimws(as.character(x))
+  x[x == ""] <- NA_character_
+  x <- gsub(",", ".", x, fixed = TRUE)
+  suppressWarnings(as.numeric(x))
 }
 
-.qc_extract_year_from_eventDate <- function(eventDate) {
-  if (is.null(eventDate)) return(NULL)
-  x <- trimws(as.character(eventDate))
-  y <- suppressWarnings(as.integer(substr(x, 1, 4)))
-  y[!is.finite(y)] <- NA_integer_
-  y
+.qc_parse_partial_date <- function(x) {
+  x <- trimws(as.character(x))
+  x[x == ""] <- NA_character_
+
+  out <- rep(as.Date(NA), length(x))
+
+  full_idx <- grepl("^\\d{4}-\\d{2}-\\d{2}$", x)
+  ym_idx <- grepl("^\\d{4}-\\d{2}$", x)
+  y_idx <- grepl("^\\d{4}$", x)
+
+  out[full_idx] <- suppressWarnings(as.Date(x[full_idx]))
+  out[ym_idx] <- suppressWarnings(as.Date(paste0(x[ym_idx], "-01")))
+  out[y_idx] <- suppressWarnings(as.Date(paste0(x[y_idx], "-01-01")))
+
+  out
 }
 
-.qc_required_field <- function(df, table, id_field, fields_required) {
-  out <- list()
-  if (!is.data.frame(df) || nrow(df) == 0) return(.qc_bind(out))
+.qc_dt <- function(data,
+                   colnames = NULL,
+                   page_length = 15,
+                   compact = FALSE,
+                   report = FALSE,
+                   scroll_x = TRUE,
+                   escape = TRUE,
+                   selection = "none") {
+  if (!is.data.frame(data)) data <- data.frame()
 
-  rid <- if (id_field %in% names(df)) df[[id_field]] else seq_len(nrow(df))
+  dom <- if (report) "t" else "Bfrtip"
+  buttons <- if (report) list() else list(list(extend = "colvis", text = "Columns"))
+  cls <- if (compact) "compact stripe hover order-column" else "stripe hover order-column"
 
-  for (f in fields_required) {
-    if (!f %in% names(df)) {
-      out[[length(out) + 1]] <- .qc_issue(
-        table = table,
-        row_id = "*",
-        field = f,
-        rule = "required_field_missing_column",
-        message = paste0("Missing required column: ", f),
-        severity = "ERROR"
-      )
-      next
-    }
-    miss <- .qc_is_blank(df[[f]])
-    if (any(miss, na.rm = TRUE)) {
-      ii <- which(miss)
-      out[[length(out) + 1]] <- .qc_bind(lapply(ii, function(i) {
-        .qc_issue(
-          table = table,
-          row_id = rid[i] %||% as.character(i),
-          field = f,
-          rule = "required_field_empty_value",
-          message = paste0("Empty value for required field ", f),
-          severity = "ERROR"
-        )
-      }))
-    }
-  }
-
-  .qc_bind(out)
-}
-
-.qc_unique_id <- function(df, table, id_field) {
-  if (!is.data.frame(df) || nrow(df) == 0) return(.qc_bind(list()))
-  if (!id_field %in% names(df)) {
-    return(.qc_issue(
-      table = table,
-      row_id = "*",
-      field = id_field,
-      rule = "id_missing_column",
-      message = paste0("Missing ID column: ", id_field),
-      severity = "ERROR"
-    ))
-  }
-
-  id <- as.character(df[[id_field]])
-  blank <- .qc_is_blank(id)
-  out <- list()
-
-  if (any(blank, na.rm = TRUE)) {
-    ii <- which(blank)
-    out[[length(out) + 1]] <- .qc_bind(lapply(ii, function(i) {
-      .qc_issue(
-        table = table,
-        row_id = as.character(i),
-        field = id_field,
-        rule = "id_empty",
-        message = paste0(id_field, " is empty"),
-        severity = "ERROR"
-      )
-    }))
-  }
-
-  id2 <- id[!blank]
-  dup <- duplicated(id2) | duplicated(id2, fromLast = TRUE)
-  if (any(dup, na.rm = TRUE)) {
-    vals <- unique(id2[dup])
-    for (v in vals) {
-      idx <- which(id == v)
-      out[[length(out) + 1]] <- .qc_bind(lapply(idx, function(i) {
-        .qc_issue(
-          table = table,
-          row_id = id[i],
-          field = id_field,
-          rule = "id_duplicated",
-          message = paste0(id_field, " duplicated: ", v),
-          severity = "ERROR"
-        )
-      }))
-    }
-  }
-
-  .qc_bind(out)
-}
-
-.qc_coords_range <- function(df, table, id_field,
-                             lat_field = "decimalLatitude",
-                             lon_field = "decimalLongitude") {
-  if (!is.data.frame(df) || nrow(df) == 0) return(.qc_bind(list()))
-  if (!(lat_field %in% names(df) && lon_field %in% names(df))) return(.qc_bind(list()))
-
-  rid <- if (id_field %in% names(df)) df[[id_field]] else seq_len(nrow(df))
-  lat <- .qc_num(df[[lat_field]])
-  lon <- .qc_num(df[[lon_field]])
-
-  out <- list()
-
-  bad <- (is.finite(lat) & (lat < -90 | lat > 90)) |
-    (is.finite(lon) & (lon < -180 | lon > 180))
-  bad[is.na(bad)] <- FALSE
-
-  if (any(bad)) {
-    ii <- which(bad)
-    out[[length(out) + 1]] <- .qc_bind(lapply(ii, function(i) {
-      .qc_issue(
-        table = table,
-        row_id = rid[i] %||% as.character(i),
-        field = "coordinates_error",
-        rule = "coords_out_of_range",
-        message = "Out-of-range coordinates (lat must be -90..90, lon must be -180..180)",
-        severity = "ERROR"
-      )
-    }))
-  }
-
-  .qc_bind(out)
-}
-
-.qc_eventDate_basic <- function(event, id_field = "eventID", field = "eventDate") {
-  if (!is.data.frame(event) || nrow(event) == 0) return(.qc_bind(list()))
-  if (!field %in% names(event)) return(.qc_bind(list()))
-
-  rid <- if (id_field %in% names(event)) event[[id_field]] else seq_len(nrow(event))
-  x <- trimws(as.character(event[[field]]))
-  out <- list()
-
-  ok <- grepl("^\\d{4}($|-\\d{2}($|-\\d{2}$))", x) |
-    grepl("^\\d{4}.*\\/\\d{4}", x)
-  ok[.qc_is_blank(x)] <- TRUE
-
-  bad <- !ok
-  bad[is.na(bad)] <- FALSE
-  if (any(bad)) {
-    ii <- which(bad)
-    out[[length(out) + 1]] <- .qc_bind(lapply(ii, function(i) {
-      .qc_issue(
-        table = "event",
-        row_id = rid[i] %||% as.character(i),
-        field = field,
-        rule = "eventDate_invalid_format",
-        message = paste0(field, " does not seem to be a valid ISO-8601 date"),
-        severity = "ERROR"
-      )
-    }))
-  }
-
-  .qc_bind(out)
-}
-
-.qc_rel_occ_event <- function(occ, event) {
-  if (!is.data.frame(occ) || nrow(occ) == 0) return(.qc_bind(list()))
-  if (!("eventID" %in% names(occ))) return(.qc_bind(list()))
-  if (!is.data.frame(event) || nrow(event) == 0) {
-    return(.qc_issue(
-      table = "occurrence",
-      row_id = "*",
-      field = "eventID",
-      rule = "event_table_missing",
-      message = "Event table missing; cannot validate eventID links",
-      severity = "ERROR"
-    ))
-  }
-  if (!("eventID" %in% names(event))) return(.qc_bind(list()))
-
-  ev_ids <- unique(as.character(event$eventID))
-  occ_ids <- as.character(occ$occurrenceID %||% seq_len(nrow(occ)))
-
-  miss <- !.qc_is_blank(occ$eventID) & !(as.character(occ$eventID) %in% ev_ids)
-
-  if (!any(miss, na.rm = TRUE)) return(.qc_bind(list()))
-
-  ii <- which(miss)
-  .qc_bind(lapply(ii, function(i) {
-    .qc_issue(
-      table = "occurrence",
-      row_id = occ_ids[i] %||% as.character(i),
-      field = "eventID",
-      rule = "eventID_no_corresponding_event",
-      message = "This eventID has no corresponding eventID in the core",
-      severity = "ERROR"
+  args <- list(
+    data = data,
+    rownames = FALSE,
+    class = cls,
+    escape = escape,
+    selection = selection,
+    width = "100%",
+    options = list(
+      dom = dom,
+      buttons = buttons,
+      paging = !report,
+      searching = !report,
+      info = !report,
+      ordering = !report,
+      pageLength = page_length,
+      scrollX = scroll_x,
+      autoWidth = FALSE,
+      destroy = TRUE
     )
-  }))
-}
+  )
 
-.qc_parentEventID <- function(event) {
-  if (!is.data.frame(event) || nrow(event) == 0) return(.qc_bind(list()))
-  if (!("eventID" %in% names(event)) || !("parentEventID" %in% names(event))) {
-    return(.qc_bind(list()))
+  if (!is.null(colnames)) {
+    args$colnames <- colnames
   }
 
-  ev_ids <- unique(as.character(event$eventID))
-  pid <- as.character(event$parentEventID)
-  rid <- as.character(event$eventID)
-
-  miss <- !.qc_is_blank(pid) & !(pid %in% ev_ids)
-  if (!any(miss, na.rm = TRUE)) return(.qc_bind(list()))
-
-  ii <- which(miss)
-  .qc_bind(lapply(ii, function(i) {
-    .qc_issue(
-      table = "event",
-      row_id = rid[i] %||% as.character(i),
-      field = "parentEventID",
-      rule = "parentEventID_no_corresponding_event",
-      message = "parentEventID has no corresponding eventID",
-      severity = "ERROR"
+  if (!report) {
+    args$extensions <- "Buttons"
+    args$callback <- DT::JS(
+      "var t = table;
+       setTimeout(function(){ t.columns.adjust().draw(false); }, 50);
+       setTimeout(function(){ t.columns.adjust().draw(false); }, 250);"
     )
-  }))
+  }
+
+  do.call(DT::datatable, args)
 }
 
-.qc_emof_duplicates <- function(emof) {
-  if (!is.data.frame(emof) || nrow(emof) == 0) return(.qc_bind(list()))
-  if (!("measurementType" %in% names(emof))) return(.qc_bind(list()))
-
-  link_field <- if ("eventID" %in% names(emof)) {
-    "eventID"
-  } else if ("occurrenceID" %in% names(emof)) {
-    "occurrenceID"
-  } else {
-    NULL
-  }
-  if (is.null(link_field)) return(.qc_bind(list()))
-
-  key <- paste0(as.character(emof[[link_field]]), "||", as.character(emof$measurementType))
-  ok <- !.qc_is_blank(emof[[link_field]]) & !.qc_is_blank(emof$measurementType)
-  key2 <- key[ok]
-
-  dup <- duplicated(key2) | duplicated(key2, fromLast = TRUE)
-  if (!any(dup, na.rm = TRUE)) return(.qc_bind(list()))
-
-  vals <- unique(key2[dup])
-  rid <- if ("measurementID" %in% names(emof)) {
-    as.character(emof$measurementID)
-  } else {
-    as.character(seq_len(nrow(emof)))
-  }
-
-  out <- list()
-  for (v in vals) {
-    idx <- which(key == v)
-    out[[length(out) + 1]] <- .qc_bind(lapply(idx, function(i) {
-      .qc_issue(
-        table = "emof",
-        row_id = rid[i],
-        field = "measurementType",
-        rule = "duplicate_measurementType_per_link",
-        message = paste0("Duplicate measurementType linked to the same ", link_field),
-        severity = "WARN"
-      )
-    }))
-  }
-  .qc_bind(out)
-}
-
-.qc_emof_required <- function(emof) {
-  if (!is.data.frame(emof) || nrow(emof) == 0) return(.qc_bind(list()))
-  rid <- if ("measurementID" %in% names(emof)) {
-    as.character(emof$measurementID)
-  } else {
-    as.character(seq_len(nrow(emof)))
-  }
-
-  out <- list()
-  for (f in c("measurementType", "measurementValue")) {
-    if (!f %in% names(emof)) next
-    miss <- .qc_is_blank(emof[[f]])
-    if (any(miss, na.rm = TRUE)) {
-      ii <- which(miss)
-      out[[length(out) + 1]] <- .qc_bind(lapply(ii, function(i) {
-        .qc_issue(
-          table = "emof",
-          row_id = rid[i],
-          field = f,
-          rule = "required_field_empty_value",
-          message = paste0("Empty value for required field ", f),
-          severity = "ERROR"
-        )
-      }))
-    }
-  }
-  .qc_bind(out)
-}
-
-# -----------------------------
-# Phase 2 (optional) - WoRMS
-# -----------------------------
-.qc_worms_resolve <- function(occ) {
-  if (!is.data.frame(occ) || nrow(occ) == 0) {
-    return(list(issues = .qc_bind(list()), tables = list()))
-  }
-  if (!requireNamespace("worrms", quietly = TRUE)) {
-    issues <- .qc_issue(
-      table = "occurrence",
-      row_id = "*",
-      field = "scientificNameID",
-      rule = "worms_dependency_missing",
-      message = "WoRMS checks skipped (package 'worrms' not installed)",
-      severity = "WARN"
-    )
-    return(list(
-      issues = issues,
-      tables = list(unmatched = data.frame(), broken = data.frame())
-    ))
-  }
-
-  if (!("scientificName" %in% names(occ))) {
-    return(list(
-      issues = .qc_bind(list()),
-      tables = list(unmatched = data.frame(), broken = data.frame())
-    ))
-  }
-
-  sci <- trimws(as.character(occ$scientificName))
-  sci[.qc_is_blank(sci)] <- NA_character_
-
-  u <- unique(stats::na.omit(sci))
-  if (length(u) == 0) {
-    return(list(
-      issues = .qc_bind(list()),
-      tables = list(unmatched = data.frame(), broken = data.frame())
-    ))
-  }
-
-  aphia <- rep(NA_integer_, length(u))
-  for (i in seq_along(u)) {
-    res <- tryCatch(worrms::wm_records_name(u[i]), error = function(e) NULL)
-    if (is.null(res) || !is.data.frame(res) || nrow(res) == 0) next
-    if ("AphiaID" %in% names(res)) {
-      aphia[i] <- suppressWarnings(as.integer(res$AphiaID[1]))
-    }
-  }
-
-  map <- data.frame(scientificName = u, AphiaID = aphia, stringsAsFactors = FALSE)
-
-  unmatched <- map[is.na(map$AphiaID), , drop = FALSE]
-  if (nrow(unmatched) > 0) {
-    tab_sci <- table(sci)
-    unmatched$count <- as.integer(tab_sci[unmatched$scientificName])
-    unmatched$count[is.na(unmatched$count)] <- 1L
-  }
-
-  broken <- data.frame()
-  issues <- .qc_bind(list())
-
-  if ("scientificNameID" %in% names(occ)) {
-    sid <- trimws(as.character(occ$scientificNameID))
-    tmp <- data.frame(
-      scientificName = sci,
-      scientificNameID = sid,
-      stringsAsFactors = FALSE
-    )
-    tmp <- tmp[!is.na(tmp$scientificName) & !.qc_is_blank(tmp$scientificNameID), , drop = FALSE]
-
-    if (nrow(tmp) > 0) {
-      agg <- stats::aggregate(scientificNameID ~ scientificName, tmp, function(z) length(unique(z)))
-      bad <- agg$scientificNameID > 1
-      if (any(bad)) {
-        bad_names <- agg$scientificName[bad]
-        broken <- tmp[tmp$scientificName %in% bad_names, , drop = FALSE]
-        broken$n <- ave(broken$scientificNameID, broken$scientificName, FUN = function(z) length(unique(z)))
-        broken$issue <- "multiple scientificNameID per scientificName"
-
-        rid <- as.character(occ$occurrenceID %||% seq_len(nrow(occ)))
-        ii <- which(!is.na(sci) & sci %in% bad_names)
-        issues <- .qc_bind(lapply(ii, function(i) {
-          .qc_issue(
-            table = "occurrence",
-            row_id = rid[i] %||% as.character(i),
-            field = "scientificNameID",
-            rule = "broken_one_to_one_taxa_relationship",
-            message = "Broken one-to-one taxa relationship (multiple scientificNameID per scientificName)",
-            severity = "WARN"
-          )
-        }))
-      }
-    }
-  }
-
-  list(issues = issues, tables = list(unmatched = unmatched, broken = broken))
-}
-
-# -----------------------------
-# Phase 2 (optional) - URI resolve for measurementTypeID/measurementUnitID
-# -----------------------------
-.qc_uri_resolve <- function(emof, field, table = "emof") {
-  if (!is.data.frame(emof) || nrow(emof) == 0) return(.qc_bind(list()))
-  if (!field %in% names(emof)) return(.qc_bind(list()))
-
-  if (!requireNamespace("httr", quietly = TRUE)) {
-    return(.qc_issue(
-      table = table,
-      row_id = "*",
-      field = field,
-      rule = "uri_dependency_missing",
-      message = "URI checks skipped (package 'httr' not installed)",
-      severity = "WARN"
-    ))
-  }
-
-  x <- trimws(as.character(emof[[field]]))
-  x[.qc_is_blank(x)] <- NA_character_
-  u <- unique(stats::na.omit(x))
-  if (length(u) == 0) return(.qc_bind(list()))
-
-  status <- stats::setNames(rep(NA_integer_, length(u)), u)
-  for (i in seq_along(u)) {
-    r <- tryCatch(httr::HEAD(u[i], httr::timeout(3)), error = function(e) NULL)
-    if (is.null(r)) next
-    status[i] <- httr::status_code(r)
-  }
-
-  bad <- names(status)[!is.na(status) & status >= 400]
-  if (length(bad) == 0) return(.qc_bind(list()))
-
-  rid <- if ("measurementID" %in% names(emof)) {
-    as.character(emof$measurementID)
-  } else {
-    as.character(seq_len(nrow(emof)))
-  }
-  ii <- which(!is.na(x) & x %in% bad)
-
-  .qc_bind(lapply(ii, function(i) {
-    .qc_issue(
-      table = table,
-      row_id = rid[i],
-      field = field,
-      rule = "uri_does_not_resolve",
-      message = paste0(field, " does not resolve (HTTP >= 400)"),
-      severity = "WARN"
-    )
-  }))
-}
-
-# -----------------------------
-# Robust summary builder (fix for 0,1 / 0,2 crash)
-# -----------------------------
 .qc_make_summary <- function(issues_detailed) {
   empty <- data.frame(
     field = character(),
@@ -813,7 +193,6 @@ mod_qc_ui <- function(id) {
   s[is.na(s)] <- ""
 
   key <- paste(f, m, t, s, sep = "||")
-
   tab <- sort(table(key), decreasing = TRUE)
   if (length(tab) == 0) return(empty)
 
@@ -838,43 +217,521 @@ mod_qc_ui <- function(id) {
   )
 }
 
+.qc_required_field <- function(df, table, id_field, fields_required) {
+  out <- list()
+  if (!is.data.frame(df) || nrow(df) == 0) return(.qc_bind(out))
+
+  rid <- if (id_field %in% names(df)) as.character(df[[id_field]]) else as.character(seq_len(nrow(df)))
+
+  for (f in fields_required) {
+    if (!f %in% names(df)) {
+      out[[length(out) + 1]] <- .qc_issue(
+        table = table,
+        row_id = "*",
+        field = f,
+        rule = "required_field_missing_column",
+        message = paste0("Missing required column: ", f),
+        severity = "ERROR"
+      )
+      next
+    }
+
+    miss <- .qc_is_blank(df[[f]])
+    if (any(miss, na.rm = TRUE)) {
+      ii <- which(miss)
+      issue_list <- lapply(ii, function(i) {
+        .qc_issue(
+          table = table,
+          row_id = rid[i],
+          field = f,
+          rule = "required_field_empty_value",
+          message = paste0("Empty value for required field: ", f),
+          severity = "ERROR"
+        )
+      })
+      out[[length(out) + 1]] <- .qc_bind(issue_list)
+    }
+  }
+
+  .qc_bind(out)
+}
+
+.qc_unique_id <- function(df, table, id_field) {
+  if (!is.data.frame(df) || nrow(df) == 0) return(.qc_empty_issues())
+  if (!id_field %in% names(df)) {
+    return(.qc_issue(
+      table = table,
+      row_id = "*",
+      field = id_field,
+      rule = "id_missing_column",
+      message = paste0("Missing ID column: ", id_field),
+      severity = "ERROR"
+    ))
+  }
+
+  id <- as.character(df[[id_field]])
+  blank <- .qc_is_blank(id)
+  out <- list()
+
+  if (any(blank, na.rm = TRUE)) {
+    ii <- which(blank)
+    issue_list <- lapply(ii, function(i) {
+      .qc_issue(
+        table = table,
+        row_id = as.character(i), # Here i is the row index of the original df
+        field = id_field,
+        rule = "id_empty",
+        message = paste0(id_field, " is empty"),
+        severity = "ERROR"
+      )
+    })
+    out[[length(out) + 1]] <- .qc_bind(issue_list)
+  }
+
+  id2 <- id[!blank]
+  dup <- duplicated(id2) | duplicated(id2, fromLast = TRUE)
+  if (any(dup, na.rm = TRUE)) {
+    vals <- unique(id2[dup])
+    for (v in vals) {
+      idx <- which(id == v)
+      issue_list <- lapply(idx, function(i) {
+        .qc_issue(
+          table = table,
+          row_id = id[i],
+          field = id_field,
+          rule = "id_duplicated",
+          message = paste0(id_field, " is duplicated: ", v),
+          severity = "ERROR"
+        )
+      })
+      out[[length(out) + 1]] <- .qc_bind(issue_list)
+    }
+  }
+
+  .qc_bind(out)
+}
+
+.qc_coords_range <- function(df, table, id_field,
+                             lat_field = "decimalLatitude",
+                             lon_field = "decimalLongitude") {
+  if (!is.data.frame(df) || nrow(df) == 0) return(.qc_empty_issues())
+  if (!(lat_field %in% names(df) && lon_field %in% names(df))) return(.qc_empty_issues())
+
+  rid <- if (id_field %in% names(df)) as.character(df[[id_field]]) else as.character(seq_len(nrow(df)))
+  lat <- .qc_num(df[[lat_field]])
+  lon <- .qc_num(df[[lon_field]])
+
+  bad <- (is.finite(lat) & (lat < -90 | lat > 90)) |
+    (is.finite(lon) & (lon < -180 | lon > 180))
+  bad[is.na(bad)] <- FALSE
+
+  if (!any(bad)) return(.qc_empty_issues())
+
+  ii <- which(bad)
+  issue_list <- lapply(ii, function(i) {
+    .qc_issue(
+      table = table,
+      row_id = rid[i],
+      field = "coordinates_error",
+      rule = "coords_out_of_range",
+      message = "Out-of-range coordinates (latitude must be -90 to 90, longitude must be -180 to 180)",
+      severity = "ERROR"
+    )
+  })
+  .qc_bind(issue_list)
+}
+
+.qc_eventDate_basic <- function(event, id_field = "eventID", field = "eventDate") {
+  if (!is.data.frame(event) || nrow(event) == 0) return(.qc_empty_issues())
+  if (!field %in% names(event)) return(.qc_empty_issues())
+
+  rid <- if (id_field %in% names(event)) as.character(event[[id_field]]) else as.character(seq_len(nrow(event)))
+  x <- trimws(as.character(event[[field]]))
+
+  ok <- grepl("^\\d{4}($|-\\d{2}($|-\\d{2}$))", x) |
+    grepl("^\\d{4}.*\\/\\d{4}", x)
+  ok[.qc_is_blank(x)] <- TRUE
+
+  bad <- !ok
+  bad[is.na(bad)] <- FALSE
+  if (!any(bad)) return(.qc_empty_issues())
+
+  ii <- which(bad)
+  issue_list <- lapply(ii, function(i) {
+    .qc_issue(
+      table = "event",
+      row_id = rid[i],
+      field = field,
+      rule = "eventDate_invalid_format",
+      message = paste0(field, " does not appear to be a valid ISO-8601 date format"),
+      severity = "ERROR"
+    )
+  })
+  .qc_bind(issue_list)
+}
+
+.qc_rel_occ_event <- function(occ, event) {
+  if (!is.data.frame(occ) || nrow(occ) == 0) return(.qc_empty_issues())
+  if (!("eventID" %in% names(occ))) return(.qc_empty_issues())
+  if (!is.data.frame(event) || nrow(event) == 0) {
+    return(.qc_issue(
+      table = "occurrence",
+      row_id = "*",
+      field = "eventID",
+      rule = "event_table_missing",
+      message = "Event table is missing; cannot validate eventID links",
+      severity = "ERROR"
+    ))
+  }
+  if (!("eventID" %in% names(event))) return(.qc_empty_issues())
+
+  ev_ids <- unique(as.character(event$eventID))
+  # Fallback to row index if occurrenceID is missing
+  occ_ids <- if ("occurrenceID" %in% names(occ)) as.character(occ$occurrenceID) else as.character(seq_len(nrow(occ)))
+  miss <- !.qc_is_blank(occ$eventID) & !(as.character(occ$eventID) %in% ev_ids)
+
+  if (!any(miss, na.rm = TRUE)) return(.qc_empty_issues())
+
+  ii <- which(miss)
+  issue_list <- lapply(ii, function(i) {
+    .qc_issue(
+      table = "occurrence",
+      row_id = occ_ids[i],
+      field = "eventID",
+      rule = "eventID_no_corresponding_event",
+      message = "This eventID has no corresponding eventID in the event core table",
+      severity = "ERROR"
+    )
+  })
+  .qc_bind(issue_list)
+}
+
+.qc_parentEventID <- function(event) {
+  if (!is.data.frame(event) || nrow(event) == 0) return(.qc_empty_issues())
+  if (!("eventID" %in% names(event)) || !("parentEventID" %in% names(event))) {
+    return(.qc_empty_issues())
+  }
+
+  ev_ids <- unique(as.character(event$eventID))
+  pid <- as.character(event$parentEventID)
+  # Fallback to row index if eventID is missing
+  rid <- if ("eventID" %in% names(event)) as.character(event$eventID) else as.character(seq_len(nrow(event)))
+
+  miss <- !.qc_is_blank(pid) & !(pid %in% ev_ids)
+  if (!any(miss, na.rm = TRUE)) return(.qc_empty_issues())
+
+  ii <- which(miss)
+  issue_list <- lapply(ii, function(i) {
+    .qc_issue(
+      table = "event",
+      row_id = rid[i],
+      field = "parentEventID",
+      rule = "parentEventID_no_corresponding_event",
+      message = "parentEventID has no corresponding eventID in the event table",
+      severity = "ERROR"
+    )
+  })
+  .qc_bind(issue_list)
+}
+
+.qc_emof_duplicates <- function(emof) {
+  if (!is.data.frame(emof) || nrow(emof) == 0) return(.qc_empty_issues())
+  if (!("measurementType" %in% names(emof))) return(.qc_empty_issues())
+
+  link_field <- if ("eventID" %in% names(emof) && !all(.qc_is_blank(emof$eventID))) {
+    "eventID"
+  } else if ("occurrenceID" %in% names(emof)) {
+    "occurrenceID"
+  } else {
+    NULL
+  }
+  if (is.null(link_field)) return(.qc_empty_issues())
+
+  key <- paste0(as.character(emof[[link_field]]), "||", as.character(emof$measurementType))
+  ok <- !.qc_is_blank(emof[[link_field]]) & !.qc_is_blank(emof$measurementType)
+  key2 <- key[ok]
+
+  dup <- duplicated(key2) | duplicated(key2, fromLast = TRUE)
+  if (!any(dup, na.rm = TRUE)) return(.qc_empty_issues())
+
+  vals <- unique(key2[dup])
+  rid <- if ("measurementID" %in% names(emof)) {
+    as.character(emof$measurementID)
+  } else {
+    as.character(seq_len(nrow(emof)))
+  }
+
+  out <- list()
+  for (v in vals) {
+    idx <- which(key == v)
+    issue_list <- lapply(idx, function(i) {
+      .qc_issue(
+        table = "emof",
+        row_id = rid[i],
+        field = "measurementType",
+        rule = "duplicate_measurementType_per_link",
+        message = paste0("Duplicate measurementType linked to the same ", link_field),
+        severity = "WARN"
+      )
+    })
+    out[[length(out) + 1]] <- .qc_bind(issue_list)
+  }
+  .qc_bind(out)
+}
+
+.qc_emof_required <- function(emof) {
+  if (!is.data.frame(emof) || nrow(emof) == 0) return(.qc_empty_issues())
+  rid <- if ("measurementID" %in% names(emof)) {
+    as.character(emof$measurementID)
+  } else {
+    as.character(seq_len(nrow(emof)))
+  }
+
+  out <- list()
+  for (f in c("measurementType", "measurementValue")) {
+    if (!f %in% names(emof)) next
+    miss <- .qc_is_blank(emof[[f]])
+    if (any(miss, na.rm = TRUE)) {
+      ii <- which(miss)
+      issue_list <- lapply(ii, function(i) {
+        .qc_issue(
+          table = "emof",
+          row_id = rid[i],
+          field = f,
+          rule = "required_field_empty_value",
+          message = paste0("Empty value for required field: ", f),
+          severity = "ERROR"
+        )
+      })
+      out[[length(out) + 1]] <- .qc_bind(issue_list)
+    }
+  }
+  .qc_bind(out)
+}
+
+.qc_make_invalid <- function(df, table_name, id_field, issues_det) {
+  if (!is.data.frame(df) || nrow(df) == 0) return(data.frame())
+  
+  # Ensure we have a consistent ID to join on. 
+  # If the table is missing its primary ID column, we create a temporary 'row' column
+  df_work <- df
+  work_id <- id_field
+  if (!id_field %in% names(df_work)) {
+    df_work$.row_id_temp <- as.character(seq_len(nrow(df_work)))
+    work_id <- ".row_id_temp"
+  }
+
+  sub <- issues_det[issues_det$table == table_name & issues_det$severity %in% c("ERROR", "WARN"), , drop = FALSE]
+  if (nrow(sub) == 0) return(data.frame())
+
+  ids_bad <- unique(sub$row_id[sub$row_id != "*" & !is.na(sub$row_id)])
+  if (length(ids_bad) == 0) return(data.frame())
+
+  out <- df_work[as.character(df_work[[work_id]]) %in% ids_bad, , drop = FALSE]
+  if (nrow(out) == 0) return(data.frame())
+
+  fields <- unique(as.character(sub$field))
+  for (f in fields) {
+    coln <- paste0(f, "_error")
+    msg_map <- sub[sub$field == f, c("row_id", "message"), drop = FALSE]
+    msg_map <- msg_map[!duplicated(msg_map$row_id), , drop = FALSE]
+    out[[coln]] <- msg_map$message[match(as.character(out[[work_id]]), msg_map$row_id)]
+  }
+
+  err_cols <- grep("_error$", names(out), value = TRUE)
+  out$row <- seq_len(nrow(out))
+  
+  # Cleanup temp ID if created
+  if (work_id == ".row_id_temp") {
+    out$.row_id_temp <- NULL
+  }
+  
+  keep <- c("row", err_cols, setdiff(names(out), c("row", err_cols)))
+  out[, unique(keep), drop = FALSE]
+}
+
+.qc_get_coords <- function(df, id_field) {
+  if (!is.data.frame(df) || nrow(df) == 0) return(NULL)
+  if (!all(c("decimalLatitude", "decimalLongitude") %in% names(df))) return(NULL)
+  
+  # Determine the ID to use
+  id_vec <- if (id_field %in% names(df)) as.character(df[[id_field]]) else as.character(seq_len(nrow(df)))
+
+  lat <- .qc_num(df$decimalLatitude)
+  lon <- .qc_num(df$decimalLongitude)
+  ok <- is.finite(lat) & is.finite(lon)
+  if (!any(ok)) return(NULL)
+
+  out <- data.frame(
+    id = id_vec[ok],
+    decimalLatitude = lat[ok],
+    decimalLongitude = lon[ok],
+    stringsAsFactors = FALSE
+  )
+  out <- out[is.finite(out$decimalLatitude) & is.finite(out$decimalLongitude), , drop = FALSE]
+  out <- out[!duplicated(out[, c("id", "decimalLatitude", "decimalLongitude")]), , drop = FALSE]
+  rownames(out) <- NULL
+  out
+}
+
+.qc_get_map_records <- function(event, occurrence) {
+  occ_coords <- .qc_get_coords(occurrence, "occurrenceID")
+  ev_coords <- .qc_get_coords(event, "eventID")
+
+  out <- data.frame()
+
+  if (is.data.frame(occ_coords) && nrow(occ_coords) > 0) {
+    tmp <- occ_coords
+    tmp$source <- "occurrence"
+    out <- rbind(out, tmp)
+  }
+
+  if (is.data.frame(ev_coords) && nrow(ev_coords) > 0) {
+    tmp <- ev_coords
+    tmp$source <- "event"
+    out <- rbind(out, tmp)
+  }
+
+  if (!is.data.frame(out) || nrow(out) == 0) return(NULL)
+  rownames(out) <- NULL
+  out
+}
+
+.qc_extract_date_values <- function(x) {
+  if (is.null(x)) return(character())
+  x <- trimws(as.character(x))
+  x[is.na(x) | x == ""] <- NA_character_
+  x
+}
+
+.qc_overview_date_counts <- function(event, occurrence) {
+  out <- data.frame(date = character(), n = integer(), stringsAsFactors = FALSE)
+
+  if (is.data.frame(event) && nrow(event) > 0 && "eventDate" %in% names(event)) {
+    d <- .qc_extract_date_values(event$eventDate)
+    d <- d[!is.na(d)]
+    if (length(d) > 0) {
+      tb <- sort(table(d), decreasing = FALSE)
+      out <- data.frame(date = names(tb), n = as.integer(tb), stringsAsFactors = FALSE)
+    }
+  }
+
+  if (nrow(out) == 0) return(out)
+  rownames(out) <- NULL
+  out
+}
+
+.qc_build_nested_taxonomy <- function(oc) {
+  tax_levels <- c("kingdom", "phylum", "class", "order", "family", "genus", "species")
+  oc_filt <- oc
+  
+  if (nrow(oc_filt) == 0) return(NULL)
+  
+  available_levels <- tax_levels[tax_levels %in% names(oc_filt)]
+  if (length(available_levels) == 0) return(NULL)
+  
+  hierarchy_data <- oc_filt[, available_levels, drop = FALSE]
+  for (col in available_levels) {
+    hierarchy_data[[col]] <- as.character(hierarchy_data[[col]])
+    hierarchy_data[[col]][.qc_is_blank(hierarchy_data[[col]])] <- NA_character_
+  }
+  
+  hierarchy_data <- hierarchy_data[rowSums(is.na(hierarchy_data)) < length(available_levels), , drop = FALSE]
+  if (nrow(hierarchy_data) == 0) return(NULL)
+
+  # Recursively build with UNIQUE IDs
+  build_hierarchy_recursive <- function(data, levels, current_level = 1, parent_label = "", parent_id = "") {
+    if (current_level > length(levels) || nrow(data) == 0) return(NULL)
+    
+    current_col <- levels[current_level]
+    level_values <- unique(data[[current_col]])
+    level_values <- level_values[!is.na(level_values)]
+    
+    if (length(level_values) == 0) {
+      # Skip empty level and try next one
+      return(build_hierarchy_recursive(data, levels, current_level + 1, parent_label, parent_id))
+    }
+    
+    result_list <- list()
+    for (val in level_values) {
+      subset_mask <- as.character(data[[current_col]]) == as.character(val)
+      count <- sum(subset_mask, na.rm = TRUE)
+      
+      # Create unique ID by appending to parent ID
+      current_id <- if (parent_id == "") as.character(val) else paste0(parent_id, "|", val)
+      
+      result_list[[length(result_list) + 1]] <- data.frame(
+        ids = current_id,
+        labels = as.character(val),
+        parents = parent_id,
+        values = count,
+        stringsAsFactors = FALSE
+      )
+      
+      if (current_level < length(levels)) {
+        subset_data <- data[subset_mask, , drop = FALSE]
+        child_hierarchy <- build_hierarchy_recursive(subset_data, levels, current_level + 1, as.character(val), current_id)
+        if (!is.null(child_hierarchy)) result_list[[length(result_list) + 1]] <- child_hierarchy
+      }
+    }
+    do.call(rbind, result_list)
+  }
+  
+  root_id <- "All"
+  root_node <- data.frame(ids = root_id, labels = "All", parents = "", values = nrow(hierarchy_data), stringsAsFactors = FALSE)
+  child_nodes <- build_hierarchy_recursive(hierarchy_data, available_levels, 1, "All", root_id)
+  
+  res <- rbind(root_node, child_nodes)
+  res[!duplicated(res$ids), ] # Ensure ID uniqueness
+}
+
 # =========================================================
 # Main QC runner
 # =========================================================
 
-#' Run QC checks on DwC-A tables (Phase 1 + Phase 2 with fallbacks)
+#' Run QC checks on DwC-A tables
 #'
-#' @param event Event table data.frame
-#' @param occurrence Occurrence table data.frame
-#' @param emof eMoF table data.frame (may be NULL)
-#' @param pre_issues Optional data.frame of pre-split issues (mapping cleaning)
-#' @return list with overview, issues_summary, issues_detailed, invalid tables, map_issues, hierarchy, can_export
+#' @param event Event table data frame.
+#' @param occurrence Occurrence table data frame.
+#' @param emof eMoF table data frame, may be NULL.
+#' @param pre_issues Optional data frame of pre-existing issues.
+#'
+#' @return A list with overview tables, issues, invalid records, map issues,
+#'   counts, and export status.
 #' @export
 run_qc_dwca <- function(event, occurrence, emof = NULL, pre_issues = NULL) {
   if (is.null(emof)) emof <- data.frame()
 
   issues_list <- list()
 
-  issues_list[[length(issues_list) + 1]] <- .qc_unique_id(event, "event", "eventID")
-  issues_list[[length(issues_list) + 1]] <- .qc_unique_id(occurrence, "occurrence", "occurrenceID")
-
-  if ("eventDate" %in% names(event)) {
-    issues_list[[length(issues_list) + 1]] <- .qc_eventDate_basic(event, "eventID", "eventDate")
+  # Helper to safely add issues
+  .add_issues <- function(result) {
+    if (is.data.frame(result) && nrow(result) > 0) {
+      return(result)
+    }
+    return(.qc_empty_issues())
   }
 
-  issues_list[[length(issues_list) + 1]] <- .qc_required_field(
+  issues_list[[length(issues_list) + 1]] <- .add_issues(.qc_unique_id(event, "event", "eventID"))
+  issues_list[[length(issues_list) + 1]] <- .add_issues(.qc_unique_id(occurrence, "occurrence", "occurrenceID"))
+
+  if ("eventDate" %in% names(event)) {
+    issues_list[[length(issues_list) + 1]] <- .add_issues(.qc_eventDate_basic(event, "eventID", "eventDate"))
+  }
+
+  issues_list[[length(issues_list) + 1]] <- .add_issues(.qc_required_field(
     occurrence, "occurrence", "occurrenceID", c("scientificName")
-  )
+  ))
 
-  issues_list[[length(issues_list) + 1]] <- .qc_coords_range(event, "event", "eventID")
-  issues_list[[length(issues_list) + 1]] <- .qc_coords_range(occurrence, "occurrence", "occurrenceID")
+  issues_list[[length(issues_list) + 1]] <- .add_issues(.qc_coords_range(event, "event", "eventID"))
+  issues_list[[length(issues_list) + 1]] <- .add_issues(.qc_coords_range(occurrence, "occurrence", "occurrenceID"))
 
-  issues_list[[length(issues_list) + 1]] <- .qc_rel_occ_event(occurrence, event)
-  issues_list[[length(issues_list) + 1]] <- .qc_parentEventID(event)
+  issues_list[[length(issues_list) + 1]] <- .add_issues(.qc_rel_occ_event(occurrence, event))
+  issues_list[[length(issues_list) + 1]] <- .add_issues(.qc_parentEventID(event))
 
   if (is.data.frame(emof) && nrow(emof) > 0) {
-    issues_list[[length(issues_list) + 1]] <- .qc_emof_required(emof)
-    issues_list[[length(issues_list) + 1]] <- .qc_emof_duplicates(emof)
+    issues_list[[length(issues_list) + 1]] <- .add_issues(.qc_emof_required(emof))
+    issues_list[[length(issues_list) + 1]] <- .add_issues(.qc_emof_duplicates(emof))
   }
 
   if (is.data.frame(pre_issues) && nrow(pre_issues) > 0) {
@@ -894,117 +751,50 @@ run_qc_dwca <- function(event, occurrence, emof = NULL, pre_issues = NULL) {
       severity = as.character(pi$severity),
       stringsAsFactors = FALSE
     )
-    issues_list[[length(issues_list) + 1]] <- pi_out
+    issues_list[[length(issues_list) + 1]] <- .add_issues(pi_out)
   }
 
+  # Bind all issues safely
   issues_detailed <- .qc_bind(issues_list)
-
-  worms <- .qc_worms_resolve(occurrence)
-  if (is.data.frame(worms$issues) && nrow(worms$issues) > 0) {
-    issues_detailed <- rbind(issues_detailed, worms$issues)
+  
+  if (!is.data.frame(issues_detailed)) {
+    issues_detailed <- .qc_empty_issues()
   }
-
-  if (is.data.frame(emof) && nrow(emof) > 0) {
-    if ("measurementTypeID" %in% names(emof)) {
-      issues_detailed <- rbind(issues_detailed, .qc_uri_resolve(emof, "measurementTypeID", "emof"))
-    }
-    if ("measurementUnitID" %in% names(emof)) {
-      issues_detailed <- rbind(issues_detailed, .qc_uri_resolve(emof, "measurementUnitID", "emof"))
-    }
-  }
-
+  
   issues_detailed$severity <- toupper(as.character(issues_detailed$severity))
   issues_detailed$table <- tolower(as.character(issues_detailed$table))
 
   issues_summary <- .qc_make_summary(issues_detailed)
 
-  .make_invalid <- function(df, table_name, id_field, issues_det) {
-    if (!is.data.frame(df) || nrow(df) == 0) return(data.frame())
-    sub <- issues_det[issues_det$table == table_name &
-      issues_det$severity %in% c("ERROR", "WARN"), , drop = FALSE]
-    if (nrow(sub) == 0) return(data.frame())
-    if (!id_field %in% names(df)) return(data.frame())
-
-    ids_bad <- unique(sub$row_id[sub$row_id != "*" & !is.na(sub$row_id)])
-    if (length(ids_bad) == 0) return(data.frame())
-
-    out <- df[as.character(df[[id_field]]) %in% ids_bad, , drop = FALSE]
-    if (nrow(out) == 0) return(data.frame())
-
-    fields <- unique(as.character(sub$field))
-    for (f in fields) {
-      coln <- paste0(f, "_error")
-      msg_map <- sub[sub$field == f, c("row_id", "message"), drop = FALSE]
-      msg_map <- msg_map[!duplicated(msg_map$row_id), , drop = FALSE]
-      out[[coln]] <- msg_map$message[match(as.character(out[[id_field]]), msg_map$row_id)]
-    }
-
-    err_cols <- grep("_error$", names(out), value = TRUE)
-    out$row <- seq_len(nrow(out))
-    keep <- c("row", err_cols, setdiff(names(out), c("row", err_cols)))
-    out <- out[, unique(keep), drop = FALSE]
-    out
-  }
-
-  invalid_event <- .make_invalid(event, "event", "eventID", issues_detailed)
-  invalid_occ <- .make_invalid(occurrence, "occurrence", "occurrenceID", issues_detailed)
+  invalid_event <- .qc_make_invalid(event, "event", "eventID", issues_detailed)
+  invalid_occ <- .qc_make_invalid(occurrence, "occurrence", "occurrenceID", issues_detailed)
 
   if (!is.data.frame(emof)) emof <- data.frame()
-  if (nrow(emof) > 0 && !("measurementID" %in% names(emof))) emof$row <- seq_len(nrow(emof))
   id_emof <- if ("measurementID" %in% names(emof)) {
     "measurementID"
-  } else if ("row" %in% names(emof)) {
-    "row"
   } else {
-    "row"
+    "row" # Fallback internal key for .qc_make_invalid to use indices
   }
-  invalid_emof <- .make_invalid(emof, "emof", id_emof, issues_detailed)
+  invalid_emof <- .qc_make_invalid(emof, "emof", id_emof, issues_detailed)
 
-  map_issues <- data.frame()
-
-  get_coords <- function(df, id_field) {
-    if (!is.data.frame(df) || nrow(df) == 0) return(NULL)
-    if (!all(c("decimalLatitude", "decimalLongitude") %in% names(df))) return(NULL)
-    if (!id_field %in% names(df)) return(NULL)
-
-    lat <- .qc_num(df$decimalLatitude)
-    lon <- .qc_num(df$decimalLongitude)
-    ok <- is.finite(lat) & is.finite(lon)
-    if (!any(ok)) return(NULL)
-
-    data.frame(
-      id = as.character(df[[id_field]][ok]),
-      decimalLatitude = lat[ok],
-      decimalLongitude = lon[ok],
-      stringsAsFactors = FALSE
-    )
-  }
-
-  occ_coords <- get_coords(occurrence, "occurrenceID")
-  ev_coords <- get_coords(event, "eventID")
-
-  coords_src <- "occurrence"
-  coords <- occ_coords
-  if (is.null(coords)) {
-    coords_src <- "event"
-    coords <- ev_coords
-  }
+  map_records <- .qc_get_map_records(event, occurrence)
 
   bounds <- NULL
-  if (!is.null(coords) && is.data.frame(coords) && nrow(coords) > 0) {
+  if (!is.null(map_records) && is.data.frame(map_records) && nrow(map_records) > 0) {
     bounds <- list(
-      lng1 = min(coords$decimalLongitude, na.rm = TRUE),
-      lat1 = min(coords$decimalLatitude,  na.rm = TRUE),
-      lng2 = max(coords$decimalLongitude, na.rm = TRUE),
-      lat2 = max(coords$decimalLatitude,  na.rm = TRUE)
+      lng1 = min(map_records$decimalLongitude, na.rm = TRUE),
+      lat1 = min(map_records$decimalLatitude, na.rm = TRUE),
+      lng2 = max(map_records$decimalLongitude, na.rm = TRUE),
+      lat2 = max(map_records$decimalLatitude, na.rm = TRUE)
     )
   }
 
-  if (!is.null(coords) && is.data.frame(coords) && nrow(issues_detailed) > 0) {
+  map_issues <- data.frame()
+  if (!is.null(map_records) && is.data.frame(map_records) && nrow(issues_detailed) > 0) {
     det2 <- issues_detailed[issues_detailed$table %in% c("occurrence", "event"), , drop = FALSE]
     det2 <- det2[det2$row_id != "*" & !is.na(det2$row_id), , drop = FALSE]
     if (nrow(det2) > 0) {
-      joined <- merge(det2, coords, by.x = "row_id", by.y = "id", all = FALSE)
+      joined <- merge(det2, map_records[, c("id", "decimalLatitude", "decimalLongitude", "source"), drop = FALSE], by.x = "row_id", by.y = "id", all = FALSE)
       if (nrow(joined) > 0) {
         map_issues <- data.frame(
           decimalLatitude = joined$decimalLatitude,
@@ -1014,22 +804,11 @@ run_qc_dwca <- function(event, occurrence, emof = NULL, pre_issues = NULL) {
           field = joined$field,
           issue = joined$message,
           severity = joined$severity,
+          source = joined$source,
           stringsAsFactors = FALSE
         )
       }
     }
-  }
-
-  hierarchy_issues <- .qc_parentEventID(event)
-  edges <- data.frame()
-  if (is.data.frame(event) && nrow(event) > 0 &&
-    all(c("eventID", "parentEventID") %in% names(event))) {
-    edges <- data.frame(
-      from = as.character(event$parentEventID),
-      to = as.character(event$eventID),
-      stringsAsFactors = FALSE
-    )
-    edges <- edges[!(.qc_is_blank(edges$from) | .qc_is_blank(edges$to)), , drop = FALSE]
   }
 
   n_errors <- sum(issues_detailed$severity == "ERROR", na.rm = TRUE)
@@ -1084,6 +863,7 @@ run_qc_dwca <- function(event, occurrence, emof = NULL, pre_issues = NULL) {
     } else {
       "occurrenceMoF"
     }
+
     mt <- as.character(emof$measurementType)
     mu <- if ("measurementUnit" %in% names(emof)) {
       as.character(emof$measurementUnit)
@@ -1096,61 +876,222 @@ run_qc_dwca <- function(event, occurrence, emof = NULL, pre_issues = NULL) {
       NA_real_
     }
 
-    key <- paste(idlink, mt, mu, sep = "||")
-    tab <- sort(table(key), decreasing = TRUE)
+    base <- data.frame(
+      IDlink = rep(idlink, length(mt)),
+      measurementType = mt,
+      measurementUnit = mu,
+      measurementValue = mv,
+      stringsAsFactors = FALSE
+    )
 
-    if (length(tab) > 0) {
-      parts_list <- strsplit(names(tab), "||", fixed = TRUE)
-      parts_list <- lapply(parts_list, function(p) {
-        p <- as.character(p)
-        length(p) <- 3
-        p[is.na(p)] <- ""
-        p
-      })
-      parts <- do.call(rbind, parts_list)
+    count_df <- stats::aggregate(
+      rep(1L, nrow(base)),
+      by = base[c("IDlink", "measurementType", "measurementUnit")],
+      FUN = sum
+    )
+    names(count_df)[names(count_df) == "x"] <- "count"
 
-      overview_emof_types <- data.frame(
-        IDlink = parts[, 1],
-        measurementType = parts[, 2],
-        measurementUnit = parts[, 3],
-        count = as.integer(tab),
-        stringsAsFactors = FALSE
-      )
-
-      if (!all(is.na(mv))) {
-        overview_emof_types$minValue <- NA_real_
-        overview_emof_types$maxValue <- NA_real_
-        for (i in seq_len(nrow(overview_emof_types))) {
-          sel <- (mt == overview_emof_types$measurementType[i]) &
-            (mu == overview_emof_types$measurementUnit[i])
-          if (any(sel, na.rm = TRUE)) {
-            v <- mv[sel]
-            v <- v[is.finite(v)]
-            if (length(v) > 0) {
-              overview_emof_types$minValue[i] <- min(v)
-              overview_emof_types$maxValue[i] <- max(v)
-            }
-          }
-        }
-      }
+    val_fun <- function(z) {
+      z <- z[is.finite(z)]
+      if (length(z) == 0) return(c(minValue = NA_real_, maxValue = NA_real_))
+      c(minValue = min(z), maxValue = max(z))
     }
+
+    value_df <- stats::aggregate(
+      base$measurementValue,
+      by = base[c("IDlink", "measurementType", "measurementUnit")],
+      FUN = val_fun
+    )
+
+    # FIXED: Safely handle the rbind of value_df$x
+    if (nrow(value_df) > 0 && !is.null(value_df$x)) {
+      mm <- tryCatch(
+        {
+          do.call(rbind, value_df$x)
+        },
+        error = function(e) {
+          # If rbind fails, return empty matrix with correct columns
+          matrix(NA_real_, nrow = nrow(value_df), ncol = 2, dimnames = list(NULL, c("minValue", "maxValue")))
+        }
+      )
+      
+      value_df$x <- NULL
+      if (is.matrix(mm)) {
+        value_df$minValue <- mm[, "minValue"]
+        value_df$maxValue <- mm[, "maxValue"]
+      } else {
+        value_df$minValue <- NA_real_
+        value_df$maxValue <- NA_real_
+      }
+    } else {
+      value_df$minValue <- NA_real_
+      value_df$maxValue <- NA_real_
+      value_df$x <- NULL
+    }
+
+    overview_emof_types <- merge(
+      count_df,
+      value_df,
+      by = c("IDlink", "measurementType", "measurementUnit"),
+      all = TRUE
+    )
+
+    overview_emof_types <- overview_emof_types[order(overview_emof_types$count, decreasing = TRUE), , drop = FALSE]
+    rownames(overview_emof_types) <- NULL
   }
 
   list(
     overview = list(
       event_occ = overview_event_occ,
       emof_types = overview_emof_types,
-      coords_source = coords_src,
-      coords_bounds = bounds
+      map_records = map_records,
+      coords_bounds = bounds,
+      date_counts = .qc_overview_date_counts(event, occurrence)
     ),
     issues_summary = issues_summary,
     issues_detailed = issues_detailed,
     invalid = list(event = invalid_event, occurrence = invalid_occ, emof = invalid_emof),
     map_issues = map_issues,
-    hierarchy = list(issues = hierarchy_issues, edges = edges),
-    phase2_tables = worms$tables %||% list(),
     counts = list(errors = n_errors, warnings = n_warn),
     can_export = can_export
+  )
+}
+
+# =========================================================
+# QC module UI
+# =========================================================
+
+#' QC page UI
+#'
+#' @param id Module ID.
+#'
+#' @return A `bslib::nav_panel()` object.
+#' @export
+mod_qc_ui <- function(id) {
+  ns <- shiny::NS(id)
+  has_leaflet <- requireNamespace("leaflet", quietly = TRUE)
+  has_plotly <- requireNamespace("plotly", quietly = TRUE)
+
+  bslib::nav_panel(
+    title = "DwC-A Overview & QC",
+    value = "qc",
+
+    shiny::tags$style(shiny::HTML(" 
+      .qc-title { margin-top: 8px; margin-bottom: 12px; }
+      .qc-muted { color: #6b7280; }
+      .qc-box { border: 1px solid #e5e7eb; border-radius: 10px; padding: 12px 14px; background: #fff; }
+      .qc-kpi { font-size: 26px; font-weight: 700; }
+      .qc-kpi-label { font-size: 12px; color: #6b7280; text-transform: uppercase; letter-spacing: .04em; }
+      .qc-warn { color: #ff6f00; }
+      .qc-err { color: #b91c1c; }
+      .qc-ok { color: #047857; }
+      .qc-dt-report .dataTables_wrapper .dataTables_length,
+      .qc-dt-report .dataTables_wrapper .dataTables_filter,
+      .qc-dt-report .dataTables_wrapper .dataTables_info,
+      .qc-dt-report .dataTables_wrapper .dataTables_paginate { display: none !important; }
+      .qc-map-wrap { height: 420px !important; min-height: 420px !important; width: 100%; }
+      .qc-map-wrap .leaflet.html-widget,
+      .qc-map-wrap .leaflet-container { height: 100% !important; min-height: 420px !important; }
+      .qc-dt { width: 100%; overflow-x: auto; clear: both; }
+    ")),
+
+    bslib::navset_card_tab(
+      id = ns("qc_tabs"),
+      selected = "data_overview",
+      title = "Data overview",
+
+      bslib::nav_panel(
+        "Data overview",
+        value = "data_overview",
+        shiny::div(
+          class = "qc-title",
+          shiny::h3("Data Overview & Summary")
+        ),
+        shiny::fluidRow(
+          shiny::column(
+            3,
+            shiny::div(
+              class = "qc-box",
+              shiny::div(class = "qc-kpi-label", "Export status"),
+              shiny::div(shiny::uiOutput(ns("export_status_ui")))
+            )
+          ),
+          shiny::column(
+            3,
+            shiny::div(
+              class = "qc-box",
+              shiny::div(class = "qc-kpi-label", "Errors"),
+              shiny::div(class = "qc-kpi qc-err", shiny::textOutput(ns("kpi_errors")))
+            )
+          ),
+          shiny::column(
+            3,
+            shiny::div(
+              class = "qc-box",
+              shiny::div(class = "qc-kpi-label", "Warnings"),
+              shiny::div(class = "qc-kpi qc-warn", shiny::textOutput(ns("kpi_warnings")))
+            )
+          ),
+          shiny::column(
+            3,
+            shiny::div(
+              class = "qc-box",
+              shiny::div(class = "qc-kpi-label", "Records (occurrence)"),
+              shiny::div(class = "qc-kpi", shiny::textOutput(ns("kpi_n_occ")))
+            )
+          )
+        ),
+        shiny::hr(),
+        shiny::h4("Overview of event and occurrence records"),
+        shiny::div(class = "qc-dt-report", DT::DTOutput(ns("overview_event_occ_tbl"))),
+        shiny::hr(),
+        shiny::h4("Overview of measurement or fact records"),
+        shiny::div(class = "qc-dt-report", DT::DTOutput(ns("overview_emof_types_tbl"))),
+        shiny::hr(),
+        shiny::h4("Geographic coverage of the dataset"),
+        shiny::uiOutput(ns("overview_map_info")),
+        if (has_leaflet) {
+          shiny::div(class = "qc-map-wrap", leaflet::leafletOutput(ns("overview_map"), height = "100%"))
+        } else {
+          shiny::div(class = "qc-muted", "Map unavailable: install 'leaflet' to enable this section.")
+        },
+        shiny::hr(),
+        shiny::h4("Records by date (Events)"),
+        shiny::div(
+          style = "width: 100%; overflow: visible; box-sizing: border-box;",
+          shiny::plotOutput(
+            ns("overview_date_plot"), 
+            height = "380px",
+            width = "100%"
+          )
+        ),
+        shiny::hr(),
+        shiny::h4("Taxonomic coverage of the dataset"),
+        shiny::fluidRow(
+          # Full width: The Resulting Sunburst Chart
+          shiny::column(12, 
+            if (has_plotly) {
+              plotly::plotlyOutput(ns("overview_tax_plot"), height = "500px")
+            } else {
+              shiny::div(class = "qc-muted", "Sunburst chart unavailable: install 'plotly' to enable this visualization.")
+            }
+          )
+        )
+      ),
+
+      bslib::nav_panel(
+        "Issues found",
+        value = "issues_found",
+        shiny::h4("Overview of all issues"),
+        shiny::div(class = "qc-dt", DT::DTOutput(ns("issues_summary_tbl"))),
+        shiny::hr(),
+        shiny::h4("Details"),
+        shiny::div(class = "qc-dt", DT::DTOutput(ns("issues_detailed_tbl"))),
+        shiny::hr(),
+        shiny::h4("eMoF issues"),
+        shiny::div(class = "qc-dt", DT::DTOutput(ns("emof_issues_tbl")))
+      )
+    )
   )
 }
 
@@ -1160,45 +1101,18 @@ run_qc_dwca <- function(event, occurrence, emof = NULL, pre_issues = NULL) {
 
 #' QC page server
 #'
-#' @param id Module id
-#' @param event_in Reactive returning event table
-#' @param occ_in Reactive returning occurrence table
-#' @param emof_in Reactive returning emof table (may be NULL or empty)
-#' @param pre_issues_in Reactive returning pre-split issues (optional)
-#' @return list with qc_res reactive and can_export reactive
+#' @param id Module ID.
+#' @param event_in Reactive returning event table.
+#' @param occ_in Reactive returning occurrence table.
+#' @param emof_in Reactive returning eMoF table, may be NULL.
+#' @param pre_issues_in Reactive returning pre-existing issues, may be NULL.
+#'
+#' @return A list with `qc_res` and `can_export` reactives.
 #' @export
-mod_qc_server <- function(id, event_in, occ_in,
-                          emof_in = NULL, pre_issues_in = NULL) {
-
+mod_qc_server <- function(id, event_in, occ_in, emof_in = NULL, pre_issues_in = NULL) {
   shiny::moduleServer(id, function(input, output, session) {
-
-    session$onFlushed(function() {
-      shiny::outputOptions(output, "debug_cols", suspendWhenHidden = FALSE)
-      shiny::outputOptions(output, "debug_overview_event_occ", suspendWhenHidden = FALSE)
-      shiny::outputOptions(output, "debug_overview_map", suspendWhenHidden = FALSE)
-
-      shiny::outputOptions(output, "overview_event_occ_tbl", suspendWhenHidden = FALSE)
-      shiny::outputOptions(output, "overview_emof_types_tbl", suspendWhenHidden = FALSE)
-
-      shiny::outputOptions(output, "overview_map", suspendWhenHidden = FALSE)
-      shiny::outputOptions(output, "issues_map", suspendWhenHidden = FALSE)
-
-      shiny::outputOptions(output, "export_status_ui", suspendWhenHidden = FALSE)
-      shiny::outputOptions(output, "kpi_errors", suspendWhenHidden = FALSE)
-      shiny::outputOptions(output, "kpi_warnings", suspendWhenHidden = FALSE)
-      shiny::outputOptions(output, "kpi_n_occ", suspendWhenHidden = FALSE)
-
-      shiny::outputOptions(output, "overview_tax_plot", suspendWhenHidden = TRUE)
-    }, once = TRUE)
-
-    map_ready <- shiny::reactiveVal(FALSE)
-    last_coords <- shiny::reactiveVal(NULL)
-    last_coords_src <- shiny::reactiveVal(NULL)
-    last_issues <- shiny::reactiveVal(NULL)
-
-    shiny::observe({
-      cat("\nmap_ready:", map_ready(), " tab:", input$qc_tabs, "\n")
-    })
+    has_leaflet <- requireNamespace("leaflet", quietly = TRUE)
+    has_plotly <- requireNamespace("plotly", quietly = TRUE)
 
     qc_res <- shiny::reactive({
       ev <- event_in()
@@ -1207,116 +1121,12 @@ mod_qc_server <- function(id, event_in, occ_in,
       pi <- if (!is.null(pre_issues_in)) pre_issues_in() else NULL
 
       shiny::req(is.data.frame(ev), is.data.frame(oc))
-
-      tryCatch(
-        run_qc_dwca(ev, oc, em, pi),
-        error = function(e) {
-          issues <- .qc_issue(
-            table = "qc",
-            row_id = "*",
-            field = "run_qc_dwca",
-            rule = "qc_internal_error",
-            message = conditionMessage(e),
-            severity = "ERROR"
-          )
-          list(
-            overview = list(
-              event_occ = data.frame(),
-              emof_types = data.frame(),
-              coords_source = NA_character_,
-              coords_bounds = NULL
-            ),
-            issues_summary = .qc_make_summary(issues),
-            issues_detailed = issues,
-            invalid = list(
-              event = data.frame(),
-              occurrence = data.frame(),
-              emof = data.frame()
-            ),
-            map_issues = data.frame(),
-            hierarchy = list(issues = data.frame(), edges = data.frame()),
-            phase2_tables = list(),
-            counts = list(errors = 1L, warnings = 0L),
-            can_export = FALSE
-          )
-        }
-      )
+      run_qc_dwca(ev, oc, em, pi)
     })
 
     can_export <- shiny::reactive({
       isTRUE(qc_res()$can_export)
     })
-
-    output$debug_cols <- shiny::renderPrint({
-      safe_call <- function(fn) {
-        tryCatch(
-          {
-            x <- fn()
-            list(
-              ok = TRUE,
-              class = class(x),
-              is_df = is.data.frame(x),
-              dim = if (is.data.frame(x)) dim(x) else NULL,
-              cols = if (is.data.frame(x)) names(x) else NULL
-            )
-          },
-          error = function(e) {
-            list(ok = FALSE, error = conditionMessage(e))
-          }
-        )
-      }
-
-      list(
-        qc_tabs_value = input$qc_tabs %||% "(NULL)",
-        event_in = safe_call(event_in),
-        occ_in  = safe_call(occ_in),
-        emof_in = if (!is.null(emof_in)) safe_call(emof_in) else list(ok = TRUE, class = "NULL (param)")
-      )
-    })
-
-    output$debug_overview_event_occ <- shiny::renderPrint({
-      x <- qc_res()$overview$event_occ
-      list(
-        is_df = is.data.frame(x),
-        dim = if (is.data.frame(x)) dim(x) else NULL,
-        cols = if (is.data.frame(x)) names(x) else NULL,
-        head = if (is.data.frame(x)) utils::head(x, 5) else NULL
-      )
-    })
-
-    output$debug_overview_map <- shiny::renderPrint({
-      ev <- tryCatch(event_in(), error = function(e) NULL)
-      oc <- tryCatch(occ_in(), error = function(e) NULL)
-      mi <- tryCatch(qc_res()$map_issues, error = function(e) NULL)
-
-      has_ev_coords <- is.data.frame(ev) && all(c("decimalLatitude","decimalLongitude") %in% names(ev))
-      has_oc_coords <- is.data.frame(oc) && all(c("decimalLatitude","decimalLongitude") %in% names(oc))
-
-      list(
-        leaflet_installed = requireNamespace("leaflet", quietly = TRUE),
-        event_dim = if (is.data.frame(ev)) dim(ev) else NULL,
-        occ_dim = if (is.data.frame(oc)) dim(oc) else NULL,
-        has_event_coords = has_ev_coords,
-        has_occ_coords = has_oc_coords,
-        map_issues_dim = if (is.data.frame(mi)) dim(mi) else NULL,
-        map_issues_head = if (is.data.frame(mi)) utils::head(mi, 3) else NULL
-      )
-    })
-
-    shiny::observeEvent(input$qc_tabs, {
-      ev <- tryCatch(event_in(), error = function(e) NULL)
-      oc <- tryCatch(occ_in(), error = function(e) NULL)
-      em <- tryCatch(if (!is.null(emof_in)) emof_in() else data.frame(), error = function(e) NULL)
-
-      cat(
-        "\n--- DEBUG QC ---",
-        "\nQC tab active?:", input$qc_tabs,
-        "\nev:", if (is.data.frame(ev)) paste(dim(ev), collapse = " x ") else class(ev)[1] %||% "NULL",
-        "\noc:", if (is.data.frame(oc)) paste(dim(oc), collapse = " x ") else class(oc)[1] %||% "NULL",
-        "\nemof:", if (is.data.frame(em)) paste(dim(em), collapse = " x ") else class(em)[1] %||% "NULL",
-        "\n"
-      )
-    }, ignoreInit = FALSE)
 
     output$kpi_errors <- shiny::renderText({ qc_res()$counts$errors })
     output$kpi_warnings <- shiny::renderText({ qc_res()$counts$warnings })
@@ -1329,14 +1139,16 @@ mod_qc_server <- function(id, event_in, occ_in,
     output$export_status_ui <- shiny::renderUI({
       ok <- isTRUE(can_export())
       if (ok) {
-        shiny::tags$div(class = "qc-kpi qc-ok", "OK (export permitido)")
+        shiny::tags$div(class = "qc-kpi qc-ok", "OK (export allowed)")
       } else {
-        shiny::tags$div(class = "qc-kpi qc-err", "BLOCKED (há ERROR)")
+        shiny::tags$div(class = "qc-kpi qc-err", "ERROR found")
       }
     })
 
     output$overview_event_occ_tbl <- DT::renderDT({
       x <- qc_res()$overview$event_occ
+      
+      # Ensure empty df has correct structure for columns
       if (!is.data.frame(x) || nrow(x) == 0) {
         x <- data.frame(
           event_type = character(),
@@ -1347,25 +1159,21 @@ mod_qc_server <- function(id, event_in, occ_in,
           stringsAsFactors = FALSE
         )
       }
-
-      DT::datatable(
-        x,
-        rownames = FALSE,
-        options = list(
-          dom = "t",
-          paging = FALSE,
-          searching = FALSE,
-          info = FALSE,
-          ordering = FALSE,
-          autoWidth = TRUE
-        ),
-        width = "auto"
+      
+      # Define mapped column names
+      cols <- c(
+        "Event type" = "event_type",
+        "Number of events" = "n_events",
+        "basisOfRecord" = "basisOfRecord",
+        "Number of presences" = "n_present",
+        "Missing data" = "n_NA"
       )
+
+      .qc_dt(x, colnames = cols, report = TRUE)
     })
 
     output$overview_emof_types_tbl <- DT::renderDT({
       x <- qc_res()$overview$emof_types
-
       if (!is.data.frame(x) || nrow(x) == 0) {
         x <- data.frame(
           IDlink = character(),
@@ -1377,624 +1185,256 @@ mod_qc_server <- function(id, event_in, occ_in,
           stringsAsFactors = FALSE
         )
       }
+      .qc_dt(x, report = TRUE)
+    })
 
-      if ("count" %in% names(x)) {
-        x <- x[order(x$count, decreasing = TRUE), , drop = FALSE]
+    output$overview_map_info <- shiny::renderUI({
+      rec <- qc_res()$overview$map_records
+      if (!is.data.frame(rec) || nrow(rec) == 0) {
+        return(shiny::div(class = "qc-muted", "No valid coordinates found in event or occurrence tables."))
       }
-
-      DT::datatable(
-        x,
-        rownames = FALSE,
-        options = list(
-          dom = "t",
-          paging = FALSE,
-          searching = FALSE,
-          info = FALSE,
-          ordering = FALSE,
-          autoWidth = TRUE
-        ),
-        width = "auto"
-      )
+      src_tab <- sort(table(rec$source), decreasing = TRUE)
+      txt <- paste0(names(src_tab), ": ", as.integer(src_tab), collapse = " | ")
+      shiny::div(class = "qc-muted", paste0("Mapped points: ", nrow(rec), " (", txt, ")"))
     })
 
-    # TODO:
-    # Enrich overview_emof_types with NVS metadata
-    # - Use measurementTypeID (if available)
-    # - Lookup NERC Vocabulary Server
-    # - Add columns:
-    #   * TypeID_standardUnit
-    #   * TypeID_name
-    #   * TypeID_definition
-    # Must implement with:
-    # - Unique URI lookup
-    # - Cache
-    # - Timeout protection
+    if (has_leaflet) {
+      output$overview_map <- leaflet::renderLeaflet({
+        rec <- qc_res()$overview$map_records
+        m <- leaflet::leaflet() |>
+          # Updated base layers
+          leaflet::addProviderTiles("OpenStreetMap", group = "OSM") |>
+          leaflet::addProviderTiles("Esri.OceanBasemap", group = "Esri Ocean") |>
+          leaflet::addProviderTiles("Esri.WorldImagery", group = "Hybrid") |>
+          leaflet::addProviderTiles("CartoDB.PositronOnlyLabels", group = "Hybrid") |>
+          leaflet::addLayersControl(
+            baseGroups = c("OSM", "Esri Ocean", "Hybrid"),
+            overlayGroups = c("Occurrence records", "Event records", "Issues"),
+            options = leaflet::layersControlOptions(collapsed = FALSE)
+          ) |>
+          leaflet::setView(lng = 0, lat = 0, zoom = 2)
 
-    # ---------------------------------------------------------
-    # Overview map: sempre aparece (mapa base) desde o início
-    # ---------------------------------------------------------
-    output$overview_map <- leaflet::renderLeaflet({
-      if (!requireNamespace("leaflet", quietly = TRUE)) return(NULL)
+        if (is.data.frame(rec) && nrow(rec) > 0) {
+          rec_occ <- rec[rec$source == "occurrence", , drop = FALSE]
+          rec_ev <- rec[rec$source == "event", , drop = FALSE]
 
-      map_ready(TRUE)
-
-      m <- leaflet::leaflet() |>
-        leaflet::addProviderTiles("OpenStreetMap", group = "OSM") |>
-        leaflet::addTiles(
-          urlTemplate = "https://tiles.openseamap.org/seamark/{z}/{x}/{y}.png",
-          group = "OpenSeaMap",
-          options = leaflet::tileOptions(opacity = 0.9)
-        ) |>
-        leaflet::addLayersControl(
-          baseGroups = c("OSM"),
-          overlayGroups = c("OpenSeaMap", "Records", "Issues"),
-          options = leaflet::layersControlOptions(collapsed = FALSE)
-        ) |>
-        leaflet::setView(lng = 0, lat = 0, zoom = 2)
-
-      htmlwidgets::onRender(
-        m,
-        "
-        function(el, x) {
-          var map = this;
-
-          setTimeout(function(){ map.invalidateSize(); }, 0);
-          setTimeout(function(){ map.invalidateSize(); }, 250);
-          setTimeout(function(){ map.invalidateSize(); }, 1000);
-
-          if (window.ResizeObserver) {
-            var ro = new ResizeObserver(function(){
-              map.invalidateSize();
-            });
-            ro.observe(el);
-          }
-        }
-        "
-      )
-    })
-
-    shiny::observeEvent(
-      list(map_ready(), qc_res(), input$qc_tabs),
-      {
-        cat("\n==============================\n")
-        cat("[OBS] DISPAROU\n")
-        cat("[OBS] map_ready=", map_ready(), "\n")
-        cat("[OBS] qc_tabs=", if (is.null(input$qc_tabs)) "NULL" else paste0("'", input$qc_tabs, "'"), "\n")
-
-        if (!requireNamespace("leaflet", quietly = TRUE)) {
-          cat("[OBS] RETURN: leaflet NAO instalado\n")
-          return(NULL)
-        }
-
-        if (!isTRUE(map_ready())) {
-          cat("[OBS] RETURN: map_ready ainda FALSE\n")
-          return(NULL)
-        }
-
-        # ### FIX ZOOM ###
-        # Tratar NULL como "data_overview" para permitir zoom no arranque
-        tab_ok <- isTRUE(is.null(input$qc_tabs) || identical(input$qc_tabs, "data_overview"))
-        cat("[OBS] tab_ok=", tab_ok, "\n")
-
-        cat("[OBS] OK: vai tentar ler dados (mesmo se qc_tabs for NULL)\n")
-
-        ev <- tryCatch(event_in(), error = function(e) {
-          cat("[OBS] ERRO event_in():", conditionMessage(e), "\n")
-          NULL
-        })
-        oc <- tryCatch(occ_in(), error = function(e) {
-          cat("[OBS] ERRO occ_in():", conditionMessage(e), "\n")
-          NULL
-        })
-        mi <- tryCatch(qc_res()$map_issues, error = function(e) {
-          cat("[OBS] ERRO qc_res()$map_issues:", conditionMessage(e), "\n")
-          data.frame()
-        })
-
-        cat("[OBS] ev:", if (is.data.frame(ev)) paste(dim(ev), collapse="x") else "NOT_DF", "\n")
-        cat("[OBS] oc:", if (is.data.frame(oc)) paste(dim(oc), collapse="x") else "NOT_DF", "\n")
-        cat("[OBS] mi:", if (is.data.frame(mi)) paste(dim(mi), collapse="x") else "NOT_DF", "\n")
-
-        if (is.data.frame(ev)) cat("[OBS] ev_cols:", paste(names(ev), collapse=", "), "\n")
-        if (is.data.frame(oc)) cat("[OBS] oc_cols:", paste(names(oc), collapse=", "), "\n")
-
-        get_coords <- function(df, id_field, label) {
-          if (!is.data.frame(df) || nrow(df) == 0) {
-            cat("[OBS] get_coords(", label, "): DF vazio/NA\n", sep = "")
-            return(NULL)
-          }
-          if (!all(c("decimalLatitude", "decimalLongitude") %in% names(df))) {
-            cat("[OBS] get_coords(", label, "): sem colunas decimalLatitude/decimalLongitude\n", sep = "")
-            return(NULL)
-          }
-          if (!id_field %in% names(df)) {
-            cat("[OBS] get_coords(", label, "): sem id_field=", id_field, "\n", sep = "")
-            return(NULL)
-          }
-
-          lat <- suppressWarnings(as.numeric(df$decimalLatitude))
-          lon <- suppressWarnings(as.numeric(df$decimalLongitude))
-          ok <- is.finite(lat) & is.finite(lon)
-
-          cat("[OBS] get_coords(", label, "): n=", nrow(df),
-              " ok=", sum(ok, na.rm=TRUE),
-              " lat_na=", sum(!is.finite(lat)),
-              " lon_na=", sum(!is.finite(lon)),
-              "\n", sep = "")
-
-          if (!any(ok)) return(NULL)
-
-          data.frame(
-            id = as.character(df[[id_field]][ok]),
-            decimalLatitude = lat[ok],
-            decimalLongitude = lon[ok],
-            stringsAsFactors = FALSE
-          )
-        }
-
-        coords <- get_coords(oc, "occurrenceID", "occurrence")
-        coords_src <- "occurrence"
-
-        if (is.null(coords)) {
-          coords <- get_coords(ev, "eventID", "event")
-          coords_src <- "event"
-        }
-
-        cat("[OBS] coords_src=", coords_src,
-            " coords_n=", if (is.null(coords)) "NULL" else nrow(coords),
-            "\n", sep = "")
-
-        last_coords(coords)
-        last_coords_src(coords_src)
-        last_issues(mi)
-        cat("[OBS] cache: coords=", if (is.null(coords)) "NULL" else nrow(coords),
-            " issues=", if (is.data.frame(mi)) nrow(mi) else "NA", "\n")
-
-        cat("[OBS] leafletProxy: limpar grupos\n")
-        proxy <- leaflet::leafletProxy("overview_map", session) |>
-          leaflet::clearGroup("Records") |>
-          leaflet::clearGroup("Issues")
-
-        if (is.data.frame(coords) && nrow(coords) > 0) {
-          cat("[OBS] addCircleMarkers Records: n=", nrow(coords), "\n", sep="")
-
-          if (nrow(coords) > 5000) {
-            coords <- coords[sample.int(nrow(coords), 5000), , drop = FALSE]
-            cat("[OBS] Records: downsample para ", nrow(coords), "\n", sep="")
-          }
-
-          proxy <- proxy |>
-            leaflet::addCircleMarkers(
-              lng = coords$decimalLongitude,
-              lat = coords$decimalLatitude,
-              radius = 4,
-              stroke = FALSE,
-              fillOpacity = 0.7,
-              group = "Records",
-              popup = paste0(
-                "<b>source:</b> ", coords_src, "<br/>",
-                "<b>id:</b> ", coords$id
+          if (nrow(rec_occ) > 0) {
+            m <- m |>
+              leaflet::addCircleMarkers(
+                lng = rec_occ$decimalLongitude,
+                lat = rec_occ$decimalLatitude,
+                radius = 4,
+                stroke = FALSE,
+                fillOpacity = 0.7,
+                color = "#2563eb",
+                group = "Occurrence records",
+                popup = paste0("<b>source:</b> occurrence<br><b>id:</b> ", rec_occ$id)
               )
-            )
-
-          # ### FIX ZOOM ###
-          # fitBounds dá zoom para enquadrar todos os pontos
-          if (isTRUE(tab_ok)) {
-            proxy <- proxy |>
-              leaflet::fitBounds(
-                lng1 = min(coords$decimalLongitude, na.rm = TRUE),
-                lat1 = min(coords$decimalLatitude,  na.rm = TRUE),
-                lng2 = max(coords$decimalLongitude, na.rm = TRUE),
-                lat2 = max(coords$decimalLatitude,  na.rm = TRUE)
-              )
-            cat("[OBS] zoom aplicado (tab_ok=TRUE)\n")
-          } else {
-            cat("[OBS] SKIP zoom (tab_ok=FALSE)\n")
           }
 
-        } else {
-          cat("[OBS] SKIP Records: coords NULL/0\n")
+          if (nrow(rec_ev) > 0) {
+            m <- m |>
+              leaflet::addCircleMarkers(
+                lng = rec_ev$decimalLongitude,
+                lat = rec_ev$decimalLatitude,
+                radius = 4,
+                stroke = FALSE,
+                fillOpacity = 0.6,
+                color = "#059669",
+                group = "Event records",
+                popup = paste0("<b>source:</b> event<br><b>id:</b> ", rec_ev$id)
+              )
+          }
+
+          b <- qc_res()$overview$coords_bounds
+          if (!is.null(b)) {
+            m <- m |> leaflet::fitBounds(b$lng1, b$lat1, b$lng2, b$lat2)
+          }
         }
 
-        if (is.data.frame(mi) && nrow(mi) > 0 &&
-            all(c("decimalLongitude","decimalLatitude") %in% names(mi))) {
-          cat("[OBS] addCircleMarkers Issues: n=", nrow(mi), "\n", sep="")
-
-          proxy <- proxy |>
+        mi <- qc_res()$map_issues
+        if (is.data.frame(mi) && nrow(mi) > 0) {
+          m <- m |>
             leaflet::addCircleMarkers(
               lng = mi$decimalLongitude,
               lat = mi$decimalLatitude,
               radius = 5,
               stroke = FALSE,
               fillOpacity = 0.8,
+              color = "#b91c1c",
               group = "Issues",
               popup = paste0(
-                "<b>id:</b> ", mi$id, "<br/>",
-                "<b>table:</b> ", mi$table, "<br/>",
-                "<b>severity:</b> ", mi$severity, "<br/>",
-                "<b>issue:</b> ", mi$issue
+                "<b>id:</b> ", mi$id,
+                "<br><b>table:</b> ", mi$table,
+                "<br><b>severity:</b> ", mi$severity,
+                "<br><b>issue:</b> ", mi$issue
               )
             )
-        } else {
-          cat("[OBS] SKIP Issues: mi vazio/sem colunas coords\n")
         }
 
-        cat("[OBS] FIM\n")
-      },
-      ignoreInit = FALSE
-    )
+        m
+      })
 
-    shiny::observeEvent(
-      input$qc_tabs,
-      {
-        if (!requireNamespace("leaflet", quietly = TRUE)) return(NULL)
+      output$issues_map <- leaflet::renderLeaflet({
+        mi <- qc_res()$map_issues
+        m <- leaflet::leaflet() |>
+          # Updated base layers
+          leaflet::addProviderTiles("OpenStreetMap", group = "OSM") |>
+          leaflet::addProviderTiles("Esri.OceanBasemap", group = "Esri Ocean") |>
+          leaflet::addProviderTiles("Esri.WorldImagery", group = "Hybrid") |>
+          leaflet::addProviderTiles("CartoDB.PositronOnlyLabels", group = "Hybrid") |>
+          leaflet::addLayersControl(
+            baseGroups = c("OSM", "Esri Ocean", "Hybrid"),
+            options = leaflet::layersControlOptions(collapsed = FALSE)
+          )
 
-        # ### FIX ZOOM ###
-        tab_ok <- isTRUE(is.null(input$qc_tabs) || identical(input$qc_tabs, "data_overview"))
-        cat("[TAB] qc_tabs=", if (is.null(input$qc_tabs)) "NULL" else input$qc_tabs,
-            " tab_ok=", tab_ok, "\n")
+        if (!is.data.frame(mi) || nrow(mi) == 0) return(m)
 
-        if (!tab_ok) return(NULL)
-        if (!isTRUE(map_ready())) {
-          cat("[TAB] map_ready ainda FALSE\n")
+        m |>
+          leaflet::addCircleMarkers(
+            lng = mi$decimalLongitude,
+            lat = mi$decimalLatitude,
+            radius = 5,
+            stroke = FALSE,
+            fillOpacity = 0.75,
+            popup = paste0(
+              "<b>id:</b> ", mi$id,
+              "<br><b>table:</b> ", mi$table,
+              "<br><b>source:</b> ", mi$source,
+              "<br><b>severity:</b> ", mi$severity,
+              "<br><b>issue:</b> ", mi$issue
+            )
+          )
+      })
+    }
+
+    output$overview_date_plot <- shiny::renderPlot(
+      expr = {
+        ev <- event_in()
+        if (!is.data.frame(ev) || nrow(ev) == 0 || !"eventDate" %in% names(ev)) {
           return(NULL)
         }
-
-        coords <- last_coords()
-        coords_src <- last_coords_src()
-        mi <- last_issues()
-
-        cat("[TAB] reapply: coords=", if (is.null(coords)) "NULL" else nrow(coords),
-            " src=", coords_src,
-            " issues=", if (is.data.frame(mi)) nrow(mi) else "NA", "\n")
-
-        proxy <- leaflet::leafletProxy("overview_map", session) |>
-          leaflet::clearGroup("Records") |>
-          leaflet::clearGroup("Issues")
-        # (sem leaflet::invalidateSize() porque não existe no R)
-
-        if (is.data.frame(coords) && nrow(coords) > 0) {
-          proxy <- proxy |>
-            leaflet::addCircleMarkers(
-              lng = coords$decimalLongitude,
-              lat = coords$decimalLatitude,
-              radius = 4,
-              stroke = FALSE,
-              fillOpacity = 0.7,
-              group = "Records",
-              popup = paste0("<b>source:</b> ", coords_src, "<br/>",
-                            "<b>id:</b> ", coords$id)
-            ) |>
-            leaflet::fitBounds(
-              lng1 = min(coords$decimalLongitude, na.rm = TRUE),
-              lat1 = min(coords$decimalLatitude,  na.rm = TRUE),
-              lng2 = max(coords$decimalLongitude, na.rm = TRUE),
-              lat2 = max(coords$decimalLatitude,  na.rm = TRUE)
-            )
-
-          cat("[TAB] desenhou Records e aplicou zoom\n")
-        } else {
-          cat("[TAB] sem coords para desenhar\n")
-        }
-
-        if (is.data.frame(mi) && nrow(mi) > 0 &&
-            all(c("decimalLongitude","decimalLatitude") %in% names(mi))) {
-          proxy <- proxy |>
-            leaflet::addCircleMarkers(
-              lng = mi$decimalLongitude,
-              lat = mi$decimalLatitude,
-              radius = 5,
-              stroke = FALSE,
-              fillOpacity = 0.8,
-              group = "Issues"
-            )
-          cat("[TAB] desenhou Issues\n")
-        }
+        
+        dates <- .qc_extract_date_values(ev$eventDate)
+        dates <- dates[!is.na(dates)]
+        if (length(dates) == 0) return(NULL)
+        
+        # Parse ISO 8601 dates (YYYY-MM-DD format)
+        df_dates <- data.frame(
+          date_str = dates,
+          stringsAsFactors = FALSE
+        )
+        df_dates$date_parsed <- suppressWarnings(as.Date(df_dates$date_str, format = "%Y-%m-%d"))
+        df_dates <- df_dates[!is.na(df_dates$date_parsed), ]
+        
+        if (nrow(df_dates) == 0) return(NULL)
+        
+        # Aggregate counts by date
+        date_counts <- sort(table(df_dates$date_parsed), decreasing = FALSE)
+        plot_data <- data.frame(
+          date = as.Date(names(date_counts)),
+          count = as.numeric(date_counts),
+          stringsAsFactors = FALSE
+        )
+        
+        ggplot2::ggplot(plot_data, ggplot2::aes(x = date, y = count)) +
+          ggplot2::geom_col(fill = "#5985a7", color = "white", width = 0.8) +
+          ggplot2::scale_x_date(
+            date_labels = "%Y-%m-%d",
+            breaks = scales::pretty_breaks(n = 6),
+            expand = ggplot2::expansion(mult = c(0.05, 0.05))
+          ) +
+          ggplot2::scale_y_continuous(
+            breaks = scales::pretty_breaks(n = 5),
+            labels = scales::label_number(big.mark = ","),
+            expand = ggplot2::expansion(mult = c(0, 0.1))
+          ) +
+          ggplot2::labs(
+            title = NULL,
+            x = "Event Date",
+            y = "Count of Events"
+          ) +
+          ggplot2::theme_minimal(base_size = 11) +
+          ggplot2::theme(
+            plot.margin = ggplot2::margin(t = 10, r = 15, b = 20, l = 15),
+            panel.grid.minor = ggplot2::element_blank(),
+            panel.grid.major.x = ggplot2::element_blank(),
+            panel.grid.major.y = ggplot2::element_line(color = "#e5e7eb", size = 0.3),
+            axis.text.x = ggplot2::element_text(angle = 45, hjust = 1, vjust = 1, size = 11, color = "black"),
+            axis.text.y = ggplot2::element_text(size = 11, color = "black"),
+            axis.title = ggplot2::element_text(size = 12, face = "bold")
+          )
       },
-      ignoreInit = FALSE
+      height = 380,
+      width = 1200,
+      res = 96,
+      bg = "white"
     )
 
-    output$kingdom_ui <- shiny::renderUI({
-      oc <- occ_in()
-      if (!is.data.frame(oc) || nrow(oc) == 0) return(NULL)
-      if (!("kingdom" %in% names(oc))) {
-        return(shiny::tags$div(class = "qc-muted", "Campo 'kingdom' não disponível."))
-      }
-      choices <- sort(unique(stats::na.omit(as.character(oc$kingdom))))
-      if (length(choices) == 0) return(NULL)
-      shiny::selectInput(
-        session$ns("kingdom_sel"),
-        "Select kingdom",
-        choices = choices,
-        selected = choices[1]
+    output$overview_tax_plot <- if (has_plotly) {
+  plotly::renderPlotly({
+    oc <- occ_in()
+    shiny::req(is.data.frame(oc), nrow(oc) > 0)
+    
+    hierarchy_data <- .qc_build_nested_taxonomy(oc)
+    shiny::req(!is.null(hierarchy_data), nrow(hierarchy_data) > 0)
+    
+    plotly::plot_ly(
+      data = hierarchy_data,
+      ids = ~ids,           # Use the unique ID path
+      labels = ~labels,
+      parents = ~parents,
+      values = ~values,
+      type = "sunburst",
+      branchvalues = "total", # Parent value is sum of children
+      marker = list(colorscale = "Viridis"),
+      textinfo = "label+value",
+      hovertemplate = "<b>%{label}</b><br>Count: %{value}<extra></extra>"
+    ) |>
+      plotly::layout(
+        margin = list(l = 0, r = 0, t = 40, b = 0)
       )
-    })
-
-    output$overview_tax_plot <- shiny::renderPlot({
-      oc <- occ_in()
-      if (!is.data.frame(oc) || nrow(oc) == 0) return(invisible(NULL))
-      if (!("kingdom" %in% names(oc))) return(invisible(NULL))
-      if (!("class" %in% names(oc))) return(invisible(NULL))
-
-      k <- input$kingdom_sel %||% NA_character_
-      sel <- as.character(oc$kingdom) == k
-      x <- as.character(oc$class[sel])
-      x[.qc_is_blank(x)] <- NA_character_
-      x <- stats::na.omit(x)
-      if (length(x) == 0) return(invisible(NULL))
-
-      tab <- sort(table(x), decreasing = TRUE)
-      tab <- head(tab, 15)
-
-      oldpar <- graphics::par(no.readonly = TRUE)
-      on.exit(graphics::par(oldpar), add = TRUE)
-      graphics::par(mar = c(4, 8, 1.5, 1))
-      graphics::barplot(tab, horiz = TRUE, las = 1, main = "")
-    })
+  })
+}
 
     output$issues_summary_tbl <- DT::renderDT({
-      x <- qc_res()$issues_summary
-      if (!is.data.frame(x)) x <- data.frame()
-
-      DT::datatable(
-        x,
-        rownames = FALSE,
-        width = "100%",
-        options = list(
-          scrollX = TRUE,
-          autoWidth = FALSE,
-          pageLength = 15,
-          destroy = TRUE
-        ),
-        callback = DT::JS("
-          var t = table;
-          setTimeout(function(){ t.columns.adjust().draw(false); }, 50);
-          setTimeout(function(){ t.columns.adjust().draw(false); }, 250);
-        ")
-      )
+      .qc_dt(qc_res()$issues_summary, page_length = 15)
     })
 
     output$issues_detailed_tbl <- DT::renderDT({
-      x <- qc_res()$issues_detailed
-      if (!is.data.frame(x)) x <- data.frame()
-
-      DT::datatable(
-        x,
-        rownames = FALSE,
-        width = "100%",
-        options = list(
-          scrollX = TRUE,
-          autoWidth = FALSE,
-          pageLength = 20,
-          destroy = TRUE
-        ),
-        callback = DT::JS("
-          var t = table;
-          setTimeout(function(){ t.columns.adjust().draw(false); }, 50);
-          setTimeout(function(){ t.columns.adjust().draw(false); }, 250);
-        ")
-      )
-    })
-
-    output$tax_issues_tbl <- DT::renderDT({
-      tabs <- qc_res()$phase2_tables
-      unmatched <- tabs$unmatched %||% data.frame()
-      broken <- tabs$broken %||% data.frame()
-
-      out <- data.frame()
-      if (is.data.frame(unmatched) && nrow(unmatched) > 0) {
-        unmatched$type <- "unmatched_taxa"
-        out <- rbind(out, unmatched)
-      }
-      if (is.data.frame(broken) && nrow(broken) > 0) {
-        broken$type <- "broken_one_to_one"
-        out <- rbind(out, broken)
-      }
-
-      DT::datatable(
-        out,
-        rownames = FALSE,
-        width = "100%",
-        options = list(
-          scrollX = TRUE,
-          autoWidth = FALSE,
-          pageLength = 10,
-          destroy = TRUE
-        ),
-        callback = DT::JS("
-          var t = table;
-          setTimeout(function(){ t.columns.adjust().draw(false); }, 50);
-          setTimeout(function(){ t.columns.adjust().draw(false); }, 250);
-        ")
-      )
+      .qc_dt(qc_res()$issues_detailed, page_length = 20)
     })
 
     output$emof_issues_tbl <- DT::renderDT({
       x <- qc_res()$issues_detailed
-      if (!is.data.frame(x)) x <- data.frame()
       x <- x[x$table == "emof", , drop = FALSE]
-
-      DT::datatable(
-        x,
-        rownames = FALSE,
-        width = "100%",
-        options = list(
-          scrollX = TRUE,
-          autoWidth = FALSE,
-          pageLength = 15,
-          destroy = TRUE
-        ),
-        callback = DT::JS("
-          var t = table;
-          setTimeout(function(){ t.columns.adjust().draw(false); }, 50);
-          setTimeout(function(){ t.columns.adjust().draw(false); }, 250);
-        ")
-      )
+      .qc_dt(x, page_length = 15)
     })
 
-    output$issues_map <- leaflet::renderLeaflet({
-      if (!requireNamespace("leaflet", quietly = TRUE)) return(NULL)
-
-      mi <- qc_res()$map_issues
-      leaf <- leaflet::leaflet() |>
-        leaflet::addProviderTiles("OpenStreetMap") |>
-        leaflet::addProviderTiles("OpenSeaMap", group = "OpenSeaMap") |>
-        leaflet::addLayersControl(
-          baseGroups = c("OpenStreetMap"),
-          overlayGroups = c("OpenSeaMap"),
-          options = leaflet::layersControlOptions(collapsed = FALSE)
-        )
-
-      if (!is.data.frame(mi) || nrow(mi) == 0) return(leaf)
-
-      leaf |>
-        leaflet::addCircleMarkers(
-          lng = mi$decimalLongitude,
-          lat = mi$decimalLatitude,
-          radius = 5,
-          stroke = FALSE,
-          fillOpacity = 0.75,
-          popup = paste0(
-            "<b>decimalLatitude:</b> ", mi$decimalLatitude, "<br/>",
-            "<b>decimalLongitude:</b> ", mi$decimalLongitude, "<br/>",
-            "<b>id:</b> ", mi$id, "<br/>",
-            "<b>table:</b> ", mi$table, "<br/>",
-            "<b>severity:</b> ", mi$severity, "<br/>",
-            "<b>issue:</b> ", mi$issue
-          )
-        )
-    })
-
-    # ---------------------------------------------------------
-    # Invalid tables
-    # ---------------------------------------------------------
     output$invalid_event_tbl <- DT::renderDT({
-      x <- qc_res()$invalid$event
-      if (!is.data.frame(x)) x <- data.frame()
-      DT::datatable(x, rownames = FALSE, options = list(scrollX = TRUE, pageLength = 10))
+      .qc_dt(qc_res()$invalid$event, page_length = 10)
     })
 
     output$invalid_occ_tbl <- DT::renderDT({
-      x <- qc_res()$invalid$occurrence
-      if (!is.data.frame(x)) x <- data.frame()
-      DT::datatable(x, rownames = FALSE, options = list(scrollX = TRUE, pageLength = 10))
+      .qc_dt(qc_res()$invalid$occurrence, page_length = 10)
     })
-
-    # output$invalid_emof_tbl <- DT::renderDT({
-    #   x <- qc_res()$invalid$emof
-    #   if (!is.data.frame(x)) x <- data.frame()
-    #   DT::datatable(x, rownames = FALSE, options = list(scrollX = TRUE, pageLength = 10))
-    # })
 
     output$invalid_emof_tbl <- DT::renderDT({
-      x <- qc_res()$invalid$emof
-
-      if (!is.data.frame(x)) {
-        x <- data.frame()
-      }
-
-      if (nrow(x) == 0) {
-        x <- data.frame(
-          details = character(),
-          stringsAsFactors = FALSE
-        )
-      } else {
-        x$details <- rep("", nrow(x))
-        x <- x[, c("details", setdiff(names(x), "details")), drop = FALSE]
-      }
-
-      DT::datatable(
-        x,
-        rownames = FALSE,
-        escape = FALSE,
-        selection = "none",
-        extensions = "Buttons",
-        width = "100%",
-        options = list(
-          dom = "Bfrtip",
-          buttons = list(
-            list(extend = "colvis", text = "Column visibility")
-          ),
-          columnDefs = list(
-            list(
-              targets = 0,
-              className = "dt-control",
-              orderable = FALSE,
-              data = NULL,
-              defaultContent = ""
-            )
-          ),
-          order = if (ncol(x) > 1) list(list(1, "asc")) else list(),
-          scrollX = TRUE,
-          autoWidth = FALSE,
-          pageLength = 10,
-          destroy = TRUE
-        ),
-        callback = DT::JS("
-          table.on('click', 'td.dt-control', function () {
-            var tr = $(this).closest('tr');
-            var row = table.row(tr);
-
-            if (row.child.isShown()) {
-              row.child.hide();
-              tr.removeClass('shown');
-            } else {
-              var data = row.data();
-              var html = '<div style=\"padding:10px\">';
-
-              for (var i = 1; i < data.length; i++) {
-                html += '<b>' + table.column(i).header().innerText + ':</b> ' +
-                        (data[i] === null ? '' : data[i]) + '<br>';
-              }
-
-              html += '</div>';
-
-              row.child(html).show();
-              tr.addClass('shown');
-            }
-          });
-        ")
-      )
+      .qc_dt(qc_res()$invalid$emof, page_length = 10)
     })
 
-    # ---------------------------------------------------------
-    # Hierarchy
-    # ---------------------------------------------------------
-    output$hierarchy_issues_tbl <- DT::renderDT({
-      x <- qc_res()$hierarchy$issues
-      if (!is.data.frame(x)) x <- data.frame()
-      DT::datatable(x, rownames = FALSE, options = list(scrollX = TRUE, pageLength = 10))
-    })
-
-    output$hierarchy_edges_tbl <- DT::renderDT({
-      x <- qc_res()$hierarchy$edges
-      if (!is.data.frame(x)) x <- data.frame()
-      DT::datatable(x, rownames = FALSE, options = list(scrollX = TRUE, pageLength = 10))
-    })
-
-    # ---------------------------------------------------------
-    # About
-    # ---------------------------------------------------------
     output$about_ui <- shiny::renderUI({
       shiny::tagList(
-        shiny::tags$h5("Phase 1 (deterministic)"),
+        shiny::h4("Checks implemented"),
         shiny::tags$ul(
-          shiny::tags$li("eventID / occurrenceID presence + uniqueness"),
-          shiny::tags$li("Required field checks (scientificName)"),
-          shiny::tags$li("Coordinate range checks (lat/lon)"),
-          shiny::tags$li("Occurrence eventID must exist in Event core"),
-          shiny::tags$li("parentEventID must exist in Event core"),
-          shiny::tags$li("eMoF required fields + duplicate measurementType per link")
-        ),
-        shiny::tags$h5("Phase 2 (optional with fallbacks)"),
-        shiny::tags$ul(
-          shiny::tags$li("WoRMS name resolution (package worrms)"),
-          shiny::tags$li("Broken one-to-one taxa relationship using scientificNameID (if present)"),
-          shiny::tags$li("URI resolution checks for measurementTypeID / measurementUnitID (package httr)")
-        ),
-        shiny::tags$p(
-          class = "qc-muted",
-          "Export policy: bloqueia export se existir qualquer issue com severity = ERROR."
+          shiny::tags$li("Unique IDs for Event and Occurrence."),
+          shiny::tags$li("Required scientificName in Occurrence."),
+          shiny::tags$li("Basic ISO-like validation of eventDate."),
+          shiny::tags$li("Coordinate range checks."),
+          shiny::tags$li("Occurrence-event link consistency."),
+          shiny::tags$li("parentEventID consistency."),
+          shiny::tags$li("Required eMoF fields and duplicate measurementType checks."),
+          shiny::tags$li("Overview plots for event eventDate counts, taxonomy, and mapped coordinates.")
         )
       )
     })
