@@ -1,4 +1,4 @@
-# modules/mod_about.R 
+# modules/mod_about.R  
 
 #' About module UI
 #'
@@ -35,22 +35,38 @@ mod_about_ui <- function(id) {
             shiny::div(
               shiny::p(
                 class = "home-note",
-                shiny::strong("The AURORA Shiny App"),
-                " was developed in the context of the research project AURORA – bringing deep-sea biodiversity data to light."
+                shiny::strong("The AURORA R Shiny application"),
+                " was developed as a core output of the ",
+                shiny::tags$em("project AURORA - bringing deep-sea biodiversity data to light"),
+                ", an initiative dedicated to streamline the mobilization of deep-sea biodiversity data."
               ),
               shiny::p(
                 class = "home-note",
-                "The deep sea covers approximately 65% of the planet’s surface. It is the largest biome on Earth and one of the least explored and understood. Given its vastness and the growing recognition of its ecological and economic importance (e.g., climate regulation, mineral resources, biotechnological potential), sharing deep-sea biodiversity data is essential for advancing knowledge about this biome and supporting innovative initiatives such as the development of the European Digital Twin of the Ocean. However, deep-sea biodiversity data (>200 m) in European marine waters account for only 11% of records in databases like the Ocean Biogeographic Information System (OBIS). For depths greater than 3500 meters, this number drops to about 1% of total records."
+                "While the deep sea covers 65% of the planet, it remains the least understood biome on Earth. In European marine waters, deep-sea records (>200 m) account for only 11% of databases like the Ocean Biogeographic Information System (OBIS)—a figure that plunges to just 1% for depths below 3,500 meters."
               ),
               shiny::p(
                 class = "home-note",
-                "The Digital Marine Biodiversity Lab at the University of Aveiro holds a vast collection of biological data from numerous deep-sea campaigns. This project aims to expand deep-sea biodiversity datasets on the EMODnet Biology portal, contributing to European policies such as the Marine Strategy Framework Directive (MSFD) and the EU Biodiversity Strategy for 2030. The data flow we intend to create will begin with the release of data from the Aurora seamount and adjacent areas, located on the Gakkel Ridge in the Central Arctic Ocean."
+                "To address this knowledge gap, the Digital Marine Biodiversity Lab at the University of Aveiro is mobilizing its collections of deep-sea data, starting with the Aurora seamount on the Gakkel Ridge in the Central Arctic Ocean."
               ),
               shiny::p(
                 class = "home-note",
-                "This project will also develop a user-friendly tool to facilitate biodiversity data processing, from formatting to submission to online repositories. The tool will ensure compliance with the FAIR Principles – Findable, Accessible, Interoperable, and Reusable – and international standards for scientific data management and curation."
+                "This data mobilisation to open repositories, such as EMODnet Biology, will directly contribute to the development of the European Digital Twin of the Ocean."
               )
             )
+          )
+        )
+      ),
+
+      # =========================
+      # DISCLAIMER
+      # =========================
+      bslib::card(
+        class = "mb-4",
+        bslib::card_header("Disclaimer"),
+        bslib::card_body(
+          shiny::p(
+            class = "home-note",
+            "This application is provided as a tool to assist in the standardization of biodiversity datasets into Darwin Core (DwC) archives. While every effort is made to ensure the accuracy of the underlying mapping logic and transformation scripts, the outputs are provided \"as is\" without any guarantees of completeness, accuracy, or fitness for a specific purpose."
           )
         )
       ),
@@ -84,18 +100,8 @@ mod_about_ui <- function(id) {
 
         bslib::card(
           class = "mb-4",
-          bslib::card_header("Manual, support, and bug reports"),
+          bslib::card_header("Support and bug reports"),
           bslib::card_body(
-            shiny::p(
-              class = "home-note",
-              shiny::strong("Manual: "),
-              shiny::tags$a(
-                href = "https://uapt33090-my.sharepoint.com/:w:/g/personal/fmatos_ua_pt/IQBwrPuUhfJ8Rog0dUVteCP2AUx-PDMQVswSuUe3Hp4PiiA?rtime=tk_1xbyU3kg",
-                target = "_blank",
-                rel = "noopener noreferrer",
-                "Open the AURORA manual"
-              )
-            ),
             shiny::p(
               class = "home-note",
               shiny::strong("Technical support: "),
@@ -123,7 +129,7 @@ mod_about_ui <- function(id) {
       ),
 
       # =========================
-      # FUNDING (COM LOGOS)
+      # FUNDING
       # =========================
       bslib::card(
         class = "mb-4",

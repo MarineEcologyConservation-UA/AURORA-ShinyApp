@@ -13,6 +13,9 @@ mod_homepage_ui <- function(id) {
       id = ns("page"),
       class = "home-wrap",
 
+      # =========================
+      # HERO
+      # =========================
       bslib::card(
         class = "hero-card mb-4",
         bslib::card_body(
@@ -50,10 +53,14 @@ mod_homepage_ui <- function(id) {
         )
       ),
 
+      # =========================
+      # WORKFLOW
+      # =========================
       bslib::card(
         class = "mb-4",
         bslib::card_header("Tool workflow"),
         bslib::card_body(
+
           shiny::div(
             class = "step-grid",
 
@@ -126,10 +133,43 @@ mod_homepage_ui <- function(id) {
                 "Streamline metadata creation and revision using an interface inspired by the GBIF IPT."
               )
             )
+          ),
+
+          # =========================
+          # MANUAL (FULL WIDTH, BELOW STEP 7)
+          # =========================
+          bslib::card(
+            class = "mt-4 w-100",
+            bslib::card_body(
+              shiny::div(
+                style = "display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:1rem; width:100%;",
+
+                shiny::div(
+                  style = "flex:1;",
+                  shiny::strong("User manual"),
+                  shiny::p(
+                    class = "home-note",
+                    style = "margin:0;",
+                    "Step-by-step guidance covering ingestion, mapping, taxonomy, quality control, metadata, and export."
+                  )
+                ),
+
+                shiny::tags$a(
+                  href = "",
+                  target = "_blank",
+                  rel = "noopener noreferrer",
+                  class = "btn btn-primary",
+                  "Open manual"
+                )
+              )
+            )
           )
         )
       ),
 
+      # =========================
+      # FEATURES
+      # =========================
       bslib::card(
         class = "mb-4",
         bslib::card_header("Examples of supported tasks"),
