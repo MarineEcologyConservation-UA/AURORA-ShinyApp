@@ -10,7 +10,7 @@
 # - A suggested cleaned name is shown separately
 # - The user must either copy the suggestion or type the reviewed name
 # - Apply is blocked until all Reviewed scientificName cells are filled
-# - Skip keeps the original df_in() unchanged
+# - Skip is only allowed when scientificName was mapped previously
 # - Uses incremental table updates via DT proxy
 # File: R/mod_identification_cleaning.R
 # =========================================================
@@ -96,6 +96,7 @@ mod_identification_cleaning_ui <- function(id) {
     })();
     ")
     ),
+
     shiny::tags$div(
       id = ns("root"),
       class = "idc-page",
@@ -223,6 +224,19 @@ mod_identification_cleaning_server <- function(id, df_in, mapping_in) {
       x <- x[nzchar(x)]
       if (length(x) == 0) "" else x[1]
     }
+
+    scientific_name_mapped <- shiny::reactive({
+      map_df <- mapping_in()
+      shiny::req(map_df)
+      shiny::req(is.data.frame(map_df))
+      shiny::req(all(c("user_column", "dwc_term") %in% names(map_df)))
+
+      dwc_term_chr <- as.character(map_df$dwc_term %||% "")
+      dwc_term_chr[is.na(dwc_term_chr)] <- ""
+      dwc_term_chr <- trimws(dwc_term_chr)
+
+      any(dwc_term_chr == "scientificName")
+    })
 
     get_all_dwc_terms <- function() {
       if (!requireNamespace("corella", quietly = TRUE)) {
@@ -836,6 +850,22 @@ mod_identification_cleaning_server <- function(id, df_in, mapping_in) {
     })
 
     shiny::observeEvent(input$skip_step, {
+      if (!isTRUE(scientific_name_mapped())) {
+        shiny::showModal(
+          shiny::modalDialog(
+            title = shiny::tags$span(style = "color:#b91c1c;", "Warning"),
+            shiny::tags$p(
+              shiny::tags$strong("Skip disabled: "),
+              shiny::tags$code("scientificName"),
+              " was not mapped previously in Field Mapping."
+            ),
+            easyClose = TRUE,
+            footer = shiny::modalButton("Close")
+          )
+        )
+        return(invisible(NULL))
+      }
+
       shiny::showModal(
         shiny::modalDialog(
           title = "Important Notice",
@@ -859,6 +889,24 @@ mod_identification_cleaning_server <- function(id, df_in, mapping_in) {
     })
 
     shiny::observeEvent(input$confirm_skip, {
+      if (!isTRUE(scientific_name_mapped())) {
+        shiny::removeModal()
+
+        shiny::showModal(
+          shiny::modalDialog(
+            title = shiny::tags$span(style = "color:#b91c1c;", "Warning"),
+            shiny::tags$p(
+              shiny::tags$strong("Skip disabled: "),
+              shiny::tags$code("scientificName"),
+              " was not mapped previously in Field Mapping."
+            ),
+            easyClose = TRUE,
+            footer = shiny::modalButton("Close")
+          )
+        )
+        return(invisible(NULL))
+      }
+
       shiny::removeModal()
       rv$applied_df <- NULL
       rv$ready <- TRUE
@@ -891,6 +939,7 @@ mod_identification_cleaning_server <- function(id, df_in, mapping_in) {
         shiny::tags$p(shiny::tags$b("Unique entries: "), nrow(df)),
         shiny::tags$p(shiny::tags$b("Reviewed scientificName completed: "), reviewed_n, " / ", nrow(df)),
         shiny::tags$p(shiny::tags$b("Missing reviewed scientificName: "), missing_n),
+        shiny::tags$p(shiny::tags$b("scientificName mapped previously: "), if (isTRUE(scientific_name_mapped())) "Yes" else "No"),
         shiny::tags$p(shiny::tags$b("Applied to dataset: "), if (!is.null(rv$applied_df) && !isTRUE(rv$skipped)) "Yes" else "No"),
         shiny::tags$p(shiny::tags$b("Step skipped: "), if (isTRUE(rv$skipped)) "Yes" else "No")
       )
