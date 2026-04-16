@@ -7,18 +7,18 @@
 mod_qc_server(id, event_in, occ_in, emof_in = NULL, pre_issues_in = NULL)
 }
 \arguments{
-\item{id}{Module id}
+\item{id}{Module ID.}
 
-\item{event_in}{Reactive returning event table}
+\item{event_in}{Reactive returning event table.}
 
-\item{occ_in}{Reactive returning occurrence table}
+\item{occ_in}{Reactive returning occurrence table.}
 
-\item{emof_in}{Reactive returning emof table (may be NULL or empty)}
+\item{emof_in}{Reactive returning eMoF table, may be NULL.}
 
-\item{pre_issues_in}{Reactive returning pre-split issues (optional)}
+\item{pre_issues_in}{Reactive returning pre-existing issues, may be NULL.}
 }
 \value{
-list with qc_res reactive and can_export reactive
+A list with \code{qc_res} and \code{can_export} reactives.
 }
 \description{
 QC page server

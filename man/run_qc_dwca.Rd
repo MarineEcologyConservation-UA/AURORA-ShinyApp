@@ -2,22 +2,23 @@
 % Please edit documentation in R/mod_qc.R
 \name{run_qc_dwca}
 \alias{run_qc_dwca}
-\title{Run QC checks on DwC-A tables (Phase 1 + Phase 2 with fallbacks)}
+\title{Run QC checks on DwC-A tables}
 \usage{
 run_qc_dwca(event, occurrence, emof = NULL, pre_issues = NULL)
 }
 \arguments{
-\item{event}{Event table data.frame}
+\item{event}{Event table data frame.}
 
-\item{occurrence}{Occurrence table data.frame}
+\item{occurrence}{Occurrence table data frame.}
 
-\item{emof}{eMoF table data.frame (may be NULL)}
+\item{emof}{eMoF table data frame, may be NULL.}
 
-\item{pre_issues}{Optional data.frame of pre-split issues (mapping cleaning)}
+\item{pre_issues}{Optional data frame of pre-existing issues.}
 }
 \value{
-list with overview, issues_summary, issues_detailed, invalid tables, map_issues, hierarchy, can_export
+A list with overview tables, issues, invalid records, map issues,
+counts, and export status.
 }
 \description{
-Run QC checks on DwC-A tables (Phase 1 + Phase 2 with fallbacks)
+Run QC checks on DwC-A tables
 }

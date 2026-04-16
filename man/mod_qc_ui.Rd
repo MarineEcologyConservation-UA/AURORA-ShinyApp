@@ -2,16 +2,16 @@
 % Please edit documentation in R/mod_qc.R
 \name{mod_qc_ui}
 \alias{mod_qc_ui}
-\title{QC page UI (BioCheck-like)}
+\title{QC page UI}
 \usage{
 mod_qc_ui(id)
 }
 \arguments{
-\item{id}{Module id}
+\item{id}{Module ID.}
 }
 \value{
-Shiny UI
+A \code{bslib::nav_panel()} object.
 }
 \description{
-QC page UI (BioCheck-like)
+QC page UI
 }
