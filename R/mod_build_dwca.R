@@ -260,6 +260,7 @@ mod_build_dwca_server <- function(id, df_in, dwc_terms) {
         choices = cols,
         server = TRUE
       )
+
       shiny::updateSelectizeInput(
         session, "emof_cols_occ",
         choices = cols,
@@ -270,6 +271,7 @@ mod_build_dwca_server <- function(id, df_in, dwc_terms) {
     emof_levels <- shiny::reactive({
       ev <- input$emof_cols_event
       oc <- input$emof_cols_occ
+
       if (is.null(ev)) ev <- character(0)
       if (is.null(oc)) oc <- character(0)
 
@@ -301,16 +303,10 @@ mod_build_dwca_server <- function(id, df_in, dwc_terms) {
       shiny::req(df_in())
 
       df <- df_in()
-      cols <- names(df)
-
-      event_column <- if ("eventID" %in% cols) "eventID" else NULL
-
-      if (is.null(event_column)) {
-        stop("The dataset must contain an eventID column before building the Darwin Core tables.")
-      }
 
       ev <- input$emof_cols_event
       oc <- input$emof_cols_occ
+
       if (is.null(ev)) ev <- character(0)
       if (is.null(oc)) oc <- character(0)
 
@@ -328,26 +324,10 @@ mod_build_dwca_server <- function(id, df_in, dwc_terms) {
       build_dwca_tables(
         df = df,
         dwc_terms = dwc_terms,
-
-        id_spec = list(
-          event_mode = "use",
-          event_column = event_column,
-          event_concat = NULL,
-          occ_mode = "event_seq",
-          occ_column = NULL
-        ),
-
-        parent_spec = list(
-          enabled = FALSE,
-          columns = NULL
-        ),
-
         emof_spec = list(
           columns = emof_cols_all,
           levels = levs
-        ),
-
-        remarks_spec = NULL
+        )
       )
     })
 

@@ -1,14 +1,15 @@
 # =========================================================
 # Build DwC-A tables from flat mapped dataframe
+# - Assumes eventID, occurrenceID, parentEventID, and remarks
+#   were already created upstream when applicable.
+# - This function only splits the flat dataframe into DwC-A
+#   tables, optionally builds eMoF, and performs basic QC.
 # =========================================================
 
 #' @export
 build_dwca_tables <- function(df,
                               dwc_terms,
-                              id_spec,
-                              parent_spec = NULL,
-                              emof_spec = NULL,
-                              remarks_spec = NULL) {
+                              emof_spec = NULL) {
 
   .data <- rlang::.data
   qc_messages <- character(0)
@@ -29,54 +30,8 @@ build_dwca_tables <- function(df,
   df_work <- df
 
   # -------------------------------------------------------
-  # 1) REMARKS JOIN
+  # helpers
   # -------------------------------------------------------
-  if (!is.null(remarks_spec)) {
-    if (!is.null(remarks_spec$columns) &&
-        length(remarks_spec$columns) > 0 &&
-        !is.null(remarks_spec$target) &&
-        nzchar(remarks_spec$target)) {
-
-      miss <- setdiff(remarks_spec$columns, names(df_work))
-      if (length(miss) > 0) {
-        qc_messages <- c(
-          qc_messages,
-          paste0(
-            "WARNING: remarks columns missing and ignored: ",
-            paste(miss, collapse = ", ")
-          )
-        )
-      }
-
-      cols_ok <- intersect(remarks_spec$columns, names(df_work))
-      if (length(cols_ok) > 0) {
-        joined <- apply(
-          df_work[, cols_ok, drop = FALSE],
-          1,
-          function(x) {
-            x <- as.character(x)
-            x <- x[!is.na(x) & x != ""]
-            paste(x, collapse = " | ")
-          }
-        )
-        df_work[[remarks_spec$target]] <- joined
-      }
-    }
-  }
-
-  # -------------------------------------------------------
-  # helper: safe concat
-  # -------------------------------------------------------
-  .safe_concat <- function(row_vals, sep = ":") {
-    x <- as.character(row_vals)
-    x[is.na(x)] <- ""
-    x <- trimws(x)
-    x <- x[x != ""]
-    if (length(x) == 0) return("")
-    paste(x, collapse = sep)
-  }
-
-  # helper: first non-empty value
   .first_non_empty <- function(x) {
     x <- as.character(x)
     x <- trimws(x)
@@ -86,118 +41,35 @@ build_dwca_tables <- function(df,
   }
 
   # -------------------------------------------------------
-  # 2) EVENT ID
+  # 1) BASIC PRESENCE CHECKS ON INPUT DF
   # -------------------------------------------------------
-  if (id_spec$event_mode == "use") {
-
-    if (is.null(id_spec$event_column) || !nzchar(id_spec$event_column)) {
-      stop("event_mode='use' requires id_spec$event_column.")
-    }
-    if (!id_spec$event_column %in% names(df_work)) {
-      stop("Selected eventID column does not exist.")
-    }
-
-    df_work$eventID <- as.character(df_work[[id_spec$event_column]])
+  if (!"eventID" %in% names(df_work)) {
+    qc_messages <- c(qc_messages, "ERROR: Input dataframe is missing eventID.")
+  } else {
+    df_work$eventID <- as.character(df_work$eventID)
     df_work$eventID[is.na(df_work$eventID)] <- ""
-
-  } else if (id_spec$event_mode == "concat") {
-
-    cols <- id_spec$event_concat
-    if (is.null(cols) || length(cols) == 0) {
-      stop("event_mode='concat' requires id_spec$event_concat (>= 1 column).")
+    if (any(trimws(df_work$eventID) == "")) {
+      qc_messages <- c(qc_messages, "ERROR: Some rows have blank eventID in input dataframe.")
     }
-
-    miss <- setdiff(cols, names(df_work))
-    if (length(miss) > 0) {
-      stop(paste0(
-        "event_mode='concat' columns missing: ",
-        paste(miss, collapse = ", ")
-      ))
-    }
-
-    df_work$eventID <- apply(
-      df_work[, cols, drop = FALSE],
-      1,
-      .safe_concat,
-      sep = ":"
-    )
-
-  } else {
-
-    df_work$eventID <- paste0("event_", seq_len(nrow(df_work)))
-    qc_messages <- c(qc_messages, "WARNING: eventID auto-generated (not stable).")
   }
 
-  if (any(df_work$eventID == "")) {
-    qc_messages <- c(qc_messages, "ERROR: Some rows have blank eventID.")
-  }
-
-  # -------------------------------------------------------
-  # 3) OCCURRENCE ID
-  # -------------------------------------------------------
-  if (id_spec$occ_mode == "use") {
-
-    if (is.null(id_spec$occ_column) || !nzchar(id_spec$occ_column)) {
-      stop("occ_mode='use' requires id_spec$occ_column.")
-    }
-    if (!id_spec$occ_column %in% names(df_work)) {
-      stop("Selected occurrenceID column does not exist.")
-    }
-
-    df_work$occurrenceID <- as.character(df_work[[id_spec$occ_column]])
+  if ("occurrenceID" %in% names(df_work)) {
+    df_work$occurrenceID <- as.character(df_work$occurrenceID)
     df_work$occurrenceID[is.na(df_work$occurrenceID)] <- ""
-
+    if (any(trimws(df_work$occurrenceID) == "")) {
+      qc_messages <- c(qc_messages, "ERROR: Some rows have blank occurrenceID in input dataframe.")
+    }
   } else {
-    # event_seq (default)
-    df_work <- df_work |>
-      dplyr::group_by(.data$eventID) |>
-      dplyr::mutate(
-        occurrenceID = paste0(.data$eventID, "_occ_", dplyr::row_number())
-      ) |>
-      dplyr::ungroup()
+    qc_messages <- c(qc_messages, "WARNING: Input dataframe does not contain occurrenceID.")
   }
 
-  if (any(df_work$occurrenceID == "")) {
-    qc_messages <- c(qc_messages, "ERROR: Some rows have blank occurrenceID.")
+  if ("parentEventID" %in% names(df_work)) {
+    df_work$parentEventID <- as.character(df_work$parentEventID)
+    df_work$parentEventID[trimws(df_work$parentEventID) == ""] <- NA_character_
   }
 
   # -------------------------------------------------------
-  # 4) PARENT EVENT
-  # -------------------------------------------------------
-  parent_events <- NULL
-
-  if (!is.null(parent_spec) && isTRUE(parent_spec$enabled)) {
-
-    cols <- parent_spec$columns
-    if (is.null(cols) || length(cols) == 0) {
-      stop("parentEvent enabled but parent_spec$columns is empty.")
-    }
-
-    miss <- setdiff(cols, names(df_work))
-    if (length(miss) > 0) {
-      stop(paste0(
-        "parentEventID columns missing: ",
-        paste(miss, collapse = ", ")
-      ))
-    }
-
-    df_work$parentEventID <- apply(
-      df_work[, cols, drop = FALSE],
-      1,
-      .safe_concat,
-      sep = ":"
-    )
-
-    parent_events <- df_work |>
-      dplyr::distinct(.data$parentEventID) |>
-      dplyr::filter(!is.na(.data$parentEventID) & .data$parentEventID != "") |>
-      dplyr::rename(eventID = .data$parentEventID)
-
-    df_work$parentEventID[df_work$parentEventID == ""] <- NA_character_
-  }
-
-  # -------------------------------------------------------
-  # 5) SPLIT TABLES (USING dwc_terms)
+  # 2) SPLIT TABLES (USING dwc_terms)
   # -------------------------------------------------------
   event_terms <- dwc_terms |>
     dplyr::filter(.data$Table == "Event") |>
@@ -209,29 +81,30 @@ build_dwca_tables <- function(df,
     dplyr::pull(.data$Term) |>
     unique()
 
+  # Always keep structural IDs when present
   event_terms <- unique(c("eventID", "parentEventID", event_terms))
   occ_terms <- unique(c("eventID", "occurrenceID", occ_terms))
 
-  event_table <- df_work |>
-    dplyr::select(dplyr::any_of(event_terms)) |>
-    dplyr::distinct(.data$eventID, .keep_all = TRUE)
-
-  if (!is.null(parent_events) && nrow(parent_events) > 0) {
-    missing_cols <- setdiff(names(event_table), names(parent_events))
-    if (length(missing_cols) > 0) {
-      for (cc in missing_cols) parent_events[[cc]] <- NA
-    }
-    parent_events <- parent_events[, names(event_table), drop = FALSE]
-    event_table <- dplyr::bind_rows(parent_events, event_table) |>
+  # EVENT TABLE
+  if ("eventID" %in% names(df_work)) {
+    event_table <- df_work |>
+      dplyr::select(dplyr::any_of(event_terms)) |>
       dplyr::distinct(.data$eventID, .keep_all = TRUE)
+  } else {
+    event_table <- data.frame()
   }
 
-  occurrence_table <- df_work |>
-    dplyr::select(dplyr::any_of(occ_terms)) |>
-    dplyr::distinct()
+  # OCCURRENCE TABLE
+  if ("occurrenceID" %in% names(df_work)) {
+    occurrence_table <- df_work |>
+      dplyr::select(dplyr::any_of(occ_terms)) |>
+      dplyr::distinct(.data$occurrenceID, .keep_all = TRUE)
+  } else {
+    occurrence_table <- data.frame()
+  }
 
   # -------------------------------------------------------
-  # 6) EMOF BUILD (LEVEL PER COLUMN)
+  # 3) EMOF BUILD (LEVEL PER COLUMN)
   # -------------------------------------------------------
   emof_table <- NULL
 
@@ -277,82 +150,105 @@ build_dwca_tables <- function(df,
       emof_parts <- list()
 
       # -----------------------------------------------
-      # 6a) EVENT-LEVEL EMOF
+      # 3a) EVENT-LEVEL EMOF
       # one row per eventID + measurementType
       # -----------------------------------------------
       if (length(event_cols) > 0) {
 
-        # warn if same event has conflicting values for same event-level variable
-        for (cc in event_cols) {
-          conflicts <- df_work |>
-            dplyr::mutate(.tmp_val = as.character(.data[[cc]])) |>
-            dplyr::mutate(.tmp_val = trimws(.data$.tmp_val)) |>
-            dplyr::filter(!is.na(.data$.tmp_val) & .data$.tmp_val != "") |>
+        if (!"eventID" %in% names(df_work)) {
+          qc_messages <- c(
+            qc_messages,
+            "ERROR: Cannot build event-level eMoF because eventID is missing."
+          )
+        } else {
+
+          for (cc in event_cols) {
+            conflicts <- df_work |>
+              dplyr::mutate(.tmp_val = as.character(.data[[cc]])) |>
+              dplyr::mutate(.tmp_val = trimws(.data$.tmp_val)) |>
+              dplyr::filter(!is.na(.data$.tmp_val) & .data$.tmp_val != "") |>
+              dplyr::group_by(.data$eventID) |>
+              dplyr::summarise(
+                n_values = dplyr::n_distinct(.data$.tmp_val),
+                .groups = "drop"
+              ) |>
+              dplyr::filter(.data$n_values > 1)
+
+            if (nrow(conflicts) > 0) {
+              qc_messages <- c(
+                qc_messages,
+                paste0(
+                  "WARNING: event-level eMoF column '", cc,
+                  "' has conflicting values within the same eventID; ",
+                  "keeping the first non-empty value per event."
+                )
+              )
+            }
+          }
+
+          event_emof_wide <- df_work |>
+            dplyr::select(.data$eventID, dplyr::all_of(event_cols)) |>
             dplyr::group_by(.data$eventID) |>
             dplyr::summarise(
-              n_values = dplyr::n_distinct(.data$.tmp_val),
+              dplyr::across(
+                dplyr::all_of(event_cols),
+                .first_non_empty
+              ),
               .groups = "drop"
-            ) |>
-            dplyr::filter(.data$n_values > 1)
-
-          if (nrow(conflicts) > 0) {
-            qc_messages <- c(
-              qc_messages,
-              paste0(
-                "WARNING: event-level eMoF column '", cc,
-                "' has conflicting values within the same eventID; ",
-                "keeping the first non-empty value per event."
-              )
             )
-          }
+
+          event_emof <- event_emof_wide |>
+            tidyr::pivot_longer(
+              cols = dplyr::all_of(event_cols),
+              names_to = "measurementType",
+              values_to = "measurementValue",
+              values_transform = list(measurementValue = as.character)
+            ) |>
+            dplyr::filter(!is.na(.data$measurementValue) & trimws(.data$measurementValue) != "") |>
+            dplyr::mutate(occurrenceID = "")
+
+          emof_parts[["event"]] <- event_emof
         }
-
-        event_emof_wide <- df_work |>
-          dplyr::select(.data$eventID, dplyr::all_of(event_cols)) |>
-          dplyr::group_by(.data$eventID) |>
-          dplyr::summarise(
-            dplyr::across(
-              dplyr::all_of(event_cols),
-              .first_non_empty
-            ),
-            .groups = "drop"
-          )
-
-        event_emof <- event_emof_wide |>
-          tidyr::pivot_longer(
-            cols = dplyr::all_of(event_cols),
-            names_to = "measurementType",
-            values_to = "measurementValue",
-            values_transform = list(measurementValue = as.character)
-          ) |>
-          dplyr::filter(!is.na(.data$measurementValue) & .data$measurementValue != "") |>
-          dplyr::mutate(occurrenceID = "")
-
-        emof_parts[["event"]] <- event_emof
       }
 
       # -----------------------------------------------
-      # 6b) OCCURRENCE-LEVEL EMOF
+      # 3b) OCCURRENCE-LEVEL EMOF
       # one row per eventID + occurrenceID + measurementType
       # -----------------------------------------------
       if (length(occurrence_cols) > 0) {
 
-        occurrence_emof <- df_work |>
-          dplyr::select(
-            .data$eventID,
-            .data$occurrenceID,
-            dplyr::all_of(occurrence_cols)
-          ) |>
-          dplyr::distinct() |>
-          tidyr::pivot_longer(
-            cols = dplyr::all_of(occurrence_cols),
-            names_to = "measurementType",
-            values_to = "measurementValue",
-            values_transform = list(measurementValue = as.character)
-          ) |>
-          dplyr::filter(!is.na(.data$measurementValue) & .data$measurementValue != "")
+        if (!"occurrenceID" %in% names(df_work)) {
+          qc_messages <- c(
+            qc_messages,
+            "ERROR: Cannot build occurrence-level eMoF because occurrenceID is missing."
+          )
+        } else {
 
-        emof_parts[["occurrence"]] <- occurrence_emof
+          if (!"eventID" %in% names(df_work)) {
+            qc_messages <- c(
+              qc_messages,
+              "WARNING: occurrence-level eMoF is being built without eventID in input dataframe."
+            )
+            df_work$eventID <- ""
+          }
+
+          occurrence_emof <- df_work |>
+            dplyr::select(
+              .data$eventID,
+              .data$occurrenceID,
+              dplyr::all_of(occurrence_cols)
+            ) |>
+            dplyr::distinct() |>
+            tidyr::pivot_longer(
+              cols = dplyr::all_of(occurrence_cols),
+              names_to = "measurementType",
+              values_to = "measurementValue",
+              values_transform = list(measurementValue = as.character)
+            ) |>
+            dplyr::filter(!is.na(.data$measurementValue) & trimws(.data$measurementValue) != "")
+
+          emof_parts[["occurrence"]] <- occurrence_emof
+        }
       }
 
       if (length(emof_parts) > 0) {
@@ -372,7 +268,6 @@ build_dwca_tables <- function(df,
           ) |>
           dplyr::distinct()
 
-        # final safeguard against duplicate measurementType per event for event-level rows
         dup_event_measurements <- emof_table |>
           dplyr::filter(.data$occurrenceID == "") |>
           dplyr::count(.data$eventID, .data$measurementType, name = "n") |>
@@ -399,18 +294,61 @@ build_dwca_tables <- function(df,
   }
 
   # -------------------------------------------------------
-  # 7) BASIC QC
+  # 4) BASIC QC
   # -------------------------------------------------------
-  if (!"eventID" %in% names(event_table)) {
-    qc_messages <- c(qc_messages, "ERROR: event table missing eventID.")
-  } else if (anyDuplicated(event_table$eventID) > 0) {
-    qc_messages <- c(qc_messages, "ERROR: Duplicate eventID detected in event table.")
+  if (!is.data.frame(event_table) || nrow(event_table) == 0) {
+    qc_messages <- c(qc_messages, "ERROR: event table is empty.")
+  } else {
+    if (!"eventID" %in% names(event_table)) {
+      qc_messages <- c(qc_messages, "ERROR: event table missing eventID.")
+    } else {
+      event_ids <- trimws(as.character(event_table$eventID))
+      if (any(is.na(event_ids) | event_ids == "")) {
+        qc_messages <- c(qc_messages, "ERROR: event table contains blank eventID.")
+      }
+      if (anyDuplicated(event_ids) > 0) {
+        qc_messages <- c(qc_messages, "ERROR: Duplicate eventID detected in event table.")
+      }
+    }
+
+    if ("parentEventID" %in% names(event_table)) {
+      pid <- trimws(as.character(event_table$parentEventID))
+      pid[is.na(pid) | pid == ""] <- NA_character_
+      if (any(!is.na(pid) & !(pid %in% as.character(event_table$eventID)))) {
+        qc_messages <- c(
+          qc_messages,
+          "WARNING: Some parentEventID values do not match any eventID in event table."
+        )
+      }
+    }
   }
 
-  if (!"occurrenceID" %in% names(occurrence_table)) {
-    qc_messages <- c(qc_messages, "ERROR: occurrence table missing occurrenceID.")
-  } else if (anyDuplicated(occurrence_table$occurrenceID) > 0) {
-    qc_messages <- c(qc_messages, "ERROR: Duplicate occurrenceID detected in occurrence table.")
+  if (!is.data.frame(occurrence_table) || nrow(occurrence_table) == 0) {
+    qc_messages <- c(qc_messages, "WARNING: occurrence table is empty.")
+  } else {
+    if (!"occurrenceID" %in% names(occurrence_table)) {
+      qc_messages <- c(qc_messages, "ERROR: occurrence table missing occurrenceID.")
+    } else {
+      occurrence_ids <- trimws(as.character(occurrence_table$occurrenceID))
+      if (any(is.na(occurrence_ids) | occurrence_ids == "")) {
+        qc_messages <- c(qc_messages, "ERROR: occurrence table contains blank occurrenceID.")
+      }
+      if (anyDuplicated(occurrence_ids) > 0) {
+        qc_messages <- c(qc_messages, "ERROR: Duplicate occurrenceID detected in occurrence table.")
+      }
+    }
+
+    if ("eventID" %in% names(occurrence_table) && "eventID" %in% names(event_table)) {
+      occ_event_ids <- trimws(as.character(occurrence_table$eventID))
+      ev_ids <- trimws(as.character(event_table$eventID))
+      missing_links <- !is.na(occ_event_ids) & occ_event_ids != "" & !(occ_event_ids %in% ev_ids)
+      if (any(missing_links)) {
+        qc_messages <- c(
+          qc_messages,
+          "WARNING: Some occurrence eventID values do not match any eventID in event table."
+        )
+      }
+    }
   }
 
   if (!is.null(emof_table)) {
@@ -435,6 +373,8 @@ build_dwca_tables <- function(df,
 
   if (length(qc_messages) == 0) {
     qc_messages <- "OK: build completed with no QC messages."
+  } else {
+    qc_messages <- unique(qc_messages)
   }
 
   list(
