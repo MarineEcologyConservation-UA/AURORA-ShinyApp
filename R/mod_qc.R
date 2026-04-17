@@ -3,7 +3,6 @@
 # File: R/mod_qc.R
 # =========================================================
 
-
 #' @importFrom rlang %||%
 NULL
 
@@ -38,39 +37,33 @@ NULL
 }
 
 .qc_bind <- function(x) {
-  # Handle NULL or non-list inputs
   if (is.null(x)) {
     return(.qc_empty_issues())
   }
-  
-  # If x is already a data frame, return it as-is
+
   if (is.data.frame(x)) {
     if (nrow(x) == 0) {
       return(.qc_empty_issues())
     }
     return(x)
   }
-  
-  # If x is not a list, return empty issues
+
   if (!is.list(x)) {
     return(.qc_empty_issues())
   }
-  
-  # If list is empty, return empty issues
+
   if (length(x) == 0) {
     return(.qc_empty_issues())
   }
-  
-  # Filter to keep only data frames with rows
+
   x_filtered <- Filter(function(z) {
     is.data.frame(z) && nrow(z) > 0
   }, x)
-  
+
   if (length(x_filtered) == 0) {
     return(.qc_empty_issues())
   }
-  
-  # Use rbind with explicit list argument
+
   tryCatch(
     {
       out <- do.call(rbind, x_filtered)
@@ -81,7 +74,6 @@ NULL
       out
     },
     error = function(e) {
-      # If rbind fails, return empty
       .qc_empty_issues()
     }
   )
@@ -278,7 +270,7 @@ NULL
     issue_list <- lapply(ii, function(i) {
       .qc_issue(
         table = table,
-        row_id = as.character(i), # Here i is the row index of the original df
+        row_id = as.character(i),
         field = id_field,
         rule = "id_empty",
         message = paste0(id_field, " is empty"),
@@ -386,7 +378,6 @@ NULL
   if (!("eventID" %in% names(event))) return(.qc_empty_issues())
 
   ev_ids <- unique(as.character(event$eventID))
-  # Fallback to row index if occurrenceID is missing
   occ_ids <- if ("occurrenceID" %in% names(occ)) as.character(occ$occurrenceID) else as.character(seq_len(nrow(occ)))
   miss <- !.qc_is_blank(occ$eventID) & !(as.character(occ$eventID) %in% ev_ids)
 
@@ -414,7 +405,6 @@ NULL
 
   ev_ids <- unique(as.character(event$eventID))
   pid <- as.character(event$parentEventID)
-  # Fallback to row index if eventID is missing
   rid <- if ("eventID" %in% names(event)) as.character(event$eventID) else as.character(seq_len(nrow(event)))
 
   miss <- !.qc_is_blank(pid) & !(pid %in% ev_ids)
@@ -511,9 +501,7 @@ NULL
 
 .qc_make_invalid <- function(df, table_name, id_field, issues_det) {
   if (!is.data.frame(df) || nrow(df) == 0) return(data.frame())
-  
-  # Ensure we have a consistent ID to join on. 
-  # If the table is missing its primary ID column, we create a temporary 'row' column
+
   df_work <- df
   work_id <- id_field
   if (!id_field %in% names(df_work)) {
@@ -540,12 +528,11 @@ NULL
 
   err_cols <- grep("_error$", names(out), value = TRUE)
   out$row <- seq_len(nrow(out))
-  
-  # Cleanup temp ID if created
+
   if (work_id == ".row_id_temp") {
     out$.row_id_temp <- NULL
   }
-  
+
   keep <- c("row", err_cols, setdiff(names(out), c("row", err_cols)))
   out[, unique(keep), drop = FALSE]
 }
@@ -553,8 +540,7 @@ NULL
 .qc_get_coords <- function(df, id_field) {
   if (!is.data.frame(df) || nrow(df) == 0) return(NULL)
   if (!all(c("decimalLatitude", "decimalLongitude") %in% names(df))) return(NULL)
-  
-  # Determine the ID to use
+
   id_vec <- if (id_field %in% names(df)) as.character(df[[id_field]]) else as.character(seq_len(nrow(df)))
 
   lat <- .qc_num(df$decimalLatitude)
@@ -624,42 +610,39 @@ NULL
 .qc_build_nested_taxonomy <- function(oc) {
   tax_levels <- c("kingdom", "phylum", "class", "order", "family", "genus", "species")
   oc_filt <- oc
-  
+
   if (nrow(oc_filt) == 0) return(NULL)
-  
+
   available_levels <- tax_levels[tax_levels %in% names(oc_filt)]
   if (length(available_levels) == 0) return(NULL)
-  
+
   hierarchy_data <- oc_filt[, available_levels, drop = FALSE]
   for (col in available_levels) {
     hierarchy_data[[col]] <- as.character(hierarchy_data[[col]])
     hierarchy_data[[col]][.qc_is_blank(hierarchy_data[[col]])] <- NA_character_
   }
-  
+
   hierarchy_data <- hierarchy_data[rowSums(is.na(hierarchy_data)) < length(available_levels), , drop = FALSE]
   if (nrow(hierarchy_data) == 0) return(NULL)
 
-  # Recursively build with UNIQUE IDs
   build_hierarchy_recursive <- function(data, levels, current_level = 1, parent_label = "", parent_id = "") {
     if (current_level > length(levels) || nrow(data) == 0) return(NULL)
-    
+
     current_col <- levels[current_level]
     level_values <- unique(data[[current_col]])
     level_values <- level_values[!is.na(level_values)]
-    
+
     if (length(level_values) == 0) {
-      # Skip empty level and try next one
       return(build_hierarchy_recursive(data, levels, current_level + 1, parent_label, parent_id))
     }
-    
+
     result_list <- list()
     for (val in level_values) {
       subset_mask <- as.character(data[[current_col]]) == as.character(val)
       count <- sum(subset_mask, na.rm = TRUE)
-      
-      # Create unique ID by appending to parent ID
+
       current_id <- if (parent_id == "") as.character(val) else paste0(parent_id, "|", val)
-      
+
       result_list[[length(result_list) + 1]] <- data.frame(
         ids = current_id,
         labels = as.character(val),
@@ -667,7 +650,7 @@ NULL
         values = count,
         stringsAsFactors = FALSE
       )
-      
+
       if (current_level < length(levels)) {
         subset_data <- data[subset_mask, , drop = FALSE]
         child_hierarchy <- build_hierarchy_recursive(subset_data, levels, current_level + 1, as.character(val), current_id)
@@ -676,13 +659,80 @@ NULL
     }
     do.call(rbind, result_list)
   }
-  
+
   root_id <- "All"
   root_node <- data.frame(ids = root_id, labels = "All", parents = "", values = nrow(hierarchy_data), stringsAsFactors = FALSE)
   child_nodes <- build_hierarchy_recursive(hierarchy_data, available_levels, 1, "All", root_id)
-  
+
   res <- rbind(root_node, child_nodes)
-  res[!duplicated(res$ids), ] # Ensure ID uniqueness
+  res[!duplicated(res$ids), , drop = FALSE]
+}
+
+.qc_add_origin_columns <- function(df) {
+  if (!is.data.frame(df)) df <- data.frame()
+  if (!"original_row" %in% names(df)) df$original_row <- NA_character_
+  if (!"original_id" %in% names(df)) df$original_id <- NA_character_
+  df
+}
+
+.qc_enrich_issues_with_origin <- function(issues, df, table_name, id_field) {
+  if (!is.data.frame(issues) || nrow(issues) == 0) {
+    return(.qc_add_origin_columns(issues))
+  }
+
+  issues <- .qc_add_origin_columns(issues)
+
+  if (!is.data.frame(df) || nrow(df) == 0) return(issues)
+  if (!id_field %in% names(df)) return(issues)
+  if (!all(c(".aurora_origin_row", ".aurora_origin_id") %in% names(df))) return(issues)
+
+  idx <- which(as.character(issues$table) == as.character(table_name))
+  if (length(idx) == 0) return(issues)
+
+  sub <- issues[idx, , drop = FALSE]
+  joinable <- !is.na(sub$row_id) & sub$row_id != "*"
+  if (!any(joinable)) return(issues)
+
+  map_df <- unique(data.frame(
+    row_id = as.character(df[[id_field]]),
+    original_row = as.character(df$.aurora_origin_row),
+    original_id = as.character(df$.aurora_origin_id),
+    stringsAsFactors = FALSE
+  ))
+
+  merged <- merge(
+    sub[joinable, , drop = FALSE],
+    map_df,
+    by = "row_id",
+    all.x = TRUE,
+    suffixes = c("", ".new")
+  )
+
+  if ("original_row.new" %in% names(merged)) {
+    merged$original_row <- ifelse(
+      .qc_is_blank(merged$original_row),
+      merged$original_row.new,
+      merged$original_row
+    )
+    merged$original_row.new <- NULL
+  }
+
+  if ("original_id.new" %in% names(merged)) {
+    merged$original_id <- ifelse(
+      .qc_is_blank(merged$original_id),
+      merged$original_id.new,
+      merged$original_id
+    )
+    merged$original_id.new <- NULL
+  }
+
+  merged <- merged[match(sub$row_id[joinable], merged$row_id), , drop = FALSE]
+
+  sub$original_row[joinable] <- merged$original_row
+  sub$original_id[joinable] <- merged$original_id
+
+  issues[idx, c("original_row", "original_id")] <- sub[, c("original_row", "original_id"), drop = FALSE]
+  issues
 }
 
 # =========================================================
@@ -704,7 +754,6 @@ run_qc_dwca <- function(event, occurrence, emof = NULL, pre_issues = NULL) {
 
   issues_list <- list()
 
-  # Helper to safely add issues
   .add_issues <- function(result) {
     if (is.data.frame(result) && nrow(result) > 0) {
       return(result)
@@ -741,6 +790,8 @@ run_qc_dwca <- function(event, occurrence, emof = NULL, pre_issues = NULL) {
     if (!"rule" %in% names(pi)) pi$rule <- "pre_split_issue"
     if (!"message" %in% names(pi)) pi$message <- "Pre-split issue"
     if (!"row" %in% names(pi)) pi$row <- "*"
+    if (!"original_row" %in% names(pi)) pi$original_row <- NA_character_
+    if (!"original_id" %in% names(pi)) pi$original_id <- NA_character_
 
     pi_out <- data.frame(
       table = "pre_split",
@@ -749,20 +800,29 @@ run_qc_dwca <- function(event, occurrence, emof = NULL, pre_issues = NULL) {
       rule = as.character(pi$rule),
       message = as.character(pi$message),
       severity = as.character(pi$severity),
+      original_row = as.character(pi$original_row),
+      original_id = as.character(pi$original_id),
       stringsAsFactors = FALSE
     )
     issues_list[[length(issues_list) + 1]] <- .add_issues(pi_out)
   }
 
-  # Bind all issues safely
   issues_detailed <- .qc_bind(issues_list)
-  
+
   if (!is.data.frame(issues_detailed)) {
     issues_detailed <- .qc_empty_issues()
   }
-  
+
+  issues_detailed <- .qc_add_origin_columns(issues_detailed)
   issues_detailed$severity <- toupper(as.character(issues_detailed$severity))
   issues_detailed$table <- tolower(as.character(issues_detailed$table))
+
+  issues_detailed <- .qc_enrich_issues_with_origin(issues_detailed, event, "event", "eventID")
+  issues_detailed <- .qc_enrich_issues_with_origin(issues_detailed, occurrence, "occurrence", "occurrenceID")
+
+  if (is.data.frame(emof) && nrow(emof) > 0 && "measurementID" %in% names(emof)) {
+    issues_detailed <- .qc_enrich_issues_with_origin(issues_detailed, emof, "emof", "measurementID")
+  }
 
   issues_summary <- .qc_make_summary(issues_detailed)
 
@@ -773,7 +833,7 @@ run_qc_dwca <- function(event, occurrence, emof = NULL, pre_issues = NULL) {
   id_emof <- if ("measurementID" %in% names(emof)) {
     "measurementID"
   } else {
-    "row" # Fallback internal key for .qc_make_invalid to use indices
+    "row"
   }
   invalid_emof <- .qc_make_invalid(emof, "emof", id_emof, issues_detailed)
 
@@ -805,6 +865,8 @@ run_qc_dwca <- function(event, occurrence, emof = NULL, pre_issues = NULL) {
           issue = joined$message,
           severity = joined$severity,
           source = joined$source,
+          original_row = joined$original_row,
+          original_id = joined$original_id,
           stringsAsFactors = FALSE
         )
       }
@@ -903,18 +965,16 @@ run_qc_dwca <- function(event, occurrence, emof = NULL, pre_issues = NULL) {
       FUN = val_fun
     )
 
-    # FIXED: Safely handle the rbind of value_df$x
     if (nrow(value_df) > 0 && !is.null(value_df$x)) {
       mm <- tryCatch(
         {
           do.call(rbind, value_df$x)
         },
         error = function(e) {
-          # If rbind fails, return empty matrix with correct columns
           matrix(NA_real_, nrow = nrow(value_df), ncol = 2, dimnames = list(NULL, c("minValue", "maxValue")))
         }
       )
-      
+
       value_df$x <- NULL
       if (is.matrix(mm)) {
         value_df$minValue <- mm[, "minValue"]
@@ -976,7 +1036,7 @@ mod_qc_ui <- function(id) {
     title = "DwC-A Overview & QC",
     value = "qc",
 
-    shiny::tags$style(shiny::HTML(" 
+    shiny::tags$style(shiny::HTML("
       .qc-title { margin-top: 8px; margin-bottom: 12px; }
       .qc-muted { color: #6b7280; }
       .qc-box { border: 1px solid #e5e7eb; border-radius: 10px; padding: 12px 14px; background: #fff; }
@@ -1060,7 +1120,7 @@ mod_qc_ui <- function(id) {
         shiny::div(
           style = "width: 100%; overflow: visible; box-sizing: border-box;",
           shiny::plotOutput(
-            ns("overview_date_plot"), 
+            ns("overview_date_plot"),
             height = "380px",
             width = "100%"
           )
@@ -1068,8 +1128,8 @@ mod_qc_ui <- function(id) {
         shiny::hr(),
         shiny::h4("Taxonomic coverage of the dataset"),
         shiny::fluidRow(
-          # Full width: The Resulting Sunburst Chart
-          shiny::column(12, 
+          shiny::column(
+            12,
             if (has_plotly) {
               plotly::plotlyOutput(ns("overview_tax_plot"), height = "500px")
             } else {
@@ -1139,7 +1199,7 @@ mod_qc_server <- function(id, event_in, occ_in, emof_in = NULL, pre_issues_in = 
     output$export_status_ui <- shiny::renderUI({
       ok <- isTRUE(can_export())
       if (ok) {
-        shiny::tags$div(class = "qc-kpi qc-ok", "OK (export allowed)")
+        shiny::tags$div(class = "qc-kpi qc-ok", "OK")
       } else {
         shiny::tags$div(class = "qc-kpi qc-err", "ERROR found")
       }
@@ -1147,8 +1207,7 @@ mod_qc_server <- function(id, event_in, occ_in, emof_in = NULL, pre_issues_in = 
 
     output$overview_event_occ_tbl <- DT::renderDT({
       x <- qc_res()$overview$event_occ
-      
-      # Ensure empty df has correct structure for columns
+
       if (!is.data.frame(x) || nrow(x) == 0) {
         x <- data.frame(
           event_type = character(),
@@ -1159,8 +1218,7 @@ mod_qc_server <- function(id, event_in, occ_in, emof_in = NULL, pre_issues_in = 
           stringsAsFactors = FALSE
         )
       }
-      
-      # Define mapped column names
+
       cols <- c(
         "Event type" = "event_type",
         "Number of events" = "n_events",
@@ -1202,7 +1260,6 @@ mod_qc_server <- function(id, event_in, occ_in, emof_in = NULL, pre_issues_in = 
       output$overview_map <- leaflet::renderLeaflet({
         rec <- qc_res()$overview$map_records
         m <- leaflet::leaflet() |>
-          # Updated base layers
           leaflet::addProviderTiles("OpenStreetMap", group = "OSM") |>
           leaflet::addProviderTiles("Esri.OceanBasemap", group = "Esri Ocean") |>
           leaflet::addProviderTiles("Esri.WorldImagery", group = "Hybrid") |>
@@ -1267,7 +1324,9 @@ mod_qc_server <- function(id, event_in, occ_in, emof_in = NULL, pre_issues_in = 
                 "<b>id:</b> ", mi$id,
                 "<br><b>table:</b> ", mi$table,
                 "<br><b>severity:</b> ", mi$severity,
-                "<br><b>issue:</b> ", mi$issue
+                "<br><b>issue:</b> ", mi$issue,
+                "<br><b>original_row:</b> ", mi$original_row,
+                "<br><b>original_id:</b> ", mi$original_id
               )
             )
         }
@@ -1278,7 +1337,6 @@ mod_qc_server <- function(id, event_in, occ_in, emof_in = NULL, pre_issues_in = 
       output$issues_map <- leaflet::renderLeaflet({
         mi <- qc_res()$map_issues
         m <- leaflet::leaflet() |>
-          # Updated base layers
           leaflet::addProviderTiles("OpenStreetMap", group = "OSM") |>
           leaflet::addProviderTiles("Esri.OceanBasemap", group = "Esri Ocean") |>
           leaflet::addProviderTiles("Esri.WorldImagery", group = "Hybrid") |>
@@ -1302,7 +1360,9 @@ mod_qc_server <- function(id, event_in, occ_in, emof_in = NULL, pre_issues_in = 
               "<br><b>table:</b> ", mi$table,
               "<br><b>source:</b> ", mi$source,
               "<br><b>severity:</b> ", mi$severity,
-              "<br><b>issue:</b> ", mi$issue
+              "<br><b>issue:</b> ", mi$issue,
+              "<br><b>original_row:</b> ", mi$original_row,
+              "<br><b>original_id:</b> ", mi$original_id
             )
           )
       })
@@ -1314,29 +1374,27 @@ mod_qc_server <- function(id, event_in, occ_in, emof_in = NULL, pre_issues_in = 
         if (!is.data.frame(ev) || nrow(ev) == 0 || !"eventDate" %in% names(ev)) {
           return(NULL)
         }
-        
+
         dates <- .qc_extract_date_values(ev$eventDate)
         dates <- dates[!is.na(dates)]
         if (length(dates) == 0) return(NULL)
-        
-        # Parse ISO 8601 dates (YYYY-MM-DD format)
+
         df_dates <- data.frame(
           date_str = dates,
           stringsAsFactors = FALSE
         )
         df_dates$date_parsed <- suppressWarnings(as.Date(df_dates$date_str, format = "%Y-%m-%d"))
-        df_dates <- df_dates[!is.na(df_dates$date_parsed), ]
-        
+        df_dates <- df_dates[!is.na(df_dates$date_parsed), , drop = FALSE]
+
         if (nrow(df_dates) == 0) return(NULL)
-        
-        # Aggregate counts by date
+
         date_counts <- sort(table(df_dates$date_parsed), decreasing = FALSE)
         plot_data <- data.frame(
           date = as.Date(names(date_counts)),
           count = as.numeric(date_counts),
           stringsAsFactors = FALSE
         )
-        
+
         ggplot2::ggplot(plot_data, ggplot2::aes(x = date, y = count)) +
           ggplot2::geom_col(fill = "#5985a7", color = "white", width = 0.8) +
           ggplot2::scale_x_date(
@@ -1359,7 +1417,7 @@ mod_qc_server <- function(id, event_in, occ_in, emof_in = NULL, pre_issues_in = 
             plot.margin = ggplot2::margin(t = 10, r = 15, b = 20, l = 15),
             panel.grid.minor = ggplot2::element_blank(),
             panel.grid.major.x = ggplot2::element_blank(),
-            panel.grid.major.y = ggplot2::element_line(color = "#e5e7eb", size = 0.3),
+            panel.grid.major.y = ggplot2::element_line(color = "#e5e7eb", linewidth = 0.3),
             axis.text.x = ggplot2::element_text(angle = 45, hjust = 1, vjust = 1, size = 11, color = "black"),
             axis.text.y = ggplot2::element_text(size = 11, color = "black"),
             axis.title = ggplot2::element_text(size = 12, face = "bold")
@@ -1372,30 +1430,30 @@ mod_qc_server <- function(id, event_in, occ_in, emof_in = NULL, pre_issues_in = 
     )
 
     output$overview_tax_plot <- if (has_plotly) {
-  plotly::renderPlotly({
-    oc <- occ_in()
-    shiny::req(is.data.frame(oc), nrow(oc) > 0)
-    
-    hierarchy_data <- .qc_build_nested_taxonomy(oc)
-    shiny::req(!is.null(hierarchy_data), nrow(hierarchy_data) > 0)
-    
-    plotly::plot_ly(
-      data = hierarchy_data,
-      ids = ~ids,           # Use the unique ID path
-      labels = ~labels,
-      parents = ~parents,
-      values = ~values,
-      type = "sunburst",
-      branchvalues = "total", # Parent value is sum of children
-      marker = list(colorscale = "Viridis"),
-      textinfo = "label+value",
-      hovertemplate = "<b>%{label}</b><br>Count: %{value}<extra></extra>"
-    ) |>
-      plotly::layout(
-        margin = list(l = 0, r = 0, t = 40, b = 0)
-      )
-  })
-}
+      plotly::renderPlotly({
+        oc <- occ_in()
+        shiny::req(is.data.frame(oc), nrow(oc) > 0)
+
+        hierarchy_data <- .qc_build_nested_taxonomy(oc)
+        shiny::req(!is.null(hierarchy_data), nrow(hierarchy_data) > 0)
+
+        plotly::plot_ly(
+          data = hierarchy_data,
+          ids = ~ids,
+          labels = ~labels,
+          parents = ~parents,
+          values = ~values,
+          type = "sunburst",
+          branchvalues = "total",
+          marker = list(colorscale = "Viridis"),
+          textinfo = "label+value",
+          hovertemplate = "<b>%{label}</b><br>Count: %{value}<extra></extra>"
+        ) |>
+          plotly::layout(
+            margin = list(l = 0, r = 0, t = 40, b = 0)
+          )
+      })
+    }
 
     output$issues_summary_tbl <- DT::renderDT({
       .qc_dt(qc_res()$issues_summary, page_length = 15)

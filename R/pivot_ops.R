@@ -13,7 +13,7 @@
 #' @param drop_zero logical, drop zero values after pivot (numeric only)
 #' @param trim_names logical, trim whitespace in names_to column
 #'
-#' @return data.frame
+#' @return list(data=..., dropped_na=..., dropped_zero=..., meta=...)
 apply_pivot_longer <- function(df,
                                id_cols,
                                pivot_cols,
@@ -30,11 +30,22 @@ apply_pivot_longer <- function(df,
   if (length(pivot_cols) == 0) {
     stop("No pivot columns selected.")
   }
-  if (!nzchar(names_to)) stop("`names_to` cannot be empty.")
-  if (!nzchar(values_to)) stop("`values_to` cannot be empty.")
+
+  if (!nzchar(names_to)) {
+    stop("`names_to` cannot be empty.")
+  }
+
+  if (!nzchar(values_to)) {
+    stop("`values_to` cannot be empty.")
+  }
 
   if (length(intersect(id_cols, pivot_cols)) > 0) {
     stop("ID columns cannot also be pivot columns.")
+  }
+
+  internal_cols <- intersect(aurora_internal_cols(), names(df))
+  if (length(intersect(pivot_cols, internal_cols)) > 0) {
+    stop("Internal AURORA trace columns cannot be pivoted.")
   }
 
   missing_cols <- setdiff(c(id_cols, pivot_cols), names(df))
@@ -53,16 +64,41 @@ apply_pivot_longer <- function(df,
     out[[names_to]] <- trimws(as.character(out[[names_to]]))
   }
 
+  dropped_na <- out[0, , drop = FALSE]
+  dropped_zero <- out[0, , drop = FALSE]
+
   if (isTRUE(drop_na)) {
-    out <- out[!is.na(out[[values_to]]), , drop = FALSE]
+    idx_na <- is.na(out[[values_to]])
+    if (any(idx_na)) {
+      dropped_na <- out[idx_na, , drop = FALSE]
+      out <- out[!idx_na, , drop = FALSE]
+    }
   }
 
   if (isTRUE(drop_zero)) {
     v <- out[[values_to]]
     if (is.numeric(v)) {
-      out <- out[v != 0, , drop = FALSE]
+      idx_zero <- !is.na(v) & v == 0
+      if (any(idx_zero)) {
+        dropped_zero <- out[idx_zero, , drop = FALSE]
+        out <- out[!idx_zero, , drop = FALSE]
+      }
     }
   }
 
-  out
+  list(
+    data = out,
+    dropped_na = dropped_na,
+    dropped_zero = dropped_zero,
+    meta = list(
+      n_before = nrow(df),
+      n_after = nrow(out),
+      n_dropped_na = nrow(dropped_na),
+      n_dropped_zero = nrow(dropped_zero),
+      pivot_cols = pivot_cols,
+      id_cols = id_cols,
+      names_to = names_to,
+      values_to = values_to
+    )
+  )
 }

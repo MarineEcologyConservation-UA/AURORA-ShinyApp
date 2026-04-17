@@ -43,6 +43,8 @@ clean_dwc_pipeline <- function(df,
 
   issues <- data.frame(
     row = integer(),
+    original_row = integer(),
+    original_id = character(),
     field = character(),
     rule = character(),
     severity = character(),
@@ -51,10 +53,31 @@ clean_dwc_pipeline <- function(df,
   )
 
   add_issue <- function(idx, field, rule, severity, message) {
+    idx_int <- suppressWarnings(as.integer(idx)[1])
+
+    has_valid_idx <- !is.na(idx_int) &&
+      length(idx_int) == 1 &&
+      idx_int >= 1 &&
+      idx_int <= nrow(out)
+
+    aurora_row <- NA_integer_
+    aurora_id <- NA_character_
+
+    if (has_valid_idx) {
+      if (".aurora_origin_row" %in% names(out)) {
+        aurora_row <- suppressWarnings(as.integer(out$.aurora_origin_row[idx_int]))
+      }
+      if (".aurora_origin_id" %in% names(out)) {
+        aurora_id <- as.character(out$.aurora_origin_id[idx_int])
+      }
+    }
+
     issues <<- rbind(
       issues,
       data.frame(
-        row = as.integer(idx),
+        row = if (has_valid_idx) idx_int else NA_integer_,
+        original_row = aurora_row,
+        original_id = aurora_id,
         field = as.character(field),
         rule = as.character(rule),
         severity = as.character(severity),

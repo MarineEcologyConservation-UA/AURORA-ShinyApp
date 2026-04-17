@@ -251,6 +251,35 @@ mod_build_dwca_server <- function(id, df_in, dwc_terms) {
       ready = FALSE
     )
 
+    # --------------------------------------------------
+    # DEBUG: input arriving from previous module
+    # --------------------------------------------------
+    shiny::observe({
+      df <- df_in()
+      shiny::req(is.data.frame(df))
+
+      aurora_cols <- grep("^\\.aurora", names(df), value = TRUE)
+      has_row <- ".aurora_origin_row" %in% names(df)
+      has_id  <- ".aurora_origin_id" %in% names(df)
+
+      msg1 <- paste0(
+        "[DWCA][INPUT] aurora cols -> row: ", has_row,
+        " | id: ", has_id,
+        " | nrow=", nrow(df),
+        " | ncol=", ncol(df)
+      )
+
+      msg2 <- paste0(
+        "[DWCA][INPUT] .aurora columns: ",
+        if (length(aurora_cols) > 0) paste(aurora_cols, collapse = ", ") else "<none>"
+      )
+
+      message(msg1)
+      message(msg2)
+      cat(msg1, "\n")
+      cat(msg2, "\n")
+    })
+
     shiny::observe({
       shiny::req(df_in())
       cols <- names(df_in())
@@ -304,6 +333,19 @@ mod_build_dwca_server <- function(id, df_in, dwc_terms) {
 
       df <- df_in()
 
+      # --------------------------------------------------
+      # DEBUG: exact dataframe used in build
+      # --------------------------------------------------
+      aurora_cols_in <- grep("^\\.aurora", names(df), value = TRUE)
+      msg_build_1 <- paste0(
+        "[DWCA][BUILD] input df -> nrow=", nrow(df),
+        " | ncol=", ncol(df),
+        " | aurora=",
+        if (length(aurora_cols_in) > 0) paste(aurora_cols_in, collapse = ", ") else "<none>"
+      )
+      message(msg_build_1)
+      cat(msg_build_1, "\n")
+
       ev <- input$emof_cols_event
       oc <- input$emof_cols_occ
 
@@ -321,7 +363,7 @@ mod_build_dwca_server <- function(id, df_in, dwc_terms) {
       emof_cols_all <- unique(c(ev, oc))
       levs <- emof_levels()
 
-      build_dwca_tables(
+      res <- build_dwca_tables(
         df = df,
         dwc_terms = dwc_terms,
         emof_spec = list(
@@ -329,6 +371,57 @@ mod_build_dwca_server <- function(id, df_in, dwc_terms) {
           levels = levs
         )
       )
+
+      # --------------------------------------------------
+      # DEBUG: what survived after build_dwca_tables()
+      # --------------------------------------------------
+      event_aurora <- if (is.data.frame(res$event)) {
+        grep("^\\.aurora", names(res$event), value = TRUE)
+      } else character(0)
+
+      occ_aurora <- if (is.data.frame(res$occurrence)) {
+        grep("^\\.aurora", names(res$occurrence), value = TRUE)
+      } else character(0)
+
+      emof_aurora <- if (!is.null(res$emof) && is.data.frame(res$emof)) {
+        grep("^\\.aurora", names(res$emof), value = TRUE)
+      } else character(0)
+
+      msg_res_1 <- paste0(
+        "[DWCA][RESULT] event -> nrow=",
+        if (is.data.frame(res$event)) nrow(res$event) else NA_integer_,
+        " | ncol=",
+        if (is.data.frame(res$event)) ncol(res$event) else NA_integer_,
+        " | aurora=",
+        if (length(event_aurora) > 0) paste(event_aurora, collapse = ", ") else "<none>"
+      )
+
+      msg_res_2 <- paste0(
+        "[DWCA][RESULT] occurrence -> nrow=",
+        if (is.data.frame(res$occurrence)) nrow(res$occurrence) else NA_integer_,
+        " | ncol=",
+        if (is.data.frame(res$occurrence)) ncol(res$occurrence) else NA_integer_,
+        " | aurora=",
+        if (length(occ_aurora) > 0) paste(occ_aurora, collapse = ", ") else "<none>"
+      )
+
+      msg_res_3 <- paste0(
+        "[DWCA][RESULT] emof -> nrow=",
+        if (!is.null(res$emof) && is.data.frame(res$emof)) nrow(res$emof) else 0L,
+        " | ncol=",
+        if (!is.null(res$emof) && is.data.frame(res$emof)) ncol(res$emof) else 0L,
+        " | aurora=",
+        if (length(emof_aurora) > 0) paste(emof_aurora, collapse = ", ") else "<none>"
+      )
+
+      message(msg_res_1)
+      message(msg_res_2)
+      message(msg_res_3)
+      cat(msg_res_1, "\n")
+      cat(msg_res_2, "\n")
+      cat(msg_res_3, "\n")
+
+      res
     })
 
     shiny::observeEvent(result(), {
@@ -350,7 +443,7 @@ mod_build_dwca_server <- function(id, df_in, dwc_terms) {
     output$event_preview <- DT::renderDT({
       shiny::req(result())
       DT::datatable(
-        utils::head(result()$event, 50),
+        utils::head(aurora_drop_internal_cols(result()$event), 50),
         rownames = FALSE,
         options = list(
           scrollX = TRUE,
@@ -362,7 +455,7 @@ mod_build_dwca_server <- function(id, df_in, dwc_terms) {
     output$occ_preview <- DT::renderDT({
       shiny::req(result())
       DT::datatable(
-        utils::head(result()$occurrence, 50),
+        utils::head(aurora_drop_internal_cols(result()$occurrence), 50),
         rownames = FALSE,
         options = list(
           scrollX = TRUE,
@@ -375,6 +468,7 @@ mod_build_dwca_server <- function(id, df_in, dwc_terms) {
       shiny::req(result())
       x <- result()$emof
       if (is.null(x)) x <- data.frame()
+      x <- aurora_drop_internal_cols(x)
       DT::datatable(
         utils::head(x, 50),
         rownames = FALSE,
@@ -388,14 +482,24 @@ mod_build_dwca_server <- function(id, df_in, dwc_terms) {
     output$download_event <- shiny::downloadHandler(
       filename = function() "event.csv",
       content = function(file) {
-        utils::write.csv(result()$event, file, row.names = FALSE, na = "")
+        utils::write.csv(
+          aurora_drop_internal_cols(result()$event),
+          file,
+          row.names = FALSE,
+          na = ""
+        )
       }
     )
 
     output$download_occ <- shiny::downloadHandler(
       filename = function() "occurrence.csv",
       content = function(file) {
-        utils::write.csv(result()$occurrence, file, row.names = FALSE, na = "")
+        utils::write.csv(
+          aurora_drop_internal_cols(result()$occurrence),
+          file,
+          row.names = FALSE,
+          na = ""
+        )
       }
     )
 
@@ -404,6 +508,7 @@ mod_build_dwca_server <- function(id, df_in, dwc_terms) {
       content = function(file) {
         x <- result()$emof
         if (is.null(x)) x <- data.frame()
+        x <- aurora_drop_internal_cols(x)
         utils::write.csv(x, file, row.names = FALSE, na = "")
       }
     )

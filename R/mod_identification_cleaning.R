@@ -11,7 +11,7 @@
 # - The user must either copy the suggestion or type the reviewed name
 # - Apply is blocked until all Reviewed scientificName cells are filled
 # - Skip is only allowed when scientificName was mapped previously
-# - Uses incremental table updates via DT proxy
+# - Uses full re-render with scroll restore (stable; no DT proxy reload)
 # File: R/mod_identification_cleaning.R
 # =========================================================
 
@@ -45,8 +45,54 @@ mod_identification_cleaning_ui <- function(id) {
 #%s .idc-small { font-size: .92rem; color: #64706d; }
 #%s .idc-side .card-body { padding: 1rem; }
 #%s .idc-main .card-body { padding: 1rem; }
+
+#%s .idc-btn-build,
+#%s .idc-btn-build:focus,
+#%s .idc-btn-build:hover {
+  background: #5C7AEA !important;
+  border-color: #5C7AEA !important;
+  color: #ffffff !important;
+}
+
+#%s .idc-btn-apply,
+#%s .idc-btn-apply:focus,
+#%s .idc-btn-apply:hover {
+  background: #1B998B !important;
+  border-color: #1B998B !important;
+  color: #ffffff !important;
+}
+
+#%s .idc-btn-skip,
+#%s .idc-btn-skip:focus,
+#%s .idc-btn-skip:hover {
+  background: #E9C46A !important;
+  border-color: #D4A73A !important;
+  color: #2f2f2f !important;
+}
+
+#%s .idc-btn-secondary,
+#%s .idc-btn-secondary:focus,
+#%s .idc-btn-secondary:hover {
+  background: #ffffff !important;
+  border: 1px solid #5f6b68 !important;
+  color: #303d34 !important;
+}
+
+#%s .idc-btn-use,
+#%s .idc-btn-use:focus,
+#%s .idc-btn-use:hover {
+  background: #ffffff !important;
+  border: 1px solid #5C7AEA !important;
+  color: #5C7AEA !important;
+  font-weight: 600 !important;
+}
 ",
       ns("root"), ns("root"), ns("root"), ns("root"),
+      ns("root"), ns("root"), ns("root"),
+      ns("root"), ns("root"), ns("root"),
+      ns("root"), ns("root"), ns("root"),
+      ns("root"), ns("root"), ns("root"),
+      ns("root"), ns("root"), ns("root"),
       ns("root"), ns("root"), ns("root")
     ))),
 
@@ -78,10 +124,6 @@ mod_identification_cleaning_ui <- function(id) {
       document.addEventListener('scroll', function(e) {
         var body = e.target;
         if (!body || !body.classList || !body.classList.contains('dataTables_scrollBody')) return;
-        var wrapper = body.closest('.datatables');
-        if (!wrapper) return;
-        var id = wrapper.id;
-        if (!id) return;
         body.dataset.lastScrollTop = body.scrollTop || 0;
         body.dataset.lastScrollLeft = body.scrollLeft || 0;
       }, true);
@@ -157,7 +199,12 @@ mod_identification_cleaning_ui <- function(id) {
                   shiny::actionButton(
                     ns("build_table"),
                     "Build Editable Table",
-                    class = "btn-primary"
+                    class = "idc-btn-build"
+                  ),
+                  shiny::actionButton(
+                    ns("use_all_suggestions"),
+                    "Use all suggestions",
+                    class = "idc-btn-secondary"
                   ),
                   shiny::uiOutput(ns("apply_btn_ui"), inline = TRUE)
                 ),
@@ -167,7 +214,7 @@ mod_identification_cleaning_ui <- function(id) {
                 shiny::downloadButton(
                   ns("download_lookup"),
                   "Download decisions (CSV)",
-                  class = "btn-outline-secondary"
+                  class = "idc-btn-secondary"
                 )
               )
             ),
@@ -215,14 +262,88 @@ mod_identification_cleaning_server <- function(id, df_in, mapping_in) {
     normalize_text <- function(x) {
       x <- as.character(x %||% "")
       x[is.na(x)] <- ""
+      x <- gsub("[[:cntrl:]]", " ", x, perl = TRUE)
       x <- gsub("[[:space:]]+", " ", trimws(x))
       x
+    }
+
+    sanitize_atomic_df <- function(df) {
+      if (is.null(df) || !is.data.frame(df)) {
+        return(df)
+      }
+
+      out <- df
+
+      for (nm in names(out)) {
+        col <- out[[nm]]
+
+        if (nm %in% c(".aurora_origin_row")) {
+          out[[nm]] <- suppressWarnings(as.integer(col))
+          next
+        }
+
+        if (nm %in% c(".aurora_origin_id")) {
+          out[[nm]] <- as.character(col)
+          next
+        }
+
+        if (is.factor(col)) {
+          col <- as.character(col)
+        }
+
+        if (is.list(col)) {
+          col <- vapply(
+            col,
+            function(x) paste(as.character(x), collapse = " "),
+            character(1)
+          )
+        }
+
+        col <- as.character(col)
+        col[is.na(col)] <- ""
+        col <- gsub("[[:cntrl:]]", " ", col, perl = TRUE)
+        col <- gsub("[[:space:]]+", " ", trimws(col))
+        out[[nm]] <- col
+      }
+
+      out
     }
 
     first_non_empty <- function(x) {
       x <- normalize_text(x)
       x <- x[nzchar(x)]
       if (length(x) == 0) "" else x[1]
+    }
+
+    remember_and_restore_scroll <- function(expr) {
+      session$sendCustomMessage(
+        "idc-remember-scroll",
+        list(id = ns("editable_table"))
+      )
+
+      force(expr)
+
+      session$onFlushed(function() {
+        session$sendCustomMessage(
+          "idc-restore-scroll",
+          list(id = ns("editable_table"))
+        )
+      }, once = TRUE)
+    }
+
+    make_use_button <- function(row_i) {
+      as.character(
+        shiny::tags$button(
+          type = "button",
+          class = "btn btn-sm idc-btn-use",
+          onclick = sprintf(
+            "Shiny.setInputValue('%s', {row: %d, nonce: Math.random()}, {priority: 'event'})",
+            ns("use_suggestion"),
+            row_i
+          ),
+          "Use"
+        )
+      )
     }
 
     scientific_name_mapped <- shiny::reactive({
@@ -236,6 +357,41 @@ mod_identification_cleaning_server <- function(id, df_in, mapping_in) {
       dwc_term_chr <- trimws(dwc_term_chr)
 
       any(dwc_term_chr == "scientificName")
+    })
+
+    verbatim_identification_mapped <- shiny::reactive({
+      map_df <- mapping_in()
+      shiny::req(map_df)
+      shiny::req(is.data.frame(map_df))
+      shiny::req(all(c("user_column", "dwc_term") %in% names(map_df)))
+
+      dwc_term_chr <- as.character(map_df$dwc_term %||% "")
+      dwc_term_chr[is.na(dwc_term_chr)] <- ""
+      dwc_term_chr <- trimws(dwc_term_chr)
+
+      any(dwc_term_chr == "verbatimIdentification")
+    })
+
+    scientific_name_used <- shiny::reactive({
+      df <- df_in()
+      map_ok <- isTRUE(scientific_name_mapped())
+
+      if (!is.data.frame(df) || !map_ok || !("scientificName" %in% names(df))) {
+        return(FALSE)
+      }
+
+      any(nzchar(normalize_text(df$scientificName)))
+    })
+
+    verbatim_identification_used <- shiny::reactive({
+      df <- df_in()
+      map_ok <- isTRUE(verbatim_identification_mapped())
+
+      if (!is.data.frame(df) || !map_ok || !("verbatimIdentification" %in% names(df))) {
+        return(FALSE)
+      }
+
+      any(nzchar(normalize_text(df$verbatimIdentification)))
     })
 
     get_all_dwc_terms <- function() {
@@ -304,11 +460,26 @@ mod_identification_cleaning_server <- function(id, df_in, mapping_in) {
 
       low <- tolower(x)
 
-      m <- regexec("\\b(cf\\.?|aff\\.?|nr\\.?|sp\\.?|spp\\.?|msp\\.?)(.*)$", low, perl = TRUE)
-      hit <- regmatches(low, m)[[1]]
+      m_cf_aff_nr <- regexec(
+        "\\b(cf\\.?|aff\\.?|nr\\.?)\\b\\s+([[:alpha:]][[:alnum:]_.-]*)\\b",
+        low,
+        perl = TRUE
+      )
+      hit_cf_aff_nr <- regmatches(low, m_cf_aff_nr)[[1]]
 
-      if (length(hit) > 0) {
-        return(normalize_text(paste0(hit[2], hit[3])))
+      if (length(hit_cf_aff_nr) > 0) {
+        return(normalize_text(paste(hit_cf_aff_nr[2], hit_cf_aff_nr[3])))
+      }
+
+      m_sp_like <- regexec(
+        "\\b(sp\\.?|spp\\.?|msp\\.?)\\b\\s*(\\d+)?\\b",
+        low,
+        perl = TRUE
+      )
+      hit_sp_like <- regmatches(low, m_sp_like)[[1]]
+
+      if (length(hit_sp_like) > 0) {
+        return(normalize_text(paste(hit_sp_like[2], hit_sp_like[3])))
       }
 
       if (grepl("\\?$", low)) {
@@ -342,41 +513,32 @@ mod_identification_cleaning_server <- function(id, df_in, mapping_in) {
         return(existing)
       }
 
-      combined <- normalize_text(paste(
-        first_non_empty(block$scientificName),
-        first_non_empty(block$verbatimIdentification),
-        source_value
+      source_for_qualifier <- source_value
+
+      combined_for_traits <- normalize_text(paste(
+        source_value,
+        if ("verbatimIdentification" %in% names(block)) first_non_empty(block$verbatimIdentification) else "",
+        if ("scientificName" %in% names(block)) first_non_empty(block$scientificName) else ""
       ))
 
       if (identical(col, "identificationQualifier")) {
-        return(suggest_identification_qualifier(combined))
+        return(suggest_identification_qualifier(source_for_qualifier))
       }
 
       if (identical(col, "lifeStage")) {
-        return(suggest_lifestage(combined))
+        return(suggest_lifestage(combined_for_traits))
       }
 
       if (identical(col, "sex")) {
-        return(suggest_sex(combined))
+        return(suggest_sex(combined_for_traits))
       }
 
       ""
     }
 
     source_column <- shiny::reactive({
-      df <- df_in()
-      shiny::req(df)
-
-      cols <- names(df)
-
-      has_vi <- "verbatimIdentification" %in% cols &&
-        any(nzchar(normalize_text(df$verbatimIdentification)))
-
-      has_sn <- "scientificName" %in% cols &&
-        any(nzchar(normalize_text(df$scientificName)))
-
-      if (has_vi) return("verbatimIdentification")
-      if (has_sn) return("scientificName")
+      if (isTRUE(verbatim_identification_used())) return("verbatimIdentification")
+      if (isTRUE(scientific_name_used())) return("scientificName")
       NULL
     })
 
@@ -395,10 +557,7 @@ mod_identification_cleaning_server <- function(id, df_in, mapping_in) {
         )
       }
 
-      has_vi <- "verbatimIdentification" %in% names(df) &&
-        any(nzchar(normalize_text(df$verbatimIdentification)))
-
-      fallback <- identical(src, "scientificName") && !has_vi
+      fallback <- identical(src, "scientificName") && !isTRUE(verbatim_identification_used())
 
       shiny::tagList(
         shiny::tags$p(
@@ -413,7 +572,7 @@ mod_identification_cleaning_server <- function(id, df_in, mapping_in) {
         },
         shiny::tags$p(
           class = "idc-small",
-          "The table below shows one editable row per unique value of the source identification column."
+          "Use the table on the side to edit rows corresponding to unique taxonomic entries."
         )
       )
     })
@@ -512,6 +671,9 @@ mod_identification_cleaning_server <- function(id, df_in, mapping_in) {
 
       if (nrow(out) == 0) return(NULL)
 
+      show_current_scientific <- isTRUE(scientific_name_used())
+      show_verbatim_identification <- isTRUE(verbatim_identification_used())
+
       split_idx <- split(seq_len(nrow(out)), out$.source_key)
 
       rows <- lapply(names(split_idx), function(key) {
@@ -524,14 +686,19 @@ mod_identification_cleaning_server <- function(id, df_in, mapping_in) {
         suggested <- suggest_scientific_name(src_value)
         reviewed <- first_non_empty(block$.reviewedScientificName)
 
-        row <- list(
-          sourceValue = src_value,
-          currentScientificName = sci_current,
-          verbatimIdentification = verb_current,
-          suggestedScientificName = suggested,
-          useSuggestion = "",
-          reviewedScientificName = reviewed
-        )
+        row <- list(sourceValue = src_value)
+
+        if (show_current_scientific) {
+          row$currentScientificName <- sci_current
+        }
+
+        if (show_verbatim_identification) {
+          row$verbatimIdentification <- verb_current
+        }
+
+        row$suggestedScientificName <- suggested
+        row$useSuggestion <- ""
+        row$reviewedScientificName <- reviewed
 
         for (col in selected_cols) {
           row[[col]] <- suggest_optional_value(col, block, src_value)
@@ -551,19 +718,7 @@ mod_identification_cleaning_server <- function(id, df_in, mapping_in) {
         if (length(ids) == 0) next
 
         out[out$.row_id %in% ids, ".suggestedScientificName"] <- disp$suggestedScientificName[i]
-
-        disp$useSuggestion[i] <- as.character(
-          shiny::tags$button(
-            type = "button",
-            class = "btn btn-sm btn-outline-secondary",
-            onclick = sprintf(
-              "Shiny.setInputValue('%s', {row: %d, nonce: Math.random()}, {priority: 'event'})",
-              ns("use_suggestion"),
-              i
-            ),
-            "Use"
-          )
-        )
+        disp$useSuggestion[i] <- make_use_button(i)
       }
 
       map <- c(reviewedScientificName = ".reviewedScientificName")
@@ -572,32 +727,11 @@ mod_identification_cleaning_server <- function(id, df_in, mapping_in) {
       }
 
       list(
-        full_data = out,
-        display_data = disp,
+        full_data = sanitize_atomic_df(out),
+        display_data = sanitize_atomic_df(disp),
         col_map = map,
         source_col = src
       )
-    }
-
-    refresh_table_incremental <- function() {
-      session$sendCustomMessage(
-        "idc-remember-scroll",
-        list(id = ns("editable_table"))
-      )
-
-      DT::replaceData(
-        proxy = table_proxy,
-        data = rv$display_data,
-        resetPaging = FALSE,
-        rownames = FALSE
-      )
-
-      session$onFlushed(function() {
-        session$sendCustomMessage(
-          "idc-restore-scroll",
-          list(id = ns("editable_table"))
-        )
-      }, once = TRUE)
     }
 
     shiny::observeEvent(list(df_in(), mapping_in()), {
@@ -611,8 +745,6 @@ mod_identification_cleaning_server <- function(id, df_in, mapping_in) {
       rv$skipped <- FALSE
       rv$table_seed <- 0L
     }, ignoreInit = FALSE)
-
-    table_proxy <- DT::dataTableProxy("editable_table", session = session)
 
     shiny::observeEvent(input$build_table, {
       df <- df_in()
@@ -630,6 +762,12 @@ mod_identification_cleaning_server <- function(id, df_in, mapping_in) {
       rv$fallback_used <- identical(built$source_col, "scientificName")
       rv$skipped <- FALSE
       rv$table_seed <- rv$table_seed + 1L
+
+      shiny::showNotification(
+        "Editable table built successfully.",
+        type = "message",
+        duration = 3
+      )
     })
 
     output$table_note <- shiny::renderUI({
@@ -654,9 +792,9 @@ mod_identification_cleaning_server <- function(id, df_in, mapping_in) {
 
     output$editable_table <- DT::renderDT({
       shiny::req(rv$table_seed > 0L)
+      shiny::req(rv$display_data)
 
-      df_disp <- rv$display_data
-      shiny::req(df_disp)
+      df_disp <- sanitize_atomic_df(rv$display_data)
 
       hide_idx <- which(names(df_disp) %in% c("sourceValue", ".row_ids")) - 1L
       editable_names <- c("reviewedScientificName", input$other_cols %||% character(0))
@@ -684,30 +822,42 @@ mod_identification_cleaning_server <- function(id, df_in, mapping_in) {
           order = list(list(which(names(df_disp) == "reviewedScientificName") - 1L, "asc")),
           columnDefs = list(
             list(visible = FALSE, targets = hide_idx)
-          ),
-          preDrawCallback = DT::JS("function() { Shiny.unbindAll(this.api().table().node()); }"),
-          drawCallback = DT::JS("function() { Shiny.bindAll(this.api().table().node()); }")
+          )
         )
       )
 
-      dt <- DT::formatStyle(
-        dt,
-        columns = "currentScientificName",
-        backgroundColor = "#f8f9fa"
-      )
+      if ("currentScientificName" %in% names(df_disp)) {
+        dt <- DT::formatStyle(
+          dt,
+          columns = "currentScientificName",
+          backgroundColor = "#f8f9fa"
+        )
+      }
 
-      dt <- DT::formatStyle(
-        dt,
-        columns = "suggestedScientificName",
-        backgroundColor = "#eef6ff"
-      )
+      if ("verbatimIdentification" %in% names(df_disp)) {
+        dt <- DT::formatStyle(
+          dt,
+          columns = "verbatimIdentification",
+          backgroundColor = "#f8f9fa"
+        )
+      }
 
-      dt <- DT::formatStyle(
-        dt,
-        columns = "reviewedScientificName",
-        backgroundColor = "#fde7e9",
-        fontWeight = "600"
-      )
+      if ("suggestedScientificName" %in% names(df_disp)) {
+        dt <- DT::formatStyle(
+          dt,
+          columns = "suggestedScientificName",
+          backgroundColor = "#eef6ff"
+        )
+      }
+
+      if ("reviewedScientificName" %in% names(df_disp)) {
+        dt <- DT::formatStyle(
+          dt,
+          columns = "reviewedScientificName",
+          backgroundColor = "#fde7e9",
+          fontWeight = "600"
+        )
+      }
 
       dt
     }, server = FALSE)
@@ -720,59 +870,99 @@ mod_identification_cleaning_server <- function(id, df_in, mapping_in) {
         return(invisible(NULL))
       }
 
-      df_disp <- rv$display_data
-      df_full <- rv$full_data
+      remember_and_restore_scroll({
+        df_disp <- rv$display_data
+        df_full <- rv$full_data
 
-      suggested <- normalize_text(df_disp$suggestedScientificName[row_i])
-      ids <- as.integer(strsplit(df_disp$.row_ids[row_i], ",", fixed = TRUE)[[1]])
-      ids <- ids[!is.na(ids)]
+        suggested <- normalize_text(df_disp$suggestedScientificName[row_i])
+        ids <- as.integer(strsplit(df_disp$.row_ids[row_i], ",", fixed = TRUE)[[1]])
+        ids <- ids[!is.na(ids)]
 
-      df_disp$reviewedScientificName[row_i] <- suggested
+        df_disp$reviewedScientificName[row_i] <- suggested
 
-      if (length(ids) > 0) {
-        df_full[df_full$.row_id %in% ids, ".reviewedScientificName"] <- suggested
+        if (length(ids) > 0) {
+          df_full[df_full$.row_id %in% ids, ".reviewedScientificName"] <- suggested
+        }
+
+        rv$display_data <- sanitize_atomic_df(df_disp)
+        rv$full_data <- sanitize_atomic_df(df_full)
+        rv$ready <- FALSE
+      })
+    }, ignoreInit = TRUE)
+
+    shiny::observeEvent(input$use_all_suggestions, {
+      shiny::req(rv$display_data, rv$full_data)
+
+      suggested <- normalize_text(rv$display_data$suggestedScientificName)
+      fill_idx <- which(nzchar(suggested))
+
+      if (length(fill_idx) == 0) {
+        shiny::showNotification(
+          "There are no suggestions available to apply.",
+          type = "warning"
+        )
+        return(invisible(NULL))
       }
 
-      rv$display_data <- df_disp
-      rv$full_data <- df_full
-      rv$ready <- FALSE
+      remember_and_restore_scroll({
+        df_disp <- rv$display_data
+        df_full <- rv$full_data
 
-      refresh_table_incremental()
+        df_disp$reviewedScientificName[fill_idx] <- suggested[fill_idx]
+
+        for (i in fill_idx) {
+          ids <- as.integer(strsplit(df_disp$.row_ids[i], ",", fixed = TRUE)[[1]])
+          ids <- ids[!is.na(ids)]
+
+          if (length(ids) > 0) {
+            df_full[df_full$.row_id %in% ids, ".reviewedScientificName"] <- suggested[i]
+          }
+        }
+
+        rv$display_data <- sanitize_atomic_df(df_disp)
+        rv$full_data <- sanitize_atomic_df(df_full)
+        rv$ready <- FALSE
+      })
+
+      shiny::showNotification(
+        paste(length(fill_idx), "suggestion(s) copied to Reviewed scientificName."),
+        type = "message"
+      )
     }, ignoreInit = TRUE)
 
     shiny::observeEvent(input$editable_table_cell_edit, {
       shiny::req(rv$display_data, rv$full_data, rv$col_map)
 
       info <- input$editable_table_cell_edit
-      df_disp <- rv$display_data
-      df_full <- rv$full_data
-
       if (is.null(info$row) || is.null(info$col)) {
         return(invisible(NULL))
       }
 
-      col_name <- names(df_disp)[info$col + 1L]
+      remember_and_restore_scroll({
+        df_disp <- rv$display_data
+        df_full <- rv$full_data
 
-      if (!col_name %in% names(rv$col_map)) {
-        return(invisible(NULL))
-      }
+        col_name <- names(df_disp)[info$col + 1L]
 
-      target_col <- rv$col_map[[col_name]]
-      ids <- as.integer(strsplit(df_disp$.row_ids[info$row], ",", fixed = TRUE)[[1]])
-      ids <- ids[!is.na(ids)]
-      value <- normalize_text(info$value)
+        if (!col_name %in% names(rv$col_map)) {
+          return(invisible(NULL))
+        }
 
-      df_disp[info$row, col_name] <- value
+        target_col <- rv$col_map[[col_name]]
+        ids <- as.integer(strsplit(df_disp$.row_ids[info$row], ",", fixed = TRUE)[[1]])
+        ids <- ids[!is.na(ids)]
+        value <- normalize_text(info$value)
 
-      if (length(ids) > 0) {
-        df_full[df_full$.row_id %in% ids, target_col] <- value
-      }
+        df_disp[info$row, col_name] <- value
 
-      rv$display_data <- df_disp
-      rv$full_data <- df_full
-      rv$ready <- FALSE
+        if (length(ids) > 0) {
+          df_full[df_full$.row_id %in% ids, target_col] <- value
+        }
 
-      refresh_table_incremental()
+        rv$display_data <- sanitize_atomic_df(df_disp)
+        rv$full_data <- sanitize_atomic_df(df_full)
+        rv$ready <- FALSE
+      })
     }, ignoreInit = TRUE)
 
     output$apply_btn_ui <- shiny::renderUI({
@@ -782,12 +972,12 @@ mod_identification_cleaning_server <- function(id, df_in, mapping_in) {
         shiny::actionButton(
           ns("apply_changes"),
           "Apply changes to dataset",
-          class = "btn-success"
+          class = "idc-btn-apply"
         ),
         shiny::actionButton(
           ns("skip_step"),
           "Skip this step",
-          class = "btn-outline-warning"
+          class = "idc-btn-skip"
         )
       )
     })
@@ -882,7 +1072,7 @@ mod_identification_cleaning_server <- function(id, df_in, mapping_in) {
           easyClose = TRUE,
           footer = shiny::tagList(
             shiny::modalButton("Cancel"),
-            shiny::actionButton(ns("confirm_skip"), "Skip this step", class = "btn-warning")
+            shiny::actionButton(ns("confirm_skip"), "Skip this step", class = "idc-btn-skip")
           )
         )
       )
@@ -940,6 +1130,7 @@ mod_identification_cleaning_server <- function(id, df_in, mapping_in) {
         shiny::tags$p(shiny::tags$b("Reviewed scientificName completed: "), reviewed_n, " / ", nrow(df)),
         shiny::tags$p(shiny::tags$b("Missing reviewed scientificName: "), missing_n),
         shiny::tags$p(shiny::tags$b("scientificName mapped previously: "), if (isTRUE(scientific_name_mapped())) "Yes" else "No"),
+        shiny::tags$p(shiny::tags$b("verbatimIdentification mapped previously: "), if (isTRUE(verbatim_identification_mapped())) "Yes" else "No"),
         shiny::tags$p(shiny::tags$b("Applied to dataset: "), if (!is.null(rv$applied_df) && !isTRUE(rv$skipped)) "Yes" else "No"),
         shiny::tags$p(shiny::tags$b("Step skipped: "), if (isTRUE(rv$skipped)) "Yes" else "No")
       )

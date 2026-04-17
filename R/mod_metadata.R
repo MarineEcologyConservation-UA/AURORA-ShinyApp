@@ -219,12 +219,8 @@ mod_metadata_ui <- function(id) {
       "Dataset Metadata"
     ),
     shiny::div(
-      class = "metadata-page-subtitle",
-      "Preencha os metadados do dataset em secções organizadas por tema."
-    ),
-    shiny::div(
       class = "metadata-note",
-      "As secções seguem a estrutura da planilha do IPT. Os campos automáticos podem ser preenchidos manualmente agora e, futuramente, podem ser ligados ao pipeline para auto-preenchimento."
+      "The sections follow the structure of the GBIF IPT metadata form. Fields can be completed to facilitate metadata review among dataset authors, and then copied and pasted into the metadata form of the selected IPT for dataset submission."
     ),
 
     shiny::div(
@@ -727,7 +723,7 @@ mod_metadata_ui <- function(id) {
               ),
               shiny::uiOutput(ns("alt_ids_ui"))
             ),
-            .metadata_nav_buttons(ns, current = "meta", prev_tab = "external", next_tab = "info")
+            .metadata_nav_buttons(ns, current = "meta", prev_tab = "external", next_tab = "export")
           )
         ),
 
@@ -735,45 +731,15 @@ mod_metadata_ui <- function(id) {
         # 15. Info / reference
         # ---------------------------------------------------
         bslib::nav_panel(
-          title = "Info",
-          value = "info",
+          title = "Export",
+          value = "export",
           shiny::div(
             class = "metadata-block",
             .metadata_section(
-              "Subtype reference",
-              shiny::tags$ul(
-                shiny::tags$li(shiny::strong("Taxonomic Authority"), ": checklist taxonómica autoritativa."),
-                shiny::tags$li(shiny::strong("Nomenclator Authority"), ": checklist nomenclatural."),
-                shiny::tags$li(shiny::strong("Thematic"), ": checklist temática."),
-                shiny::tags$li(shiny::strong("Inventory Regional"), ": checklist regional."),
-                shiny::tags$li(shiny::strong("Global Species Dataset"), ": checklist com cobertura global."),
-                shiny::tags$li(shiny::strong("Derived from Occurrence"), ": derivado de dados de ocorrência."),
-                shiny::tags$li(shiny::strong("Specimen"), ": dados de espécimes."),
-                shiny::tags$li(shiny::strong("Observation"), ": dados observacionais.")
-              )
+              "Export metadata",
+              shiny::downloadButton(ns("export_metadata_ods"), "Export workbook", class = "btn btn-success")
             ),
-            .metadata_section(
-              "Role reference",
-              shiny::tags$ul(
-                shiny::tags$li("Author"),
-                shiny::tags$li("Content Provider"),
-                shiny::tags$li("Custodian Steward"),
-                shiny::tags$li("Distributor"),
-                shiny::tags$li("Editor"),
-                shiny::tags$li("Metadata Provider"),
-                shiny::tags$li("Originator"),
-                shiny::tags$li("Owner"),
-                shiny::tags$li("Point Of Contact"),
-                shiny::tags$li("Principal Investigator"),
-                shiny::tags$li("Processor"),
-                shiny::tags$li("Publisher"),
-                shiny::tags$li("User"),
-                shiny::tags$li("Programmer"),
-                shiny::tags$li("Curator"),
-                shiny::tags$li("Reviewer")
-              )
-            ),
-            .metadata_nav_buttons(ns, current = "info", prev_tab = "meta")
+            .metadata_nav_buttons(ns, current = "export", prev_tab = "meta")
           )
         )
       )
@@ -829,7 +795,7 @@ mod_metadata_server <- function(id) {
       "collections",
       "external",
       "meta",
-      "info"
+      "export"
     )
 
     go_to_tab <- function(target_tab) {
@@ -871,6 +837,80 @@ mod_metadata_server <- function(id) {
     shiny::observe({
       cat("DEBUG current metadata tab input ->", input$metadata_tabs %||% "NULL", "\n")
     })
+
+
+    export_metadata_path <- shiny::reactive({
+      req <- shiny::req
+      req(TRUE)
+      path <- tempfile(fileext = ".xlsx")
+
+      basic_df <- data.frame(field = names(basic()), value = unlist(basic(), use.names = FALSE), stringsAsFactors = FALSE)
+      geo_df <- data.frame(field = names(geographical()), value = unlist(geographical(), use.names = FALSE), stringsAsFactors = FALSE)
+      tax_df <- data.frame(field = names(taxonomic()), value = unlist(taxonomic(), use.names = FALSE), stringsAsFactors = FALSE)
+      temp_df <- data.frame(field = names(temporal()), value = unlist(temporal(), use.names = FALSE), stringsAsFactors = FALSE)
+      adddesc_df <- data.frame(field = names(additional_description()), value = unlist(additional_description(), use.names = FALSE), stringsAsFactors = FALSE)
+      project_raw <- project()
+      project_df <- data.frame(
+        field = c("title", "funding", "studyAreaDescription", "designDescription"),
+        value = c(project_raw$title, project_raw$funding, project_raw$studyAreaDescription, project_raw$designDescription),
+        stringsAsFactors = FALSE
+      )
+      sampling_df <- data.frame(field = names(sampling_methods()), value = unlist(sampling_methods(), use.names = FALSE), stringsAsFactors = FALSE)
+      citations_raw <- citations()
+      citations_main_df <- data.frame(
+        field = c("resourceCitation", "resourceCitationIdentifier"),
+        value = c(citations_raw$resourceCitation, citations_raw$resourceCitationIdentifier),
+        stringsAsFactors = FALSE
+      )
+      ext_raw <- list(resourceHomepage = input$external_homepage, otherDataFormats = external_formats())
+      ext_links_df <- data.frame(field = "resourceHomepage", value = ext_raw$resourceHomepage, stringsAsFactors = FALSE)
+      addmeta_df <- data.frame(field = names(additional_metadata()[1:4]), value = unlist(additional_metadata()[1:4], use.names = FALSE), stringsAsFactors = FALSE)
+      ack_df <- data.frame(field = "acknowledgements", value = input$ack_text %||% "", stringsAsFactors = FALSE)
+
+      sheets <- list(
+        Basic = basic_df,
+        Contacts = contacts(),
+        Acknowledgements = ack_df,
+        Geographical = geo_df,
+        Taxonomic = tax_df,
+        Temporal = temp_df,
+        AdditionalDescription = adddesc_df,
+        Keywords = keywords(),
+        Project = project_df,
+        ProjectPersonnel = project_personnel(),
+        SamplingMethods = sampling_df,
+        Citations = citations_main_df,
+        BibliographicCitations = bibliographic_citations(),
+        Collections = collections(),
+        PreservationMethods = data.frame(method = preservation_methods(), stringsAsFactors = FALSE),
+        CuratorialUnits = curatorial_units(),
+        ExternalLinks = ext_links_df,
+        OtherDataFormats = external_formats(),
+        AdditionalMetadata = addmeta_df,
+        AlternativeIdentifiers = data.frame(identifier = alternative_identifiers(), stringsAsFactors = FALSE)
+      )
+
+      sheets <- lapply(sheets, function(df) {
+        if (is.null(df) || nrow(df) == 0) data.frame(note = "No data", stringsAsFactors = FALSE) else df
+      })
+
+      readODS::write_ods(x = sheets, path = path, append = FALSE)
+      path
+    })
+
+
+    output$export_metadata_ods <- shiny::downloadHandler(
+      filename = function() {
+        paste0("metadata_export_", Sys.Date(), ".ods")
+      },
+      content = function(file) {
+        # Get the path from the reactive
+        src <- export_metadata_path()
+        
+        # Copy the generated ODS file to the download destination
+        file.copy(src, file, overwrite = TRUE)
+      }
+    )
 
     # ---------------------------
     # Dynamic UI: Contacts

@@ -209,7 +209,7 @@ mod_dwc_mapping_ui <- function(id) {
           shiny::selectInput(
             ns("target_database"),
             "Data repository",
-            choices = c("GBIF", "OBIS"),
+            choices = c("GBIF", "OBIS", "EMODnet"),
             selected = "GBIF",
             width = "100%"
           ),
@@ -224,7 +224,7 @@ mod_dwc_mapping_ui <- function(id) {
           bslib::card_header("Actions"),
           shiny::downloadButton(
             ns("download_issues_csv"),
-            "Download Warning/Issues (CSV)",
+            "Download Warning/Errors (CSV)",
             class = "btn-outline-secondary download-btn"
           )
         ),
@@ -690,6 +690,47 @@ mod_dwc_mapping_ui <- function(id) {
         "order"
       ),
       note = "Test"
+    ),
+    EMODnet = list(
+      label = "EMODnet",
+      required = c(
+        "basisOfRecord",
+        "datasetName",
+        "decimalLatitude",
+        "decimalLongitude",
+        "eventDate",
+        "eventID",
+        "institutionCode",
+        "measurementType",
+        "measurementTypeID",
+        "measurementUnit",
+        "measurementValue",
+        "occurrenceID",
+        "occurrenceStatus",
+        "scientificName",
+        "scientificNameID"
+      ),
+      strongly_recommended = c(
+        "kingdom",
+        "taxonRank",
+        "parentEventID",
+        "footprintWKT",
+        "coordinateUncertaintyInMeters",
+        "maximumDepthInMeters",
+        "minimumDepthInMeters",
+        "measurementUnitID",
+        "measurementValueID",
+        "type",
+        "identificationQualifier",
+        "measurementAccuracy",
+        "measurementID",
+        "measurementRemarks",
+        "catalogNumber",
+        "collectionCode",
+        "modified",
+        "scientificNameAuthorship"
+      ),
+      note = "Test"
     )
   )
 }
@@ -802,12 +843,20 @@ mod_dwc_mapping_ui <- function(id) {
 .apply_mapping <- function(df, map_df) {
   out <- df
 
+  internal_cols <- intersect(names(out), aurora_internal_cols())
+
   final_names <- map_df$dwc_term
   blank <- is.na(final_names) | final_names == ""
   final_names[blank] <- map_df$user_column[blank]
 
-  out <- out[, map_df$user_column, drop = FALSE]
-  names(out) <- final_names
+  keep_user_cols <- intersect(map_df$user_column, names(out))
+  keep_cols <- c(keep_user_cols, setdiff(internal_cols, keep_user_cols))
+
+  out <- out[, keep_cols, drop = FALSE]
+
+  mapped_idx <- seq_along(keep_user_cols)
+  names(out)[mapped_idx] <- final_names[match(keep_user_cols, map_df$user_column)]
+
   out
 }
 
@@ -1126,7 +1175,7 @@ mod_dwc_mapping_server <- function(id, df_in) {
       df <- df_in()
       shiny::req(df)
 
-      cols <- names(df)
+      cols <- aurora_user_cols(df)
       keys <- make.names(cols, unique = TRUE)
       stats::setNames(cols, keys)
     })
@@ -1249,7 +1298,7 @@ mod_dwc_mapping_server <- function(id, df_in) {
       df <- df_in()
       shiny::req(df)
 
-      cols <- names(df)
+      cols <- aurora_user_cols(df)
 
       shiny::updateSelectizeInput(
         session,
@@ -1272,7 +1321,7 @@ mod_dwc_mapping_server <- function(id, df_in) {
       df <- current_preclean_df()
       if (is.null(df)) return()
 
-      cols <- names(df)
+      cols <- aurora_user_cols(df)
 
       shiny::updateSelectizeInput(
         session,
@@ -1525,10 +1574,6 @@ mod_dwc_mapping_server <- function(id, df_in) {
       default_suggestion <- deps$suggested_value[1] %||% ""
 
       shiny::tagList(
-        shiny::p(
-          "Some mapped or created terms imply the presence of a companion field. ",
-          "Select one dependency below and create the missing field with a constant value."
-        ),
         shiny::selectInput(
           session$ns("dependency_choice"),
           "Dependency",
@@ -1537,7 +1582,7 @@ mod_dwc_mapping_server <- function(id, df_in) {
         ),
         shiny::textInput(
           session$ns("dependency_value"),
-          "Value to fill the missing companion field",
+          "The value used to populate the dependency field",
           value = default_suggestion
         ),
         shiny::actionButton(
@@ -1805,7 +1850,7 @@ mod_dwc_mapping_server <- function(id, df_in) {
     output$preview_tbl <- DT::renderDT({
       shiny::req(rv$cleaned)
       DT::datatable(
-        utils::head(rv$cleaned, 200),
+        utils::head(aurora_drop_internal_cols(rv$cleaned), 200),
         rownames = FALSE,
         options = list(
           scrollX = TRUE,

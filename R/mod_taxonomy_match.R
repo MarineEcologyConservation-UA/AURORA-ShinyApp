@@ -7,8 +7,52 @@
 # - one lookup row per unique inputName
 # - selectable output columns to keep in final dataset
 # - notes block moved to the top
+# - dropped rows are logged for later QC merge
+# - debug table shows internal .aurora* columns after issues table
 # File: R/mod_taxonomy_match.R
 # =========================================================
+
+# -------- helper: init drop log --------
+.init_drop_log <- function() {
+  data.frame(
+    module = character(),
+    step = character(),
+    reason = character(),
+    .aurora_origin_row = integer(),
+    .aurora_origin_id = character(),
+    details = character(),
+    stringsAsFactors = FALSE
+  )
+}
+
+# -------- helper: append dropped rows to log --------
+.append_drop_log <- function(log_df, dropped_df, module, step, reason, details = NA_character_) {
+  if (is.null(log_df) || !is.data.frame(log_df)) {
+    log_df <- .init_drop_log()
+  }
+
+  if (is.null(dropped_df) || !is.data.frame(dropped_df) || nrow(dropped_df) == 0) {
+    return(log_df)
+  }
+
+  req_cols <- c(".aurora_origin_row", ".aurora_origin_id")
+  miss <- setdiff(req_cols, names(dropped_df))
+  if (length(miss) > 0) {
+    stop("Dropped rows are missing origin columns: ", paste(miss, collapse = ", "))
+  }
+
+  new_rows <- data.frame(
+    module = rep(module, nrow(dropped_df)),
+    step = rep(step, nrow(dropped_df)),
+    reason = rep(reason, nrow(dropped_df)),
+    .aurora_origin_row = dropped_df$.aurora_origin_row,
+    .aurora_origin_id = as.character(dropped_df$.aurora_origin_id),
+    details = rep(as.character(details), nrow(dropped_df)),
+    stringsAsFactors = FALSE
+  )
+
+  dplyr::bind_rows(log_df, new_rows)
+}
 
 #' Taxonomy match UI
 #' @param id module id
@@ -93,25 +137,25 @@ mod_taxonomy_match_ui <- function(id) {
     shiny::tags$div(
       class = "tax-tip-example",
       shiny::tags$span(class = "tax-tip-chip", "Polynoidae msp 1"),
-      " \u2192 ",
+      " → ",
       shiny::tags$span(class = "tax-tip-chip", "Polynoidae")
     ),
     shiny::tags$div(
       class = "tax-tip-example",
       shiny::tags$span(class = "tax-tip-chip", "Abra alba (juveniles)"),
-      " \u2192 ",
+      " → ",
       shiny::tags$span(class = "tax-tip-chip", "Abra alba")
     ),
     shiny::tags$div(
       class = "tax-tip-example",
       shiny::tags$span(class = "tax-tip-chip", "Gammarus cf. salinus"),
-      " \u2192 ",
+      " → ",
       shiny::tags$span(class = "tax-tip-chip", "Gammarus salinus")
     ),
     shiny::tags$div(
       class = "tax-tip-example",
       shiny::tags$span(class = "tax-tip-chip", "Nephtys indet."),
-      " \u2192 ",
+      " → ",
       shiny::tags$span(class = "tax-tip-chip", "Nephtys")
     )
   )
@@ -124,16 +168,30 @@ mod_taxonomy_match_ui <- function(id) {
     "i"
   )
 
-  css <- paste0("
+  css <- paste0(
+    "
     ", root_sel, " .tax-top .card-body { padding: 1rem; }
     ", root_sel, " .tax-top .card { height: 100%; }
     ", root_sel, " .tax-minh { min-height: 300px; }
     ", root_sel, " .tax-actions .btn { margin-right: .5rem; }
+
+    ", root_sel, " .tax-actions-right {
+      display: flex;
+      justify-content: flex-end;
+      align-items: center;
+      gap: .5rem;
+      flex-wrap: wrap;
+      margin-top: 1rem;
+      width: 100%;
+    }
+
+    ", root_sel, " .tax-actions-right .btn { margin-right: 0; }
     ", root_sel, " .tax-scroll-note { color: #6b7280; font-size: .9rem; }
     ", root_sel, " .tax-muted { color: #6b7280; }
     ", root_sel, " .tax-small { font-size: .92rem; }
     ", root_sel, " .tax-cols-wrap { max-height: 260px; overflow-y: auto; padding-right: .5rem; }
     ", root_sel, " .tax-card-fill { height: 100%; }
+
     ", root_sel, " .tax-summary-list {
       max-height: 120px;
       overflow-y: auto;
@@ -242,7 +300,43 @@ mod_taxonomy_match_ui <- function(id) {
       max-height: 180px;
       overflow-y: auto;
     }
-  ")
+
+    ", root_sel, " .tax-lookup-card .card-body {
+      overflow: visible !important;
+    }
+
+    ", root_sel, " .tax-lookup-wrap {
+      width: 100%;
+      overflow: visible !important;
+    }
+
+    ", root_sel, " .tax-lookup-wrap .dataTables_wrapper {
+      width: 100%;
+      margin-bottom: 0;
+      overflow: visible !important;
+    }
+
+    ", root_sel, " .tax-lookup-wrap .dataTables_scroll {
+      margin-bottom: 0;
+      overflow: visible !important;
+    }
+
+    ", root_sel, " .tax-lookup-wrap .dataTables_scrollHead {
+      overflow: hidden !important;
+    }
+
+    ", root_sel, " .tax-lookup-wrap .dataTables_scrollBody {
+      border-bottom: 0 !important;
+      overflow-x: auto !important;
+      overflow-y: auto !important;
+    }
+
+    ", root_sel, " .tax-lookup-wrap table.dataTable {
+      margin-top: 0 !important;
+      margin-bottom: 0 !important;
+    }
+  "
+  )
 
   shiny::tagList(
     shiny::tags$style(shiny::HTML(css)),
@@ -265,6 +359,7 @@ mod_taxonomy_match_ui <- function(id) {
                 shiny::tags$li("The lookup table shows one row per unique inputName."),
                 shiny::tags$li("When ambiguities exist, the user may manually choose one candidate before applying results to the dataset."),
                 shiny::tags$li("Rows without a resolved taxonomy match are discarded when results are applied to the final dataset."),
+                shiny::tags$li("Dropped rows are logged with .aurora origin columns for later QC merging."),
                 shiny::tags$li("If unresolved names need to be kept, the original file should be corrected and the workflow restarted.")
               )
             )
@@ -314,14 +409,11 @@ mod_taxonomy_match_ui <- function(id) {
 
                   shiny::tags$div(
                     class = "tax-actions d-flex gap-2 flex-wrap",
-                    shiny::actionButton(ns("run_match"), "Run match", class = "btn-primary"),
-                    shiny::uiOutput(ns("apply_btn_ui"), inline = TRUE)
+                    shiny::actionButton(ns("run_match"), "Run match", class = "btn-primary")
                   ),
 
                   shiny::hr(),
-                  shiny::uiOutput(ns("pkg_status")),
-                  shiny::hr(),
-                  shiny::downloadButton(ns("download_lookup"), "Export lookup (CSV)")
+                  shiny::uiOutput(ns("pkg_status"))
                 )
               ),
 
@@ -353,9 +445,18 @@ mod_taxonomy_match_ui <- function(id) {
       ),
 
       bslib::card(
+        class = "tax-lookup-card",
         bslib::card_header("Name lookup table"),
         bslib::card_body(
-          DT::DTOutput(ns("lookup_tbl"))
+          shiny::tags$div(
+            class = "tax-lookup-wrap",
+            DT::DTOutput(ns("lookup_tbl"))
+          ),
+          shiny::tags$div(
+            class = "tax-actions-right",
+            shiny::downloadButton(ns("download_lookup"), "Export lookup (CSV)"),
+            shiny::uiOutput(ns("apply_btn_ui"), inline = TRUE)
+          )
         )
       ),
 
@@ -363,6 +464,17 @@ mod_taxonomy_match_ui <- function(id) {
         bslib::card_header("Issues (taxonomy)"),
         bslib::card_body(
           DT::DTOutput(ns("issues_tbl"))
+        )
+      ),
+
+      bslib::card(
+        bslib::card_header("Debug - internal .aurora columns in current taxonomy input"),
+        bslib::card_body(
+          shiny::tags$div(
+            class = "text-muted small mb-2",
+            "This table is only for debugging, so you can confirm that .aurora internal columns are still present before taxonomy apply."
+          ),
+          DT::DTOutput(ns("aurora_debug_tbl"))
         )
       )
     )
@@ -372,7 +484,7 @@ mod_taxonomy_match_ui <- function(id) {
 #' Taxonomy match server
 #' @param id module id
 #' @param df_in reactive df after DwC mapping
-#' @return list(df_out, lookup, issues, ready)
+#' @return list(df_out, lookup, issues, ready, dropped_log)
 #' @export
 mod_taxonomy_match_server <- function(id, df_in) {
   shiny::moduleServer(id, function(input, output, session) {
@@ -453,8 +565,36 @@ mod_taxonomy_match_server <- function(id, df_in) {
       suppress_choice_popup = FALSE,
       pending_choice = NULL,
       ready = FALSE,
-      pending_apply = FALSE
+      pending_apply = FALSE,
+      dropped_log = .init_drop_log()
     )
+
+    shiny::observe({
+      df <- df_in()
+      shiny::req(df)
+
+      aurora_cols <- grep("^\\.aurora", names(df), value = TRUE)
+      has_row <- ".aurora_origin_row" %in% names(df)
+      has_id  <- ".aurora_origin_id" %in% names(df)
+
+      msg1 <- paste0(
+        "[TAXONOMY] aurora cols -> row: ", has_row,
+        " | id: ", has_id,
+        " | nrow=", nrow(df),
+        " | ncol=", ncol(df)
+      )
+
+      msg2 <- paste0(
+        "[TAXONOMY] .aurora columns: ",
+        if (length(aurora_cols) > 0) paste(aurora_cols, collapse = ", ") else "<none>"
+      )
+
+      message(msg1)
+      message(msg2)
+
+      cat(msg1, "\n")
+      cat(msg2, "\n")
+    })
 
     choice_observers <- list()
 
@@ -495,6 +635,7 @@ mod_taxonomy_match_server <- function(id, df_in) {
       rv$pending_choice <- NULL
       rv$ready <- FALSE
       rv$pending_apply <- FALSE
+      rv$dropped_log <- .init_drop_log()
     }, ignoreInit = FALSE)
 
     has_needed_pkgs <- shiny::reactive({
@@ -1110,12 +1251,21 @@ mod_taxonomy_match_server <- function(id, df_in) {
         return(data.frame(stringsAsFactors = FALSE))
       }
 
-      keep_display <- c(
-        "inputName", "taxonMatchStatus", "selectedID",
-        "AphiaID", "scientificname",
-        "authority", "status", "rank", "valid_name", "valid_authority",
-        "kingdom", "phylum", "class", "order", "family", "genus", "lsid"
-      )
+      keep_display <- if (identical(input$tax_db, "worms")) {
+        c(
+          "inputName", "taxonMatchStatus", "selectedID",
+          "AphiaID", "scientificname",
+          "authority", "status", "rank", "valid_name", "valid_authority",
+          "kingdom", "phylum", "class", "order", "family", "genus", "lsid"
+        )
+      } else {
+        c(
+          "inputName", "taxonMatchStatus", "selectedID",
+          "key", "scientificName", "canonicalName",
+          "authorship", "taxonomicStatus", "rank",
+          "kingdom", "phylum", "order", "family", "genus", "species"
+        )
+      }
 
       disp <- lookup[, intersect(keep_display, names(lookup)), drop = FALSE]
 
@@ -1154,13 +1304,13 @@ mod_taxonomy_match_server <- function(id, df_in) {
           if (length(ids) == 0) next
 
           lab <- paste0(
-            ids, " \u2014 ",
+            ids, " — ",
             sci,
             ifelse(rk != "", paste0(" [", rk, "]"), ""),
             ifelse(st != "", paste0(" (", st, ")"), ""),
             ifelse(vn != "", paste0(" | valid: ", vn), ""),
             ifelse(mt != "", paste0(" <", mt, ">"), ""),
-            ifelse(au != "", paste0(" \u2014 ", au), "")
+            ifelse(au != "", paste0(" — ", au), "")
           )
         } else {
           ids <- as.character(cand$key)
@@ -1185,12 +1335,12 @@ mod_taxonomy_match_server <- function(id, df_in) {
           primary_nm <- ifelse(sci != "", sci, can)
 
           lab <- paste0(
-            ids, " \u2014 ",
+            ids, " — ",
             primary_nm,
             ifelse(rk != "", paste0(" [", rk, "]"), ""),
             ifelse(st != "", paste0(" (", st, ")"), ""),
             ifelse(mt != "", paste0(" <", mt, ">"), ""),
-            ifelse(au != "", paste0(" \u2014 ", au), "")
+            ifelse(au != "", paste0(" — ", au), "")
           )
         }
 
@@ -1263,7 +1413,8 @@ mod_taxonomy_match_server <- function(id, df_in) {
             shiny::tags$p(paste0("Unique names: ", length(nms))),
             shiny::tags$p(paste0("UNRESOLVABLE (pre-match): ", sum(unres))),
             shiny::tags$p("MATCHED: 0 | AMBIGUOUS: 0 | NOT_FOUND: 0"),
-            shiny::tags$p("Dataset applied: NO")
+            shiny::tags$p("Dataset applied: NO"),
+            shiny::tags$p(paste0("Dropped rows logged: ", nrow(rv$dropped_log)))
           )
         )
       }
@@ -1296,7 +1447,8 @@ mod_taxonomy_match_server <- function(id, df_in) {
             "Dataset applied: ",
             if (!is.null(rv$applied_df) && is.data.frame(rv$applied_df)) "YES" else "NO"
           )
-        )
+        ),
+        shiny::tags$p(paste0("Dropped rows logged: ", nrow(rv$dropped_log)))
       )
     })
 
@@ -1479,6 +1631,7 @@ mod_taxonomy_match_server <- function(id, df_in) {
       rv$pending_choice <- NULL
       rv$ready <- FALSE
       rv$pending_apply <- FALSE
+      rv$dropped_log <- .init_drop_log()
 
       df <- df_in()
       shiny::req(is.data.frame(df))
@@ -1683,7 +1836,10 @@ mod_taxonomy_match_server <- function(id, df_in) {
       shiny::req(is.data.frame(df))
 
       if (is.null(rv$lookup) || !is.data.frame(rv$lookup) || nrow(rv$lookup) == 0) {
-        return(df)
+        return(list(
+          kept = df,
+          dropped = df[0, , drop = FALSE]
+        ))
       }
 
       src <- current_input_col()
@@ -1713,6 +1869,7 @@ mod_taxonomy_match_server <- function(id, df_in) {
       }
 
       status_group <- tax_status_group(lk_col("taxonMatchStatus"))
+      raw_status <- lk_col("taxonMatchStatus")
 
       if (identical(input$tax_db, "worms")) {
         resolved_name <- lk_col("valid_name")
@@ -1823,9 +1980,18 @@ mod_taxonomy_match_server <- function(id, df_in) {
 
       keep_rows <- status_group == "MATCHED"
       keep_rows[is.na(keep_rows)] <- FALSE
-      out <- out[keep_rows, , drop = FALSE]
 
-      out
+      dropped <- out[!keep_rows, , drop = FALSE]
+      kept <- out[keep_rows, , drop = FALSE]
+
+      if (nrow(dropped) > 0) {
+        dropped$taxonMatchStatus <- raw_status[!keep_rows]
+      }
+
+      list(
+        kept = kept,
+        dropped = dropped
+      )
     }
 
     df_out <- shiny::reactive({
@@ -1836,8 +2002,53 @@ mod_taxonomy_match_server <- function(id, df_in) {
     })
 
     finalize_apply <- function() {
-      out <- compute_out()
+      res <- compute_out()
+      out <- res$kept
+      dropped <- res$dropped
+
       shiny::req(is.data.frame(out))
+
+      rv$dropped_log <- .init_drop_log()
+
+      if (is.data.frame(dropped) && nrow(dropped) > 0) {
+        dropped_nf <- dropped[normalize_ws(dropped$taxonMatchStatus) == "NOT_FOUND", , drop = FALSE]
+        dropped_unres <- dropped[normalize_ws(dropped$taxonMatchStatus) == "UNRESOLVABLE", , drop = FALSE]
+        dropped_amb <- dropped[normalize_ws(dropped$taxonMatchStatus) == "AMBIGUOUS", , drop = FALSE]
+
+        if (nrow(dropped_nf) > 0) {
+          rv$dropped_log <- .append_drop_log(
+            log_df = rv$dropped_log,
+            dropped_df = dropped_nf,
+            module = "taxonomy",
+            step = "apply_match",
+            reason = "taxonomy_not_found",
+            details = "Row discarded because taxonomy match status was NOT_FOUND."
+          )
+        }
+
+        if (nrow(dropped_unres) > 0) {
+          rv$dropped_log <- .append_drop_log(
+            log_df = rv$dropped_log,
+            dropped_df = dropped_unres,
+            module = "taxonomy",
+            step = "apply_match",
+            reason = "taxonomy_unresolvable",
+            details = "Row discarded because taxonomy match status was UNRESOLVABLE."
+          )
+        }
+
+        if (nrow(dropped_amb) > 0) {
+          rv$dropped_log <- .append_drop_log(
+            log_df = rv$dropped_log,
+            dropped_df = dropped_amb,
+            module = "taxonomy",
+            step = "apply_match",
+            reason = "taxonomy_ambiguous_unresolved",
+            details = "Row discarded because taxonomy match status was AMBIGUOUS and no manual choice was selected."
+          )
+        }
+      }
+
       rv$applied_df <- out
       rv$ready <- TRUE
       rv$pending_apply <- FALSE
@@ -1861,9 +2072,29 @@ mod_taxonomy_match_server <- function(id, df_in) {
           " | UNRESOLVABLE=", n_unres,
           " | Rows kept=", nrow(out),
           " | Rows discarded=", discarded_n,
+          " | Dropped rows logged=", nrow(rv$dropped_log),
           ". Rows without a resolved taxonomy match were discarded. If you need to keep them, correct the original dataset and restart the workflow."
         )
       )
+
+      msg1 <- paste0(
+        "[TAXONOMY] apply complete -> kept=", nrow(out),
+        " | dropped=", max(0, discarded_n),
+        " | dropped_log=", nrow(rv$dropped_log)
+      )
+      msg2 <- paste0(
+        "[TAXONOMY] dropped_log reasons: ",
+        if (nrow(rv$dropped_log) > 0) {
+          paste(sort(unique(rv$dropped_log$reason)), collapse = ", ")
+        } else {
+          "<none>"
+        }
+      )
+
+      message(msg1)
+      message(msg2)
+      cat(msg1, "\n")
+      cat(msg2, "\n")
 
       shiny::showNotification(
         paste0(
@@ -1931,14 +2162,18 @@ mod_taxonomy_match_server <- function(id, df_in) {
         disp,
         escape = FALSE,
         rownames = FALSE,
+        selection = "none",
+        class = "compact stripe hover",
         options = list(
           paging = FALSE,
           searching = TRUE,
           info = FALSE,
+          ordering = FALSE,
+          autoWidth = TRUE,
           scrollX = TRUE,
           scrollY = "520px",
           scrollCollapse = TRUE,
-          autoWidth = TRUE,
+          dom = "ft",
           preDrawCallback = DT::JS("function() { Shiny.unbindAll(this.api().table().node()); }"),
           drawCallback = DT::JS("function() { Shiny.bindAll(this.api().table().node()); }")
         )
@@ -1960,6 +2195,31 @@ mod_taxonomy_match_server <- function(id, df_in) {
       )
     })
 
+    output$aurora_debug_tbl <- DT::renderDT({
+      df <- df_in()
+      shiny::req(is.data.frame(df))
+
+      aurora_cols <- grep("^\\.aurora", names(df), value = TRUE)
+
+      debug_df <- if (length(aurora_cols) > 0) {
+        df[, aurora_cols, drop = FALSE]
+      } else {
+        data.frame(
+          note = "No .aurora columns found in current taxonomy input.",
+          stringsAsFactors = FALSE
+        )
+      }
+
+      DT::datatable(
+        utils::head(debug_df, 200),
+        rownames = FALSE,
+        options = list(
+          scrollX = TRUE,
+          pageLength = 10
+        )
+      )
+    })
+
     session$onSessionEnded(function() {
       destroy_choice_observers()
     })
@@ -1968,6 +2228,7 @@ mod_taxonomy_match_server <- function(id, df_in) {
       df_out = df_out,
       lookup = shiny::reactive(rv$lookup),
       issues = shiny::reactive(rv$issues),
+      dropped_log = shiny::reactive(rv$dropped_log),
       ready = shiny::reactive(isTRUE(rv$ready))
     )
   })

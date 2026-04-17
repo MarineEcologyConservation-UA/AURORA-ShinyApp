@@ -74,14 +74,14 @@ mod_ingest_ui <- function(id) {
         shiny::tags$br(),
         shiny::tags$small(
           "If your dataset is already tidy, after loading it you can proceed directly by clicking ",
-          shiny::tags$em("Complete ingest"),
+          shiny::tags$em("Complete Ingestion"),
           "."
         )
       ),
 
       shiny::actionButton(
         ns("complete_ingest"),
-        "Complete ingest",
+        "Complete Ingestion",
         class = "btn-success"
       ),
 
@@ -131,11 +131,53 @@ mod_ingest_ui <- function(id) {
 
 `%||%` <- function(x, y) if (is.null(x)) y else x
 
+# -------- helper: init drop log --------
+.init_drop_log <- function() {
+  data.frame(
+    module = character(),
+    step = character(),
+    reason = character(),
+    .aurora_origin_row = integer(),
+    .aurora_origin_id = character(),
+    details = character(),
+    stringsAsFactors = FALSE
+  )
+}
+
+# -------- helper: append dropped rows to log --------
+.append_drop_log <- function(log_df, dropped_df, module, step, reason, details = NA_character_) {
+  if (is.null(log_df) || !is.data.frame(log_df)) {
+    log_df <- .init_drop_log()
+  }
+
+  if (is.null(dropped_df) || !is.data.frame(dropped_df) || nrow(dropped_df) == 0) {
+    return(log_df)
+  }
+
+  req_cols <- c(".aurora_origin_row", ".aurora_origin_id")
+  miss <- setdiff(req_cols, names(dropped_df))
+  if (length(miss) > 0) {
+    stop("Dropped rows are missing origin columns: ", paste(miss, collapse = ", "))
+  }
+
+  new_rows <- data.frame(
+    module = rep(module, nrow(dropped_df)),
+    step = rep(step, nrow(dropped_df)),
+    reason = rep(reason, nrow(dropped_df)),
+    .aurora_origin_row = dropped_df$.aurora_origin_row,
+    .aurora_origin_id = dropped_df$.aurora_origin_id,
+    details = rep(as.character(details), nrow(dropped_df)),
+    stringsAsFactors = FALSE
+  )
+
+  dplyr::bind_rows(log_df, new_rows)
+}
+
 #' Ingestion module server
 #'
 #' @param id Module id.
 #' @param example_map Named list mapping example labels to file paths.
-#' @return A list of reactives: raw, tidy, label, ready.
+#' @return A list of reactives: raw, tidy, current, ready, label, dropped_log.
 #' @export
 mod_ingest_server <- function(id, example_map) {
   shiny::moduleServer(id, function(input, output, session) {
@@ -145,7 +187,8 @@ mod_ingest_server <- function(id, example_map) {
       tidy = NULL,
       src_label = NULL,
       encoding_used = NULL,
-      ingest_complete = FALSE
+      ingest_complete = FALSE,
+      dropped_log = .init_drop_log()
     )
 
     # --------------------------------------------------
@@ -203,6 +246,7 @@ mod_ingest_server <- function(id, example_map) {
         rv$src_label <- p$label
         rv$encoding_used <- NULL
         rv$ingest_complete <- FALSE
+        rv$dropped_log <- .init_drop_log()
 
         pv$baseline <- NULL
         pv$data <- NULL
@@ -214,6 +258,9 @@ mod_ingest_server <- function(id, example_map) {
 
       rv$encoding_used <- attr(df, "encoding_used")
       df_norm <- .normalize_utf8_once(df, rv$encoding_used)
+
+      # add fixed origin trace columns
+      df_norm <- aurora_add_origin_cols(df_norm)
 
       rv$raw <- df_norm
 
@@ -230,6 +277,7 @@ mod_ingest_server <- function(id, example_map) {
 
       rv$src_label <- p$label
       rv$ingest_complete <- FALSE
+      rv$dropped_log <- .init_drop_log()
 
       pv$baseline <- rv$tidy
       pv$data <- rv$tidy
@@ -240,10 +288,24 @@ mod_ingest_server <- function(id, example_map) {
 
     shiny::observeEvent(input$complete_ingest, {
       shiny::req(pv$data)
-      shiny::validate(
-        shiny::need(nrow(pv$data) > 0, "The current dataset is empty."),
-        shiny::need(ncol(pv$data) > 0, "The current dataset has no columns.")
-      )
+
+      if (nrow(pv$data) == 0) {
+        shiny::showNotification(
+          "The current dataset is empty.",
+          type = "error",
+          duration = 4
+        )
+        return()
+      }
+
+      if (ncol(pv$data) == 0) {
+        shiny::showNotification(
+          "The current dataset has no columns.",
+          type = "error",
+          duration = 4
+        )
+        return()
+      }
 
       rv$ingest_complete <- TRUE
 
@@ -270,7 +332,8 @@ mod_ingest_server <- function(id, example_map) {
         "Current dataset: ", current_rows, " rows x ", current_cols, " cols\n",
         "Pivot applied: ", ifelse(isTRUE(pv$is_pivoted), "Yes", "No"), "\n",
         "Undo steps available: ", length(pv$history), "\n",
-        "Ingest complete: ", ifelse(isTRUE(rv$ingest_complete), "Yes", "No")
+        "Ingest complete: ", ifelse(isTRUE(rv$ingest_complete), "Yes", "No"), "\n",
+        "Dropped rows logged: ", nrow(rv$dropped_log)
       )
     })
 
@@ -281,7 +344,7 @@ mod_ingest_server <- function(id, example_map) {
       shiny::req(rv$raw)
 
       DT::datatable(
-        utils::head(rv$raw, 200),
+        utils::head(aurora_drop_internal_cols(rv$raw), 200),
         options = list(scrollX = TRUE, pageLength = 10)
       )
     })
@@ -297,6 +360,8 @@ mod_ingest_server <- function(id, example_map) {
       } else {
         rv$raw
       }
+
+      df <- aurora_drop_internal_cols(df)
 
       stats <- data.frame(
         column = names(df),
@@ -320,8 +385,8 @@ mod_ingest_server <- function(id, example_map) {
       shiny::req(pv$data)
 
       df <- pv$data
-      cols <- names(df)
-      num_cols <- cols[vapply(df, is.numeric, logical(1))]
+      cols <- aurora_user_cols(df)
+      num_cols <- cols[vapply(df[, cols, drop = FALSE], is.numeric, logical(1))]
 
       block_id <- session$ns("pivot_block")
 
@@ -466,12 +531,20 @@ mod_ingest_server <- function(id, example_map) {
 
             shiny::div(
               class = "pivot-field",
-              shiny::textInput(session$ns("pivot_names_to"), "Name for the new column (e.g., species) of former headers", "variable")
+              shiny::textInput(
+                session$ns("pivot_names_to"),
+                "Name for the new column (e.g., species) of former headers",
+                "variable"
+              )
             ),
 
             shiny::div(
               class = "pivot-field",
-              shiny::textInput(session$ns("pivot_values_to"), "New column name (e.g., density) for previous cell values", "value")
+              shiny::textInput(
+                session$ns("pivot_values_to"),
+                "New column name (e.g., density) for previous cell values",
+                "value"
+              )
             ),
 
             shiny::div(
@@ -513,7 +586,8 @@ mod_ingest_server <- function(id, example_map) {
         "Current dataset: ", nrow(pv$data), " rows x ", ncol(pv$data), " cols\n",
         "Pivot applied: ", ifelse(isTRUE(pv$is_pivoted), "Yes", "No"), "\n",
         "Undo steps available: ", length(pv$history), "\n",
-        "Ingest complete: ", ifelse(isTRUE(rv$ingest_complete), "Yes", "No")
+        "Ingest complete: ", ifelse(isTRUE(rv$ingest_complete), "Yes", "No"), "\n",
+        "Dropped rows logged: ", nrow(rv$dropped_log)
       )
     })
 
@@ -525,13 +599,18 @@ mod_ingest_server <- function(id, example_map) {
 
       df_before <- pv$data
       pivot_cols <- input$pivot_value_cols %||% character()
-      id_cols <- setdiff(names(df_before), pivot_cols)
+      id_cols <- setdiff(aurora_user_cols(df_before), pivot_cols)
 
-      shiny::validate(
-        shiny::need(length(pivot_cols) > 0, "Select at least one column to pivot.")
-      )
+      if (length(pivot_cols) == 0) {
+        shiny::showNotification(
+          "Select at least one column to pivot.",
+          type = "warning",
+          duration = 4
+        )
+        return()
+      }
 
-      df_after <- tryCatch({
+      res <- tryCatch({
         apply_pivot_longer(
           df = df_before,
           id_cols = id_cols,
@@ -551,12 +630,34 @@ mod_ingest_server <- function(id, example_map) {
         NULL
       })
 
-      if (is.null(df_after)) {
+      if (is.null(res)) {
         return()
       }
 
+      if (nrow(res$dropped_na) > 0) {
+        rv$dropped_log <- .append_drop_log(
+          log_df = rv$dropped_log,
+          dropped_df = res$dropped_na,
+          module = "ingest",
+          step = "pivot",
+          reason = "drop_na_after_pivot",
+          details = paste0("Dropped NA rows from column '", res$meta$values_to, "'.")
+        )
+      }
+
+      if (nrow(res$dropped_zero) > 0) {
+        rv$dropped_log <- .append_drop_log(
+          log_df = rv$dropped_log,
+          dropped_df = res$dropped_zero,
+          module = "ingest",
+          step = "pivot",
+          reason = "drop_zero_after_pivot",
+          details = paste0("Dropped zero rows from column '", res$meta$values_to, "'.")
+        )
+      }
+
       pv$history <- c(list(df_before), pv$history)
-      pv$data <- df_after
+      pv$data <- res$data
       pv$is_pivoted <- !identical(pv$data, pv$baseline)
       rv$ingest_complete <- FALSE
 
@@ -605,7 +706,7 @@ mod_ingest_server <- function(id, example_map) {
       shiny::req(pv$data)
 
       DT::datatable(
-        utils::head(pv$data, 200),
+        utils::head(aurora_drop_internal_cols(pv$data), 200),
         options = list(scrollX = TRUE, pageLength = 10)
       )
     })
@@ -621,7 +722,8 @@ mod_ingest_server <- function(id, example_map) {
       }),
       current = shiny::reactive(pv$data),
       ready = shiny::reactive(isTRUE(rv$ingest_complete)),
-      label = shiny::reactive(rv$src_label)
+      label = shiny::reactive(rv$src_label),
+      dropped_log = shiny::reactive(rv$dropped_log)
     )
   })
 }

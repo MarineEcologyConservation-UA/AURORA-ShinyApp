@@ -4,6 +4,8 @@
 #   were already created upstream when applicable.
 # - This function only splits the flat dataframe into DwC-A
 #   tables, optionally builds eMoF, and performs basic QC.
+# - Keeps .aurora traceability columns in event, occurrence,
+#   and eMoF tables when present.
 # =========================================================
 
 #' @export
@@ -39,6 +41,12 @@ build_dwca_tables <- function(df,
     if (length(x) == 0) return(NA_character_)
     x[[1]]
   }
+
+  # Keep internal traceability columns if present
+  aurora_trace_cols <- intersect(
+    aurora_internal_cols(),
+    names(df_work)
+  )
 
   # -------------------------------------------------------
   # 1) BASIC PRESENCE CHECKS ON INPUT DF
@@ -81,9 +89,9 @@ build_dwca_tables <- function(df,
     dplyr::pull(.data$Term) |>
     unique()
 
-  # Always keep structural IDs when present
-  event_terms <- unique(c("eventID", "parentEventID", event_terms))
-  occ_terms <- unique(c("eventID", "occurrenceID", occ_terms))
+  # Always keep structural IDs when present + aurora traceability cols
+  event_terms <- unique(c("eventID", "parentEventID", event_terms, aurora_trace_cols))
+  occ_terms <- unique(c("eventID", "occurrenceID", occ_terms, aurora_trace_cols))
 
   # EVENT TABLE
   if ("eventID" %in% names(df_work)) {
@@ -187,11 +195,15 @@ build_dwca_tables <- function(df,
           }
 
           event_emof_wide <- df_work |>
-            dplyr::select(.data$eventID, dplyr::all_of(event_cols)) |>
+            dplyr::select(
+              .data$eventID,
+              dplyr::any_of(aurora_trace_cols),
+              dplyr::all_of(event_cols)
+            ) |>
             dplyr::group_by(.data$eventID) |>
             dplyr::summarise(
               dplyr::across(
-                dplyr::all_of(event_cols),
+                dplyr::all_of(c(aurora_trace_cols, event_cols)),
                 .first_non_empty
               ),
               .groups = "drop"
@@ -236,6 +248,7 @@ build_dwca_tables <- function(df,
             dplyr::select(
               .data$eventID,
               .data$occurrenceID,
+              dplyr::any_of(aurora_trace_cols),
               dplyr::all_of(occurrence_cols)
             ) |>
             dplyr::distinct() |>
@@ -262,6 +275,7 @@ build_dwca_tables <- function(df,
         emof_table <- emof_table |>
           dplyr::select(
             .data$eventID, .data$occurrenceID,
+            dplyr::any_of(aurora_trace_cols),
             .data$measurementType, .data$measurementTypeID,
             .data$measurementValue, .data$measurementValueID,
             .data$measurementUnit, .data$measurementUnitID
