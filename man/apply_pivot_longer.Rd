@@ -33,7 +33,7 @@ apply_pivot_longer(
 \item{trim_names}{logical, trim whitespace in names_to column}
 }
 \value{
-data.frame
+list(data=..., dropped_na=..., dropped_zero=..., meta=...)
 }
 \description{
 Pure helper (no Shiny). Intended to be called by modules.
