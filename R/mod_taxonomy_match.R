@@ -352,15 +352,16 @@ mod_taxonomy_match_ui <- function(id) {
             bslib::card_header("Notes"),
             bslib::card_body(
               shiny::tags$ul(
-                shiny::tags$li("Matching starts from a configurable input column, ideally scientificName at this stage."),
-                shiny::tags$li("normalisedQuery is always created and represents the text actually submitted to the selected database."),
-                shiny::tags$li("WoRMS uses only worrms::wm_records_taxamatch()."),
-                shiny::tags$li("GBIF remains available for terrestrial names."),
-                shiny::tags$li("The lookup table shows one row per unique inputName."),
-                shiny::tags$li("When ambiguities exist, the user may manually choose one candidate before applying results to the dataset."),
-                shiny::tags$li("Rows without a resolved taxonomy match are discarded when results are applied to the final dataset."),
-                shiny::tags$li("Dropped rows are logged with .aurora origin columns for later QC merging."),
-                shiny::tags$li("If unresolved names need to be kept, the original file should be corrected and the workflow restarted.")
+                shiny::tags$li(shiny::tags$b("Taxonomic Matching"), " — Matches are generated from the scientificName field."),
+
+                shiny::tags$li(
+                shiny::tags$b("Database Authorities"), " — Marine taxa are validated against the World Register of Marine Species (worrms package, wm_records_taxamatch()). Terrestrial taxa are matched against the GBIF Backbone Taxonomy via the rgbif package."),
+
+                shiny::tags$li(shiny::tags$b("Ambiguity Resolution"), " — The results table contains one row per unique scientificName. When multiple candidate matches exist, a manual selection is required to confirm the correct taxon."),
+
+                shiny::tags$li(shiny::tags$b("Inclusion Rules"), " — Only records with a confirmed match are included in the final dataset and passed to subsequent processing steps. Unresolved names are excluded from the output but retained in the validation log for review."),
+
+                shiny::tags$li(shiny::tags$b("Workflow Restart"), " — To process unresolved names, corrections must be made in the Identification Data Cleaning tab and the taxonomic matching step must be rerun.")
               )
             )
           ),
@@ -775,11 +776,11 @@ mod_taxonomy_match_server <- function(id, df_in) {
           "phylum",
           "order",
           "family",
-          "genus",
-          "canonicalName",
-          "acceptedKey",
-          "matchType",
-          "confidence"
+          "genus"#,
+          #"canonicalName",
+          #"acceptedKey",
+          #"matchType",
+          #"confidence"
         )
       }
 

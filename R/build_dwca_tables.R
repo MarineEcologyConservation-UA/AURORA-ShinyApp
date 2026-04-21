@@ -1,16 +1,12 @@
-# =========================================================
-# Build DwC-A tables from flat mapped dataframe
-# - Assumes eventID, occurrenceID, parentEventID, and remarks
-#   were already created upstream when applicable.
-# - This function only splits the flat dataframe into DwC-A
-#   tables, optionally builds eMoF, and performs basic QC.
-# - Keeps .aurora traceability columns in event, occurrence,
-#   and eMoF tables when present.
-# =========================================================
+# build_dwca_tables.R
+#' Build Darwin Core Archive tables from input data and field mapping
+#'
 
 #' @export
 build_dwca_tables <- function(df,
                               dwc_terms,
+                              target_database = "GBIF",
+                              selected_terms = NULL,
                               emof_spec = NULL) {
 
   .data <- rlang::.data
@@ -23,17 +19,17 @@ build_dwca_tables <- function(df,
     stop("df has 0 rows.")
   }
   if (is.null(dwc_terms) || !is.data.frame(dwc_terms)) {
-    stop("dwc_terms must be a data.frame (with columns Table, Term).")
+    stop("dwc_terms must be a data.frame.")
   }
   if (!all(c("Table", "Term") %in% names(dwc_terms))) {
     stop("dwc_terms must contain columns: Table, Term.")
   }
+  if (!target_database %in% names(dwc_terms)) {
+    stop(paste0("dwc_terms must contain repository column: ", target_database))
+  }
 
   df_work <- df
 
-  # -------------------------------------------------------
-  # helpers
-  # -------------------------------------------------------
   .first_non_empty <- function(x) {
     x <- as.character(x)
     x <- trimws(x)
@@ -42,15 +38,38 @@ build_dwca_tables <- function(df,
     x[[1]]
   }
 
-  # Keep internal traceability columns if present
+  .normalize_table_name <- function(x) {
+    x <- as.character(x)
+    x <- trimws(x)
+    out <- rep(NA_character_, length(x))
+    out[x == "Event"] <- "Event"
+    out[x %in% c("Occurrence", "Occurrence.Core")] <- "Occurrence"
+    out[x == "eMoF"] <- "eMoF"
+    out
+  }
+
   aurora_trace_cols <- intersect(
     aurora_internal_cols(),
     names(df_work)
   )
 
-  # -------------------------------------------------------
-  # 1) BASIC PRESENCE CHECKS ON INPUT DF
-  # -------------------------------------------------------
+  repo_status <- as.character(dwc_terms[[target_database]])
+  repo_status[is.na(repo_status)] <- ""
+  repo_status <- trimws(tolower(repo_status))
+
+  dwc_terms2 <- dwc_terms
+  dwc_terms2$.table_norm <- .normalize_table_name(dwc_terms2$Table)
+  dwc_terms2$.repo_status <- repo_status
+
+  dwc_terms2 <- dwc_terms2[
+    !is.na(dwc_terms2$.table_norm) &
+      dwc_terms2$.table_norm != "" &
+      dwc_terms2$.repo_status != "" &
+      dwc_terms2$.repo_status != "na",
+    ,
+    drop = FALSE
+  ]
+
   if (!"eventID" %in% names(df_work)) {
     qc_messages <- c(qc_messages, "ERROR: Input dataframe is missing eventID.")
   } else {
@@ -76,24 +95,30 @@ build_dwca_tables <- function(df,
     df_work$parentEventID[trimws(df_work$parentEventID) == ""] <- NA_character_
   }
 
-  # -------------------------------------------------------
-  # 2) SPLIT TABLES (USING dwc_terms)
-  # -------------------------------------------------------
-  event_terms <- dwc_terms |>
-    dplyr::filter(.data$Table == "Event") |>
-    dplyr::pull(.data$Term) |>
-    unique()
+  get_repo_terms <- function(tbl) {
+    x <- dwc_terms2 |>
+      dplyr::filter(.data$.table_norm == tbl) |>
+      dplyr::pull(.data$Term) |>
+      unique()
 
-  occ_terms <- dwc_terms |>
-    dplyr::filter(.data$Table == "Occurrence") |>
-    dplyr::pull(.data$Term) |>
-    unique()
+    x <- intersect(x, names(df_work))
+    sort(unique(x))
+  }
 
-  # Always keep structural IDs when present + aurora traceability cols
-  event_terms <- unique(c("eventID", "parentEventID", event_terms, aurora_trace_cols))
-  occ_terms <- unique(c("eventID", "occurrenceID", occ_terms, aurora_trace_cols))
+  repo_event_terms <- get_repo_terms("Event")
+  repo_occ_terms <- get_repo_terms("Occurrence")
 
-  # EVENT TABLE
+  if (!is.null(selected_terms) && is.list(selected_terms)) {
+    event_terms <- unique(c("eventID", "parentEventID", selected_terms$event %||% character(0), aurora_trace_cols))
+    occ_terms <- unique(c("eventID", "occurrenceID", selected_terms$occurrence %||% character(0), aurora_trace_cols))
+  } else {
+    event_terms <- unique(c("eventID", "parentEventID", repo_event_terms, aurora_trace_cols))
+    occ_terms <- unique(c("eventID", "occurrenceID", repo_occ_terms, aurora_trace_cols))
+  }
+
+  event_terms <- intersect(event_terms, names(df_work))
+  occ_terms <- intersect(occ_terms, names(df_work))
+
   if ("eventID" %in% names(df_work)) {
     event_table <- df_work |>
       dplyr::select(dplyr::any_of(event_terms)) |>
@@ -102,7 +127,6 @@ build_dwca_tables <- function(df,
     event_table <- data.frame()
   }
 
-  # OCCURRENCE TABLE
   if ("occurrenceID" %in% names(df_work)) {
     occurrence_table <- df_work |>
       dplyr::select(dplyr::any_of(occ_terms)) |>
@@ -111,9 +135,6 @@ build_dwca_tables <- function(df,
     occurrence_table <- data.frame()
   }
 
-  # -------------------------------------------------------
-  # 3) EMOF BUILD (LEVEL PER COLUMN)
-  # -------------------------------------------------------
   emof_table <- NULL
 
   if (!is.null(emof_spec) &&
@@ -157,10 +178,6 @@ build_dwca_tables <- function(df,
 
       emof_parts <- list()
 
-      # -----------------------------------------------
-      # 3a) EVENT-LEVEL EMOF
-      # one row per eventID + measurementType
-      # -----------------------------------------------
       if (length(event_cols) > 0) {
 
         if (!"eventID" %in% names(df_work)) {
@@ -187,8 +204,7 @@ build_dwca_tables <- function(df,
                 qc_messages,
                 paste0(
                   "WARNING: event-level eMoF column '", cc,
-                  "' has conflicting values within the same eventID; ",
-                  "keeping the first non-empty value per event."
+                  "' has conflicting values within the same eventID; keeping the first non-empty value per event."
                 )
               )
             }
@@ -223,10 +239,6 @@ build_dwca_tables <- function(df,
         }
       }
 
-      # -----------------------------------------------
-      # 3b) OCCURRENCE-LEVEL EMOF
-      # one row per eventID + occurrenceID + measurementType
-      # -----------------------------------------------
       if (length(occurrence_cols) > 0) {
 
         if (!"occurrenceID" %in% names(df_work)) {
@@ -307,9 +319,6 @@ build_dwca_tables <- function(df,
     }
   }
 
-  # -------------------------------------------------------
-  # 4) BASIC QC
-  # -------------------------------------------------------
   if (!is.data.frame(event_table) || nrow(event_table) == 0) {
     qc_messages <- c(qc_messages, "ERROR: event table is empty.")
   } else {

@@ -42,7 +42,7 @@ mod_about_ui <- function(id) {
               ),
               shiny::p(
                 class = "home-note",
-                "While the deep sea covers 65% of the planet, it remains the least understood biome on Earth. In European marine waters, deep-sea records (>200 m) account for only 11% of databases like the Ocean Biogeographic Information System (OBIS)—a figure that plunges to just 1% for depths below 3,500 meters."
+                "Although the deep sea covers 65% of the planet, it remains Earth’s least understood biome. Within European marine waters, deep-sea data (depths >200 m) account for only 11% of records in the Ocean Biogeographic Information System (OBIS), dropping to a mere 1% for depths below 3500 meters."
               ),
               shiny::p(
                 class = "home-note",

@@ -56,7 +56,8 @@ server <- function(input, output, session) {
   dwca <- mod_build_dwca_server(
     "dwca",
     df_in = tax_match$df_out,
-    dwc_terms = dwc_terms
+    dwc_terms = dwc_terms,
+    target_database_in = dwc_map$target_database
   )
 
   metadata <- mod_metadata_server("metadata")

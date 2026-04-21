@@ -193,6 +193,11 @@ mod_dwc_mapping_ui <- function(id) {
       .selectize-dropdown {
         z-index: 5000 !important;
       }
+
+      .dwc-map-apply-wrap {
+        display: flex;
+        justify-content: flex-end;
+      }
     ")),
 
     bslib::layout_sidebar(
@@ -215,7 +220,7 @@ mod_dwc_mapping_ui <- function(id) {
           ),
           shiny::div(
             class = "dwc-map-inline-help",
-            "Required and strongly recommended terms below follow the selected database."
+            "Required terms follow the selected database."
           )
         ),
 
@@ -279,26 +284,31 @@ mod_dwc_mapping_ui <- function(id) {
               shiny::div(
                 class = "p-3",
                 shiny::h4("Map each column to a Darwin Core term"),
+                shiny::uiOutput(ns("mapping_export_note")),
+
+                shiny::uiOutput(ns("scientific_name_note")),
 
                 shiny::div(
-                  class = "dwc-map-mapping-actions",
+                  style = "margin: 0.5rem 0 0.75rem 0;",
                   shiny::actionButton(
                     ns("auto_suggest"),
                     "Auto-suggest",
                     icon = shiny::icon("magic"),
-                    class = "btn-primary"
+                    class = "btn-primary",
+                    style = "width: 100%;"
                   )
                 ),
 
-                shiny::uiOutput(ns("mapping_export_note")),
-                shiny::uiOutput(ns("scientific_name_note")),
                 shiny::uiOutput(ns("mapping_ui")),
                 shiny::div(class = "dwc-map-section-gap"),
-                shiny::actionButton(
-                  ns("apply_mapping"),
-                  "Apply mapping",
-                  icon = shiny::icon("check"),
-                  class = "btn-primary"
+                shiny::div(
+                  class = "dwc-map-apply-wrap",
+                  shiny::actionButton(
+                    ns("apply_mapping"),
+                    "Apply mapping",
+                    icon = shiny::icon("check"),
+                    class = "btn-primary"
+                  )
                 ),
                 shiny::div(class = "dwc-map-section-gap"),
                 shiny::uiOutput(ns("apply_notice"))
@@ -452,7 +462,7 @@ mod_dwc_mapping_ui <- function(id) {
                       ns("create_basis_of_record_btn"),
                       "Create / fill basisOfRecord",
                       icon = shiny::icon("plus"),
-                      class = "btn-primary"
+                      class = "btn-secondary"
                     ),
                     shiny::div(
                       class = "dwc-map-bor-note",
@@ -464,13 +474,13 @@ mod_dwc_mapping_ui <- function(id) {
                     fill = FALSE,
                     bslib::card_header(
                       shiny::tagList(
-                        "organismQuantity and sampleSizeValue Associated Fields ",
+                        "organismQuantity and sampleSizeValue Dependecy Fields ",
                         bslib::tooltip(
                           shiny::tags$span(
                             shiny::icon("info-circle"),
                             style = "cursor: help;"
                           ),
-                          "These are fields suggested because another mapped or created field usually requires an associated term."
+                          "These are fields suggested because another mapped or created field usually requires an dependecy term."
                         )
                       )
                     ),
@@ -480,12 +490,15 @@ mod_dwc_mapping_ui <- function(id) {
 
                 shiny::div(class = "dwc-map-section-gap"),
 
+                shiny::div(
+                style = "display:flex; justify-content:flex-end;",
                 shiny::actionButton(
                   ns("continue_to_formatting"),
-                  "Continue to formatting",
+                  "Continuing with the formatting",
                   icon = shiny::icon("arrow-right"),
-                  class = "btn-success"
+                  class = "btn-primary"
                 )
+              )
               )
             ),
 
@@ -557,11 +570,14 @@ mod_dwc_mapping_ui <- function(id) {
 
                 shiny::div(class = "dwc-map-section-gap"),
 
-                shiny::actionButton(
-                  ns("apply_formatting"),
-                  "Apply formatting and preview",
-                  icon = shiny::icon("check"),
-                  class = "btn-primary"
+                shiny::div(
+                  class = "text-end",
+                  shiny::actionButton(
+                    ns("apply_formatting"),
+                    "Apply formatting and preview",
+                    icon = shiny::icon("check"),
+                    class = "btn-success"
+                  )
                 )
               )
             ),
@@ -954,15 +970,15 @@ mod_dwc_mapping_ui <- function(id) {
     ))
   }
 
-  if (length(v$missing_strong) > 0) {
-    tag_list <- c(tag_list, list(
-      make_alert(
-        "warning",
-        "Strongly recommended terms still missing:",
-        v$missing_strong
-      )
-    ))
-  }
+  # if (length(v$missing_strong) > 0) {
+  #   tag_list <- c(tag_list, list(
+  #     make_alert(
+  #       "warning",
+  #       "Strongly recommended terms still missing:",
+  #       v$missing_strong
+  #     )
+  #   ))
+  # }
 
   if (length(v$duplicate_terms) > 0) {
     tag_list <- c(tag_list, list(
@@ -978,7 +994,7 @@ mod_dwc_mapping_ui <- function(id) {
     tag_list <- c(tag_list, list(
       make_alert(
         "warning",
-        "Companion field warnings:",
+        "Dependency field warnings:",
         v$dependency_messages
       )
     ))
@@ -1104,9 +1120,7 @@ mod_dwc_mapping_ui <- function(id) {
     ),
     shiny::tags$p(
       paste0(
-        "Before or after ",
-        step_label,
-        ", please review the minimum required terms for the selected database."
+        "Please revise the minimum required terms for the selected repository. Although the AURORA Shiny App will allow you to proceed, the repository may require further revisions before the dataset is accepted."
       )
     )
   )
@@ -1547,7 +1561,7 @@ mod_dwc_mapping_server <- function(id, df_in) {
         return(
           shiny::tags$div(
             class = "alert alert-light",
-            "Apply mapping first to detect associated fields."
+            "Apply mapping first to detect dependecy fields."
           )
         )
       }
@@ -1558,7 +1572,7 @@ mod_dwc_mapping_server <- function(id, df_in) {
         return(
           shiny::tags$div(
             class = "alert alert-light",
-            "No associated fields are currently suggested."
+            "No dependecy fields are currently suggested."
           )
         )
       }
@@ -1587,7 +1601,7 @@ mod_dwc_mapping_server <- function(id, df_in) {
         ),
         shiny::actionButton(
           session$ns("create_dependency_btn"),
-          "Create companion field",
+          "Create dependency field",
           icon = shiny::icon("plus")
         )
       )
@@ -1652,11 +1666,11 @@ mod_dwc_mapping_server <- function(id, df_in) {
       rv$formatting_done <- FALSE
       rv$ready <- FALSE
 
-      .show_missing_terms_modal(
-        session = session,
-        validation = current_validation(),
-        step_label = "applying mapping"
-      )
+      # .show_missing_terms_modal(
+      #   session = session,
+      #   validation = current_validation(),
+      #   step_label = "applying mapping"
+      # )
 
       bslib::nav_select(
         id = "main_tabs",
@@ -1803,11 +1817,11 @@ mod_dwc_mapping_server <- function(id, df_in) {
     shiny::observeEvent(input$continue_to_formatting, {
       shiny::req(!is.null(rv$mapped))
 
-      .show_missing_terms_modal(
-        session = session,
-        validation = current_validation(),
-        step_label = "continuing to formatting"
-      )
+      # .show_missing_terms_modal(
+      #   session = session,
+      #   validation = current_validation(),
+      #   step_label = "continuing to formatting"
+      # )
 
       bslib::nav_select(
         id = "main_tabs",
@@ -1903,6 +1917,7 @@ mod_dwc_mapping_server <- function(id, df_in) {
       issues = shiny::reactive(rv$issues),
       clean_summary = shiny::reactive(rv$clean_summary),
       validation = current_validation,
+      target_database = shiny::reactive(input$target_database %||% "GBIF"),
       ready = shiny::reactive(isTRUE(rv$ready))
     )
   })

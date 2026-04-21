@@ -229,7 +229,7 @@ mod_homepage_ui <- function(id) {
               class = "feature-card",
               bslib::card_body(
                 shiny::div(class = "feature-icon", "🗂️"),
-                shiny::div(class = "feature-title", "Build Darwin Core Archives"),
+                shiny::div(class = "feature-title", "Build Darwin Core Tables"),
                 shiny::div(
                   class = "feature-text",
                   "Structure the data into relational Event, Occurrence, and Extended Measurement or Fact (eMoF) tables to comply with the DwC-A star schema."

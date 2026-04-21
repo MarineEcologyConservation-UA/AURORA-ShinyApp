@@ -73,10 +73,19 @@ mod_ingest_ui <- function(id) {
         shiny::tags$strong("Note"),
         shiny::tags$br(),
         shiny::tags$small(
-          "If your dataset is already tidy, after loading it you can proceed directly by clicking ",
-          shiny::tags$em("Complete Ingestion"),
-          "."
-        )
+  "If your dataset is already in a tidy format, you can proceed directly by clicking ",
+  shiny::tags$em("Complete Ingestion"),
+  ".",
+
+  shiny::tags$br(),
+  shiny::tags$br(),
+
+  shiny::tags$b("What is a tidy format?"),
+  shiny::tags$ul(
+    shiny::tags$li("Each occurrence must correspond to a single row."),
+    shiny::tags$li("Do not store a single variable across multiple columns (e.g., species names split into separate columns).")
+  )
+)
       ),
 
       shiny::actionButton(
@@ -451,12 +460,14 @@ mod_ingest_server <- function(id, example_map) {
             padding-top: 1.9rem;
           }
 
-          #%s .pivot-actions {
+          .pivot-actions {
             display: flex;
             flex-wrap: wrap;
             gap: 0.45rem;
             align-items: flex-end;
             padding-top: 1.6rem;
+            margin-left: auto;
+            justify-content: flex-end;
           }
 
           #%s .pivot-actions .btn {
@@ -479,7 +490,6 @@ mod_ingest_server <- function(id, example_map) {
             width: 100%%;
           }
         ",
-          block_id,
           block_id,
           block_id,
           block_id,

@@ -458,32 +458,15 @@ mod_identification_cleaning_server <- function(id, df_in, mapping_in) {
       x <- normalize_text(x)
       if (!nzchar(x)) return("")
 
-      low <- tolower(x)
+      qual_patterns <- c("cf\\.", "aff\\.")
 
-      m_cf_aff_nr <- regexec(
-        "\\b(cf\\.?|aff\\.?|nr\\.?)\\b\\s+([[:alpha:]][[:alnum:]_.-]*)\\b",
-        low,
-        perl = TRUE
-      )
-      hit_cf_aff_nr <- regmatches(low, m_cf_aff_nr)[[1]]
+      for (pat in qual_patterns) {
+        regex <- paste0("(", pat, ".*)$")
+        m <- stringr::str_match(x, regex)
 
-      if (length(hit_cf_aff_nr) > 0) {
-        return(normalize_text(paste(hit_cf_aff_nr[2], hit_cf_aff_nr[3])))
-      }
-
-      m_sp_like <- regexec(
-        "\\b(sp\\.?|spp\\.?|msp\\.?)\\b\\s*(\\d+)?\\b",
-        low,
-        perl = TRUE
-      )
-      hit_sp_like <- regmatches(low, m_sp_like)[[1]]
-
-      if (length(hit_sp_like) > 0) {
-        return(normalize_text(paste(hit_sp_like[2], hit_sp_like[3])))
-      }
-
-      if (grepl("\\?$", low)) {
-        return("?")
+        if (!is.na(m[1, 1])) {
+          return(normalize_text(m[1, 1]))
+        }
       }
 
       ""
