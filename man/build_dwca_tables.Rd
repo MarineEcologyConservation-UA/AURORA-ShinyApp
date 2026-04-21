@@ -8,6 +8,7 @@ build_dwca_tables(
   df,
   dwc_terms,
   target_database = "GBIF",
+  resource_type = "sampling_event",
   selected_terms = NULL,
   emof_spec = NULL
 )

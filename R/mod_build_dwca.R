@@ -1,5 +1,6 @@
 # =========================================================
 # Shiny Module: Build DwC-A
+# File: R/mod_build_dwca.R
 # =========================================================
 
 #' @export
@@ -54,6 +55,12 @@ mod_build_dwca_ui <- function(id) {
           margin-bottom: 0;
         }
 
+        .dwca-help-block {
+          color: #6c757d;
+          font-size: 0.92rem;
+          margin-bottom: 0.75rem;
+        }
+
         .dwca-build-actions-bottom {
           display: flex;
           justify-content: flex-end;
@@ -97,7 +104,14 @@ mod_build_dwca_ui <- function(id) {
           padding-top: 0.5rem;
         }
 
-        .dwca-select-grid {
+        .dwca-main-grid {
+          display: grid;
+          grid-template-columns: 1fr 1fr;
+          gap: 1rem;
+          align-items: start;
+        }
+
+        .dwca-subgrid {
           display: grid;
           grid-template-columns: 1fr 1fr;
           gap: 1rem;
@@ -110,51 +124,65 @@ mod_build_dwca_ui <- function(id) {
           margin-bottom: 0.6rem;
         }
 
-        .dwca-term-list {
-          display: flex;
-          flex-direction: column;
-          gap: 0.55rem;
-        }
-
-        .dwca-term-box {
+        .dwca-scroll-box {
           border: 1px solid #e5e7eb;
           border-radius: 12px;
-          padding: 0.65rem 0.9rem;
           background: #ffffff;
+          padding: 0.55rem 0.65rem;
+          height: 255px;
+          overflow-y: auto;
         }
 
-        .dwca-term-box.is-required {
-          background: #f8fafc;
-          border-color: #cbd5e1;
+        .dwca-scroll-box-empty {
+          color: #6c757d;
+          font-size: 0.92rem;
         }
 
-        .dwca-term-box.is-strong {
+        .dwca-term-check-row {
+          border: 1px solid #e5e7eb;
+          border-radius: 10px;
+          background: #ffffff;
+          padding: 0.5rem 0.7rem;
+          margin-bottom: 0.45rem;
+        }
+
+        .dwca-term-check-row.is-strong {
           background: #f0f9ff;
           border-color: #bae6fd;
         }
 
-        .dwca-term-box.is-recommended {
+        .dwca-term-check-row.is-recommended {
+          background: #fffdf5;
+          border-color: #fef3c7;
+        }
+
+        .dwca-term-check-row.is-optional {
           background: #ffffff;
           border-color: #e5e7eb;
         }
 
-        .dwca-term-box.is-neutral {
-          background: #ffffff;
-          border-color: #e5e7eb;
+        .dwca-term-check-row:last-child {
+          margin-bottom: 0;
         }
 
-        .dwca-term-static {
-          display: flex;
-          align-items: center;
-          gap: 0.6rem;
-        }
-
-        .dwca-term-static input[type='checkbox'] {
+        .dwca-term-check-row .checkbox {
           margin: 0;
         }
 
-        .dwca-term-name {
+        .dwca-term-check-row .checkbox label {
+          display: flex;
+          align-items: flex-start;
+          gap: 0.45rem;
+          margin: 0;
+          width: 100%;
           font-weight: 600;
+          line-height: 1.2;
+          word-break: break-word;
+        }
+
+        .dwca-term-check-row .checkbox input[type='checkbox'] {
+          margin-top: 0.1rem;
+          flex: 0 0 auto;
         }
 
         .dwca-badge {
@@ -165,11 +193,7 @@ mod_build_dwca_ui <- function(id) {
           font-size: 0.78rem;
           line-height: 1.2;
           vertical-align: middle;
-        }
-
-        .dwca-badge-required {
-          background: #e2e8f0;
-          color: #334155;
+          font-weight: 500;
         }
 
         .dwca-badge-strong {
@@ -187,109 +211,31 @@ mod_build_dwca_ui <- function(id) {
           color: #4b5563;
         }
 
-        .dwca-term-box .checkbox {
-          margin: 0;
-        }
-
-        .dwca-term-box .checkbox label {
-          display: flex;
-          align-items: center;
-          gap: 0.45rem;
-          margin: 0;
-          font-weight: 600;
-          width: 100%;
-        }
-
-        .dwca-term-box .checkbox input[type='checkbox'] {
-          margin-top: 0;
-        }
-
-        .dwca-help-block {
-          color: #6c757d;
-          font-size: 0.92rem;
-          margin-bottom: 0.75rem;
-        }
-
-        .dwca-subgrid {
-          display: grid;
-          grid-template-columns: 1fr 1fr;
-          gap: 1rem;
-        }
-
-        .dwca-emof-grid-wrap {
-          max-height: 380px;
-          overflow-y: auto;
-          padding-right: 0.25rem;
-        }
-
-        .dwca-emof-grid {
-          display: grid;
-          grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-          gap: 0.5rem 0.75rem;
-          align-items: start;
-        }
-
-        .dwca-emof-item {
-          border: 1px solid #e5e7eb;
-          border-radius: 10px;
-          padding: 0.35rem 0.55rem;
-          background: #ffffff;
-          min-height: 40px;
-        }
-
-        .dwca-emof-item.is-strong {
-          background: #f0f9ff;
-          border-color: #bae6fd;
-        }
-
-        .dwca-emof-item.is-recommended {
-          background: #ffffff;
-          border-color: #e5e7eb;
-        }
-
-        .dwca-emof-item.is-neutral {
-          background: #ffffff;
-          border-color: #e5e7eb;
-        }
-
-        .dwca-emof-item .checkbox {
-          margin: 0;
-        }
-
-        .dwca-emof-item .checkbox label {
-          display: flex;
-          align-items: flex-start;
-          gap: 0.35rem;
-          margin: 0;
-          font-weight: 500;
-          width: 100%;
-          line-height: 1.15;
-          font-size: 0.9rem;
-          word-break: break-word;
-        }
-
-        .dwca-emof-item .checkbox input[type='checkbox'] {
-          margin-top: 0.1rem;
-          transform: scale(0.95);
-          flex: 0 0 auto;
-        }
-
         .dwca-build-error {
           margin-bottom: 1rem;
         }
 
+        .dwca-card-spacer {
+          height: 1rem;
+        }
+
+        .dwca-resource-type-wrap .radio {
+          margin-top: 0;
+          margin-bottom: 0.35rem;
+        }
+
+        .dwca-resource-type-wrap .radio:last-child {
+          margin-bottom: 0;
+        }
+
         @media (max-width: 991.98px) {
-          .dwca-select-grid,
+          .dwca-main-grid,
           .dwca-subgrid {
             grid-template-columns: 1fr;
           }
 
           .dwca-build-actions-bottom {
             justify-content: flex-start;
-          }
-
-          .dwca-emof-grid {
-            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
           }
         }
       "))
@@ -303,7 +249,7 @@ mod_build_dwca_ui <- function(id) {
         shiny::h3(class = "dwca-title", "Build Darwin Core Tables"),
         shiny::p(
           class = "dwca-subtitle",
-          "Generate the Darwin Core tables and review which terms and measurement-like columns should remain in Event, Occurrence, and eMoF."
+          "Choose the archive resource type, review the allowed fields for that architecture, and build the Darwin Core tables."
         )
       ),
 
@@ -315,25 +261,7 @@ mod_build_dwca_ui <- function(id) {
         )
       ),
 
-      shiny::div(
-        class = "dwca-select-grid",
-
-        bslib::card(
-          class = "dwca-section-card",
-          bslib::card_header("Event table"),
-          bslib::card_body(
-            shiny::uiOutput(ns("event_terms_ui"))
-          )
-        ),
-
-        bslib::card(
-          class = "dwca-section-card",
-          bslib::card_header("Occurrence table"),
-          bslib::card_body(
-            shiny::uiOutput(ns("occurrence_terms_ui"))
-          )
-        )
-      ),
+      shiny::uiOutput(ns("table_cards_ui")),
 
       shiny::div(style = "height: 1rem;"),
 
@@ -432,13 +360,23 @@ mod_build_dwca_server <- function(id, df_in, dwc_terms, target_database_in) {
       x
     }
 
+    normalize_resource_type <- function(x) {
+      x <- as.character(x %||% "sampling_event")
+      x <- trimws(tolower(x))
+      if (!x %in% c("sampling_event", "occurrence_core")) {
+        x <- "sampling_event"
+      }
+      x
+    }
+
     normalize_table_name <- function(x) {
       x <- as.character(x %||% "")
       x <- trimws(x)
 
       out <- rep(NA_character_, length(x))
       out[x == "Event"] <- "Event"
-      out[x %in% c("Occurrence", "Occurrence.Core")] <- "Occurrence"
+      out[x == "Occurrence"] <- "Occurrence"
+      out[x == "Occurrence.Core"] <- "Occurrence.Core"
       out[x == "eMoF"] <- "eMoF"
       out
     }
@@ -451,11 +389,17 @@ mod_build_dwca_server <- function(id, df_in, dwc_terms, target_database_in) {
       x
     }
 
+    normalize_status <- function(x) {
+      x <- as.character(x %||% "")
+      x[is.na(x)] <- ""
+      x <- trimws(tolower(x))
+      x[x %in% c("strongly_recommended", "strongly-recommended")] <- "strongly recommended"
+      x[x %in% c("optional", "neutral", "", "na")] <- "optional"
+      x
+    }
+
     badge_html <- function(status) {
-      st <- tolower(trimws(as.character(status %||% "")))
-      if (st == "required") {
-        return("<span class='dwca-badge dwca-badge-required'>required</span>")
-      }
+      st <- normalize_status(status)
       if (st == "strongly recommended") {
         return("<span class='dwca-badge dwca-badge-strong'>strongly recommended</span>")
       }
@@ -468,8 +412,53 @@ mod_build_dwca_server <- function(id, df_in, dwc_terms, target_database_in) {
       ""
     }
 
+    status_rank <- function(status) {
+      st <- normalize_status(status)
+      ifelse(
+        st == "required", 1L,
+        ifelse(
+          st == "strongly recommended", 2L,
+          ifelse(st == "recommended", 3L, 4L)
+        )
+      )
+    }
+
     repo_col <- shiny::reactive({
       normalize_repo_name(target_database_in())
+    })
+
+    resource_type_rx <- shiny::reactive({
+      normalize_resource_type(input$resource_type)
+    })
+
+    resource_config <- shiny::reactive({
+      rt <- resource_type_rx()
+
+      if (identical(rt, "sampling_event")) {
+        return(list(
+          resource_type = "sampling_event",
+          event_table_key = "Event",
+          occurrence_table_key = "Occurrence",
+          show_event = TRUE,
+          show_occurrence = TRUE,
+          show_emof_event = TRUE,
+          show_emof_occurrence = TRUE,
+          occurrence_card_title = "Occurrence table",
+          architecture_label = "Sampling event (Event core)"
+        ))
+      }
+
+      list(
+        resource_type = "occurrence_core",
+        event_table_key = NULL,
+        occurrence_table_key = "Occurrence.Core",
+        show_event = FALSE,
+        show_occurrence = TRUE,
+        show_emof_event = FALSE,
+        show_emof_occurrence = TRUE,
+        occurrence_card_title = "Occurrence.Core table",
+        architecture_label = "Occurrence (Occurrence core)"
+      )
     })
 
     dwc_terms_norm <- shiny::reactive({
@@ -486,9 +475,8 @@ mod_build_dwca_server <- function(id, df_in, dwc_terms, target_database_in) {
         stop(paste0("Column '", repo_nm, "' was not found in dwc_terms."))
       }
 
-      out$.repo_status <- as.character(out[[repo_nm]])
-      out$.repo_status[is.na(out$.repo_status)] <- ""
-      out$.repo_status <- trimws(tolower(out$.repo_status))
+      out$.repo_status <- normalize_status(out[[repo_nm]])
+      out <- out[!is.na(out$.table_norm) & out$.table_norm != "", , drop = FALSE]
       out
     })
 
@@ -506,9 +494,18 @@ mod_build_dwca_server <- function(id, df_in, dwc_terms, target_database_in) {
       terms_present <- present_terms()
 
       dt <- dt[dt$Term %in% terms_present, , drop = FALSE]
-      dt <- dt[!is.na(dt$.table_norm) & dt$.table_norm != "", , drop = FALSE]
 
       make_tbl <- function(tbl_name) {
+        if (is.null(tbl_name) || !nzchar(tbl_name)) {
+          return(data.frame(
+            term = character(),
+            status = character(),
+            selected_default = logical(),
+            locked = logical(),
+            stringsAsFactors = FALSE
+          ))
+        }
+
         x <- dt[dt$.table_norm == tbl_name, c("Term", ".repo_status"), drop = FALSE]
 
         if (nrow(x) == 0) {
@@ -525,36 +522,20 @@ mod_build_dwca_server <- function(id, df_in, dwc_terms, target_database_in) {
         names(x) <- c("term", "status")
 
         x$term <- as.character(x$term)
-        x$status <- as.character(x$status)
-        x$status[is.na(x$status)] <- ""
-        x$status <- trimws(tolower(x$status))
-
-        x$status[x$status %in% c("strongly_recommended", "strongly-recommended")] <- "strongly recommended"
-        x$status[x$status %in% c("optional", "neutral", "", "na")] <- "optional"
-
+        x$status <- normalize_status(x$status)
         x$locked <- x$status == "required"
-        x$selected_default <- x$status %in% c("required", "strongly recommended")
+        x$selected_default <- x$status == "strongly recommended"
 
-        status_order <- ifelse(
-          x$status == "required", 1L,
-          ifelse(
-            x$status == "strongly recommended", 2L,
-            ifelse(
-              x$status == "recommended", 3L,
-              4L
-            )
-          )
-        )
-
-        x <- x[order(status_order, x$term), , drop = FALSE]
+        x <- x[order(status_rank(x$status), x$term), , drop = FALSE]
         rownames(x) <- NULL
         x
       }
 
+      cfg <- resource_config()
+
       list(
-        Event = make_tbl("Event"),
-        Occurrence = make_tbl("Occurrence"),
-        eMoF = make_tbl("eMoF")
+        Event = make_tbl(cfg$event_table_key),
+        Occurrence = make_tbl(cfg$occurrence_table_key)
       )
     })
 
@@ -577,13 +558,12 @@ mod_build_dwca_server <- function(id, df_in, dwc_terms, target_database_in) {
       dt <- dwc_terms_norm()
       repo_map <- dt[dt$.table_norm == "eMoF", c("Term", ".repo_status"), drop = FALSE]
       repo_map <- repo_map[!duplicated(repo_map$Term), , drop = FALSE]
+
       status_map <- stats::setNames(repo_map$.repo_status, repo_map$Term)
 
       status <- unname(status_map[cols])
       status[is.na(status)] <- ""
-      status <- trimws(tolower(as.character(status)))
-      status[status %in% c("strongly_recommended", "strongly-recommended")] <- "strongly recommended"
-      status[status %in% c("optional", "neutral", "", "na")] <- "optional"
+      status <- normalize_status(status)
 
       out <- data.frame(
         term = cols,
@@ -592,6 +572,8 @@ mod_build_dwca_server <- function(id, df_in, dwc_terms, target_database_in) {
         stringsAsFactors = FALSE
       )
 
+      out <- out[order(status_rank(out$status), out$term), , drop = FALSE]
+      rownames(out) <- NULL
       out
     })
 
@@ -619,22 +601,136 @@ mod_build_dwca_server <- function(id, df_in, dwc_terms, target_database_in) {
       }, once = TRUE)
     }
 
-    output$build_info_ui <- shiny::renderUI({
+    render_scroll_choices <- function(spec_df, prefix) {
+      if (!"locked" %in% names(spec_df)) {
+        spec_df$locked <- FALSE
+      }
+
+      sel_df <- spec_df[!as.logical(spec_df$locked), , drop = FALSE]
+
+      if (nrow(sel_df) == 0) {
+        return(
+          shiny::tags$div(
+            class = "dwca-scroll-box",
+            shiny::tags$div(
+              class = "dwca-scroll-box-empty",
+              "No selectable fields are available here for the active rules."
+            )
+          )
+        )
+      }
+
+      items <- lapply(seq_len(nrow(sel_df)), function(i) {
+        term <- sel_df$term[i]
+        status <- sel_df$status[i]
+        selected_default <- isTRUE(sel_df$selected_default[i])
+        cid <- paste0(prefix, safe_id_piece(term))
+
+        box_class <- if (status == "strongly recommended") {
+          "dwca-term-check-row is-strong"
+        } else if (status == "recommended") {
+          "dwca-term-check-row is-recommended"
+        } else {
+          "dwca-term-check-row is-optional"
+        }
+
+        shiny::tags$div(
+          class = box_class,
+          shiny::checkboxInput(
+            session$ns(cid),
+            label = shiny::HTML(paste0(term, badge_html(status))),
+            value = selected_default,
+            width = "100%"
+          )
+        )
+      })
+
+      shiny::tags$div(
+        class = "dwca-scroll-box",
+        items
+      )
+    }
+
+    render_table_card_body <- function(spec_df, prefix, help_text) {
       shiny::tagList(
+        shiny::tags$div(class = "dwca-help-block", help_text),
+        render_scroll_choices(spec_df, prefix)
+      )
+    }
+
+    output$build_info_ui <- shiny::renderUI({
+      cfg <- resource_config()
+
+      shiny::tagList(
+        shiny::div(
+          class = "dwca-resource-type-wrap",
+          shiny::radioButtons(
+            session$ns("resource_type"),
+            "Resource type",
+            choices = c(
+              "Sampling event (Event core)" = "sampling_event",
+              "Occurrence (Occurrence core)" = "occurrence_core"
+            ),
+            selected = cfg$resource_type,
+            inline = FALSE
+          )
+        ),
         shiny::p(
           class = "dwca-section-note",
           paste0(
             "Repository rules currently applied: ",
             repo_col(),
-            ". Required terms are always included. Strongly recommended terms start selected. Recommended terms and optional terms start unselected."
+            ". Active architecture: ",
+            cfg$architecture_label,
+            ". Required fields are included automatically and are not shown here. Strongly recommended fields start selected. Recommended and optional fields start unselected."
           )
-        ),
-        shiny::div(style = "height: 0.5rem;"),
-        shiny::p(
-          class = "dwca-help-block",
-          "For eMoF, you can choose any eligible column present in the dataset except structural IDs and internal tracking fields."
         )
       )
+    })
+
+    output$table_cards_ui <- shiny::renderUI({
+      cfg <- resource_config()
+      specs <- table_term_specs()
+
+      cards <- list()
+
+      if (isTRUE(cfg$show_event)) {
+        cards[[length(cards) + 1]] <- bslib::card(
+          class = "dwca-section-card",
+          bslib::card_header("Event table"),
+          bslib::card_body(
+            render_table_card_body(
+              spec_df = specs$Event,
+              prefix = "event_term__",
+              help_text = "Required fields are included automatically and are not shown here. Only non-required fields are selectable below."
+            )
+          )
+        )
+      }
+
+      if (isTRUE(cfg$show_occurrence)) {
+        cards[[length(cards) + 1]] <- bslib::card(
+          class = "dwca-section-card",
+          bslib::card_header(cfg$occurrence_card_title),
+          bslib::card_body(
+            render_table_card_body(
+              spec_df = specs$Occurrence,
+              prefix = "occ_term__",
+              help_text = "Required fields are included automatically and are not shown here. Only non-required fields are selectable below."
+            )
+          )
+        )
+      }
+
+      if (length(cards) == 0) {
+        return(NULL)
+      }
+
+      if (length(cards) == 1) {
+        return(cards[[1]])
+      }
+
+      shiny::tags$div(class = "dwca-main-grid", cards)
     })
 
     output$build_error_ui <- shiny::renderUI({
@@ -648,140 +744,20 @@ mod_build_dwca_server <- function(id, df_in, dwc_terms, target_database_in) {
       )
     })
 
-    output$event_terms_ui <- shiny::renderUI({
-      spec <- table_term_specs()$Event
-
-      if (nrow(spec) == 0) {
-        return(
-          shiny::tags$div(
-            class = "dwca-help-block",
-            "No Event terms from the current dataset match the selected repository rules."
-          )
-        )
-      }
-
-      tag_list <- list(
-        shiny::tags$div(
-          class = "dwca-help-block",
-          "Required terms are locked. Strongly recommended terms start selected. Recommended terms and optional terms start unselected."
-        ),
-        shiny::tags$div(class = "dwca-term-list")
-      )
-
-      boxes <- lapply(seq_len(nrow(spec)), function(i) {
-        term <- spec$term[i]
-        status <- spec$status[i]
-        locked <- isTRUE(spec$locked[i])
-        selected_default <- isTRUE(spec$selected_default[i])
-
-        box_class <- if (status == "required") {
-          "dwca-term-box is-required"
-        } else if (status == "strongly recommended") {
-          "dwca-term-box is-strong"
-        } else if (status == "recommended") {
-          "dwca-term-box is-recommended"
-        } else {
-          "dwca-term-box is-neutral"
-        }
-
-        if (locked) {
-          shiny::tags$div(
-            class = box_class,
-            shiny::tags$div(
-              class = "dwca-term-static",
-              shiny::tags$input(type = "checkbox", checked = NA, disabled = NA),
-              shiny::tags$span(
-                class = "dwca-term-name",
-                shiny::HTML(paste0(term, badge_html(status)))
-              )
-            )
-          )
-        } else {
-          cid <- paste0("event_term__", safe_id_piece(term))
-          shiny::tags$div(
-            class = box_class,
-            shiny::checkboxInput(
-              session$ns(cid),
-              label = shiny::HTML(paste0(term, badge_html(status))),
-              value = selected_default,
-              width = "100%"
-            )
-          )
-        }
-      })
-
-      tag_list[[2]] <- shiny::tags$div(class = "dwca-term-list", boxes)
-      shiny::tagList(tag_list)
-    })
-
-    output$occurrence_terms_ui <- shiny::renderUI({
-      spec <- table_term_specs()$Occurrence
-
-      if (nrow(spec) == 0) {
-        return(
-          shiny::tags$div(
-            class = "dwca-help-block",
-            "No Occurrence terms from the current dataset match the selected repository rules."
-          )
-        )
-      }
-
-      tag_list <- list(
-        shiny::tags$div(
-          class = "dwca-help-block",
-          "Required terms are locked. Strongly recommended terms start selected. Recommended terms and optional terms start unselected."
-        ),
-        shiny::tags$div(class = "dwca-term-list")
-      )
-
-      boxes <- lapply(seq_len(nrow(spec)), function(i) {
-        term <- spec$term[i]
-        status <- spec$status[i]
-        locked <- isTRUE(spec$locked[i])
-        selected_default <- isTRUE(spec$selected_default[i])
-
-        box_class <- if (status == "required") {
-          "dwca-term-box is-required"
-        } else if (status == "strongly recommended") {
-          "dwca-term-box is-strong"
-        } else if (status == "recommended") {
-          "dwca-term-box is-recommended"
-        } else {
-          "dwca-term-box is-neutral"
-        }
-
-        if (locked) {
-          shiny::tags$div(
-            class = box_class,
-            shiny::tags$div(
-              class = "dwca-term-static",
-              shiny::tags$input(type = "checkbox", checked = NA, disabled = NA),
-              shiny::tags$span(
-                class = "dwca-term-name",
-                shiny::HTML(paste0(term, badge_html(status)))
-              )
-            )
-          )
-        } else {
-          cid <- paste0("occ_term__", safe_id_piece(term))
-          shiny::tags$div(
-            class = box_class,
-            shiny::checkboxInput(
-              session$ns(cid),
-              label = shiny::HTML(paste0(term, badge_html(status))),
-              value = selected_default,
-              width = "100%"
-            )
-          )
-        }
-      })
-
-      tag_list[[2]] <- shiny::tags$div(class = "dwca-term-list", boxes)
-      shiny::tagList(tag_list)
-    })
-
     output$emof_terms_ui <- shiny::renderUI({
+      cfg <- resource_config()
       spec <- emof_candidate_specs()
+
+      make_emof_panel <- function(level_prefix, title) {
+        shiny::tags$div(
+          shiny::tags$div(class = "dwca-term-group-title", title),
+          shiny::tags$div(
+            class = "dwca-help-block",
+            "Select the columns that should become eMoF records at this level."
+          ),
+          render_scroll_choices(spec, level_prefix)
+        )
+      }
 
       if (nrow(spec) == 0) {
         return(
@@ -792,101 +768,86 @@ mod_build_dwca_server <- function(id, df_in, dwc_terms, target_database_in) {
         )
       }
 
-      make_emof_col <- function(level_prefix, title) {
-        items <- lapply(seq_len(nrow(spec)), function(i) {
-          term <- spec$term[i]
-          status <- spec$status[i]
-          selected_default <- isTRUE(spec$selected_default[i])
-          cid <- paste0(level_prefix, safe_id_piece(term))
-
-          box_class <- if (status == "strongly recommended") {
-            "dwca-emof-item is-strong"
-          } else if (status == "recommended") {
-            "dwca-emof-item is-recommended"
-          } else {
-            "dwca-emof-item is-neutral"
-          }
-
-          shiny::tags$div(
-            class = box_class,
-            shiny::checkboxInput(
-              session$ns(cid),
-              label = shiny::HTML(paste0(term, badge_html(status))),
-              value = selected_default,
-              width = "100%"
+      if (isTRUE(cfg$show_emof_event) && isTRUE(cfg$show_emof_occurrence)) {
+        return(
+          shiny::tagList(
+            shiny::tags$div(
+              class = "dwca-help-block",
+              "The available eMoF levels depend on the selected resource type. Do not select the same field in both lists."
+            ),
+            shiny::tags$div(
+              class = "dwca-subgrid",
+              make_emof_panel("emof_event__", "eMoF - event"),
+              make_emof_panel("emof_occ__", "eMoF - occurrence")
             )
-          )
-        })
-
-        shiny::tags$div(
-          shiny::tags$div(class = "dwca-term-group-title", title),
-          shiny::tags$div(
-            class = "dwca-emof-grid-wrap",
-            shiny::tags$div(class = "dwca-emof-grid", items)
           )
         )
       }
 
-      shiny::tagList(
-        shiny::tags$div(
-          class = "dwca-help-block",
-          "Choose which eligible dataset columns should be transformed into eMoF records. Structural IDs are added automatically when needed. Do not select the same column in both event and occurrence levels."
-        ),
-        shiny::tags$div(
-          class = "dwca-subgrid",
-          make_emof_col("emof_event__", "Event-level eMoF"),
-          make_emof_col("emof_occ__", "Occurrence-level eMoF")
+      if (isTRUE(cfg$show_emof_occurrence)) {
+        return(
+          shiny::tagList(
+            shiny::tags$div(
+              class = "dwca-help-block",
+              "For Occurrence core, only occurrence-level eMoF is available."
+            ),
+            make_emof_panel("emof_occ__", "eMoF - occurrence")
+          )
         )
+      }
+
+      shiny::tags$div(
+        class = "dwca-help-block",
+        "eMoF is not available for the active architecture."
       )
     })
 
     selected_table_terms <- shiny::reactive({
       specs <- table_term_specs()
-
-      event_spec <- specs$Event
-      occ_spec <- specs$Occurrence
+      cfg <- resource_config()
 
       event_keep <- character(0)
-      if (nrow(event_spec) > 0) {
-        event_keep <- vapply(seq_len(nrow(event_spec)), function(i) {
-          term <- event_spec$term[i]
-          if (isTRUE(event_spec$locked[i])) {
+      if (isTRUE(cfg$show_event) && nrow(specs$Event) > 0) {
+        event_keep <- vapply(seq_len(nrow(specs$Event)), function(i) {
+          term <- specs$Event$term[i]
+          if (isTRUE(specs$Event$locked[i])) {
             return(term)
           }
           cid <- paste0("event_term__", safe_id_piece(term))
-          keep <- checkbox_value_or_default(cid, default = event_spec$selected_default[i])
+          keep <- checkbox_value_or_default(cid, default = specs$Event$selected_default[i])
           if (keep) term else NA_character_
         }, character(1))
         event_keep <- event_keep[!is.na(event_keep)]
       }
 
       occ_keep <- character(0)
-      if (nrow(occ_spec) > 0) {
-        occ_keep <- vapply(seq_len(nrow(occ_spec)), function(i) {
-          term <- occ_spec$term[i]
-          if (isTRUE(occ_spec$locked[i])) {
+      if (isTRUE(cfg$show_occurrence) && nrow(specs$Occurrence) > 0) {
+        occ_keep <- vapply(seq_len(nrow(specs$Occurrence)), function(i) {
+          term <- specs$Occurrence$term[i]
+          if (isTRUE(specs$Occurrence$locked[i])) {
             return(term)
           }
           cid <- paste0("occ_term__", safe_id_piece(term))
-          keep <- checkbox_value_or_default(cid, default = occ_spec$selected_default[i])
+          keep <- checkbox_value_or_default(cid, default = specs$Occurrence$selected_default[i])
           if (keep) term else NA_character_
         }, character(1))
         occ_keep <- occ_keep[!is.na(occ_keep)]
       }
 
       list(
-        event = unique(c("eventID", "parentEventID", event_keep)),
-        occurrence = unique(c("eventID", "occurrenceID", occ_keep))
+        event = unique(event_keep),
+        occurrence = unique(occ_keep)
       )
     })
 
     emof_selected <- shiny::reactive({
+      cfg <- resource_config()
       spec <- emof_candidate_specs()
 
       event_cols <- character(0)
       occ_cols <- character(0)
 
-      if (nrow(spec) > 0) {
+      if (nrow(spec) > 0 && isTRUE(cfg$show_emof_event)) {
         event_cols <- vapply(seq_len(nrow(spec)), function(i) {
           term <- spec$term[i]
           cid <- paste0("emof_event__", safe_id_piece(term))
@@ -894,7 +855,9 @@ mod_build_dwca_server <- function(id, df_in, dwc_terms, target_database_in) {
           if (keep) term else NA_character_
         }, character(1))
         event_cols <- event_cols[!is.na(event_cols)]
+      }
 
+      if (nrow(spec) > 0 && isTRUE(cfg$show_emof_occurrence)) {
         occ_cols <- vapply(seq_len(nrow(spec)), function(i) {
           term <- spec$term[i]
           cid <- paste0("emof_occ__", safe_id_piece(term))
@@ -925,37 +888,48 @@ mod_build_dwca_server <- function(id, df_in, dwc_terms, target_database_in) {
       levs
     })
 
-    shiny::observeEvent(list(df_in(), target_database_in()), {
+    shiny::observeEvent(list(df_in(), target_database_in(), input$resource_type), {
       rv$ready <- FALSE
       rv$result <- NULL
       rv$build_error <- NULL
     }, ignoreInit = FALSE)
 
-    shiny::observeEvent(table_term_specs(), {
+    shiny::observeEvent(list(table_term_specs(), input$resource_type), {
       specs <- table_term_specs()
-      reset_table_checkboxes(specs$Event, "event_term__")
-      reset_table_checkboxes(specs$Occurrence, "occ_term__")
+      cfg <- resource_config()
+
+      if (isTRUE(cfg$show_event)) {
+        reset_table_checkboxes(specs$Event, "event_term__")
+      }
+
+      if (isTRUE(cfg$show_occurrence)) {
+        reset_table_checkboxes(specs$Occurrence, "occ_term__")
+      }
     }, ignoreInit = TRUE)
 
-    shiny::observeEvent(emof_candidate_specs(), {
+    shiny::observeEvent(list(emof_candidate_specs(), input$resource_type), {
       spec <- emof_candidate_specs()
+      cfg <- resource_config()
 
       session$onFlushed(function() {
         for (i in seq_len(nrow(spec))) {
           term <- spec$term[i]
-          def <- isTRUE(spec$selected_default[i])
 
-          shiny::updateCheckboxInput(
-            session,
-            inputId = paste0("emof_event__", safe_id_piece(term)),
-            value = def
-          )
+          if (isTRUE(cfg$show_emof_event)) {
+            shiny::updateCheckboxInput(
+              session,
+              inputId = paste0("emof_event__", safe_id_piece(term)),
+              value = FALSE
+            )
+          }
 
-          shiny::updateCheckboxInput(
-            session,
-            inputId = paste0("emof_occ__", safe_id_piece(term)),
-            value = FALSE
-          )
+          if (isTRUE(cfg$show_emof_occurrence)) {
+            shiny::updateCheckboxInput(
+              session,
+              inputId = paste0("emof_occ__", safe_id_piece(term)),
+              value = FALSE
+            )
+          }
         }
       }, once = TRUE)
     }, ignoreInit = TRUE)
@@ -964,7 +938,9 @@ mod_build_dwca_server <- function(id, df_in, dwc_terms, target_database_in) {
       df <- df_in()
       shiny::req(is.data.frame(df))
 
+      cfg <- resource_config()
       emof_sel <- emof_selected()
+
       both <- intersect(emof_sel$event, emof_sel$occurrence)
 
       if (length(both) > 0) {
@@ -981,6 +957,7 @@ mod_build_dwca_server <- function(id, df_in, dwc_terms, target_database_in) {
         df = df,
         dwc_terms = dwc_terms,
         target_database = repo_col(),
+        resource_type = cfg$resource_type,
         selected_terms = selected_table_terms(),
         emof_spec = list(
           columns = unique(c(emof_sel$event, emof_sel$occurrence)),
@@ -1033,8 +1010,12 @@ mod_build_dwca_server <- function(id, df_in, dwc_terms, target_database_in) {
 
     output$event_preview <- DT::renderDT({
       shiny::req(rv$result)
+      x <- rv$result$event
+      if (is.null(x)) x <- data.frame()
+      x <- aurora_drop_internal_cols(x)
+
       DT::datatable(
-        utils::head(aurora_drop_internal_cols(rv$result$event), 50),
+        utils::head(x, 50),
         rownames = FALSE,
         options = list(
           scrollX = TRUE,
@@ -1045,8 +1026,12 @@ mod_build_dwca_server <- function(id, df_in, dwc_terms, target_database_in) {
 
     output$occ_preview <- DT::renderDT({
       shiny::req(rv$result)
+      x <- rv$result$occurrence
+      if (is.null(x)) x <- data.frame()
+      x <- aurora_drop_internal_cols(x)
+
       DT::datatable(
-        utils::head(aurora_drop_internal_cols(rv$result$occurrence), 50),
+        utils::head(x, 50),
         rownames = FALSE,
         options = list(
           scrollX = TRUE,
@@ -1060,6 +1045,7 @@ mod_build_dwca_server <- function(id, df_in, dwc_terms, target_database_in) {
       x <- rv$result$emof
       if (is.null(x)) x <- data.frame()
       x <- aurora_drop_internal_cols(x)
+
       DT::datatable(
         utils::head(x, 50),
         rownames = FALSE,
@@ -1074,8 +1060,10 @@ mod_build_dwca_server <- function(id, df_in, dwc_terms, target_database_in) {
       filename = function() "event.csv",
       content = function(file) {
         shiny::req(rv$result)
+        x <- rv$result$event
+        if (is.null(x)) x <- data.frame()
         utils::write.csv(
-          aurora_drop_internal_cols(rv$result$event),
+          aurora_drop_internal_cols(x),
           file,
           row.names = FALSE,
           na = ""
@@ -1087,8 +1075,10 @@ mod_build_dwca_server <- function(id, df_in, dwc_terms, target_database_in) {
       filename = function() "occurrence.csv",
       content = function(file) {
         shiny::req(rv$result)
+        x <- rv$result$occurrence
+        if (is.null(x)) x <- data.frame()
         utils::write.csv(
-          aurora_drop_internal_cols(rv$result$occurrence),
+          aurora_drop_internal_cols(x),
           file,
           row.names = FALSE,
           na = ""
@@ -1116,11 +1106,15 @@ mod_build_dwca_server <- function(id, df_in, dwc_terms, target_database_in) {
       result = result_rx,
       event = shiny::reactive({
         shiny::req(rv$result)
-        rv$result$event
+        x <- rv$result$event
+        if (is.null(x)) x <- data.frame()
+        x
       }),
       occurrence = shiny::reactive({
         shiny::req(rv$result)
-        rv$result$occurrence
+        x <- rv$result$occurrence
+        if (is.null(x)) x <- data.frame()
+        x
       }),
       emof = shiny::reactive({
         shiny::req(rv$result)
@@ -1135,427 +1129,4 @@ mod_build_dwca_server <- function(id, df_in, dwc_terms, target_database_in) {
       ready = shiny::reactive(isTRUE(rv$ready))
     )
   })
-}
-
-# =========================================================
-# Build DwC-A tables from flat mapped dataframe
-# =========================================================
-
-#' @export
-build_dwca_tables <- function(df,
-                              dwc_terms,
-                              target_database = "GBIF",
-                              selected_terms = NULL,
-                              emof_spec = NULL) {
-
-  `%||%` <- function(x, y) if (is.null(x)) y else x
-  .data <- rlang::.data
-  qc_messages <- character(0)
-
-  if (is.null(df) || !is.data.frame(df)) {
-    stop("df must be a data.frame.")
-  }
-  if (nrow(df) == 0) {
-    stop("df has 0 rows.")
-  }
-  if (is.null(dwc_terms) || !is.data.frame(dwc_terms)) {
-    stop("dwc_terms must be a data.frame.")
-  }
-  if (!all(c("Table", "Term") %in% names(dwc_terms))) {
-    stop("dwc_terms must contain columns: Table, Term.")
-  }
-  if (!target_database %in% names(dwc_terms)) {
-    stop(paste0("dwc_terms must contain repository column: ", target_database))
-  }
-
-  df_work <- df
-
-  .first_non_empty <- function(x) {
-    x <- as.character(x)
-    x <- trimws(x)
-    x <- x[!is.na(x) & x != ""]
-    if (length(x) == 0) return(NA_character_)
-    x[[1]]
-  }
-
-  .normalize_table_name <- function(x) {
-    x <- as.character(x)
-    x <- trimws(x)
-    out <- rep(NA_character_, length(x))
-    out[x == "Event"] <- "Event"
-    out[x %in% c("Occurrence", "Occurrence.Core")] <- "Occurrence"
-    out[x == "eMoF"] <- "eMoF"
-    out
-  }
-
-  aurora_trace_cols <- intersect(
-    aurora_internal_cols(),
-    names(df_work)
-  )
-
-  repo_status <- as.character(dwc_terms[[target_database]])
-  repo_status[is.na(repo_status)] <- ""
-  repo_status <- trimws(tolower(repo_status))
-
-  dwc_terms2 <- dwc_terms
-  dwc_terms2$.table_norm <- .normalize_table_name(dwc_terms2$Table)
-  dwc_terms2$.repo_status <- repo_status
-
-  dwc_terms2 <- dwc_terms2[
-    !is.na(dwc_terms2$.table_norm) &
-      dwc_terms2$.table_norm != "",
-    ,
-    drop = FALSE
-  ]
-
-  if (!"eventID" %in% names(df_work)) {
-    qc_messages <- c(qc_messages, "ERROR: Input dataframe is missing eventID.")
-  } else {
-    df_work$eventID <- as.character(df_work$eventID)
-    df_work$eventID[is.na(df_work$eventID)] <- ""
-    if (any(trimws(df_work$eventID) == "")) {
-      qc_messages <- c(qc_messages, "ERROR: Some rows have blank eventID in input dataframe.")
-    }
-  }
-
-  if ("occurrenceID" %in% names(df_work)) {
-    df_work$occurrenceID <- as.character(df_work$occurrenceID)
-    df_work$occurrenceID[is.na(df_work$occurrenceID)] <- ""
-    if (any(trimws(df_work$occurrenceID) == "")) {
-      qc_messages <- c(qc_messages, "ERROR: Some rows have blank occurrenceID in input dataframe.")
-    }
-  } else {
-    qc_messages <- c(qc_messages, "WARNING: Input dataframe does not contain occurrenceID.")
-  }
-
-  if ("parentEventID" %in% names(df_work)) {
-    df_work$parentEventID <- as.character(df_work$parentEventID)
-    df_work$parentEventID[trimws(df_work$parentEventID) == ""] <- NA_character_
-  }
-
-  get_repo_terms <- function(tbl) {
-    x <- dwc_terms2 |>
-      dplyr::filter(.data$.table_norm == tbl) |>
-      dplyr::pull(.data$Term) |>
-      unique()
-
-    x <- intersect(x, names(df_work))
-    sort(unique(x))
-  }
-
-  repo_event_terms <- get_repo_terms("Event")
-  repo_occ_terms <- get_repo_terms("Occurrence")
-
-  if (!is.null(selected_terms) && is.list(selected_terms)) {
-    event_terms <- unique(c(
-      "eventID",
-      "parentEventID",
-      selected_terms$event %||% character(0),
-      aurora_trace_cols
-    ))
-    occ_terms <- unique(c(
-      "eventID",
-      "occurrenceID",
-      selected_terms$occurrence %||% character(0),
-      aurora_trace_cols
-    ))
-  } else {
-    event_terms <- unique(c("eventID", "parentEventID", repo_event_terms, aurora_trace_cols))
-    occ_terms <- unique(c("eventID", "occurrenceID", repo_occ_terms, aurora_trace_cols))
-  }
-
-  event_terms <- intersect(event_terms, names(df_work))
-  occ_terms <- intersect(occ_terms, names(df_work))
-
-  if ("eventID" %in% names(df_work)) {
-    event_table <- df_work |>
-      dplyr::select(dplyr::any_of(event_terms)) |>
-      dplyr::distinct(.data$eventID, .keep_all = TRUE)
-  } else {
-    event_table <- data.frame()
-  }
-
-  if ("occurrenceID" %in% names(df_work)) {
-    occurrence_table <- df_work |>
-      dplyr::select(dplyr::any_of(occ_terms)) |>
-      dplyr::distinct(.data$occurrenceID, .keep_all = TRUE)
-  } else {
-    occurrence_table <- data.frame()
-  }
-
-  emof_table <- NULL
-
-  if (!is.null(emof_spec) &&
-      !is.null(emof_spec$columns) &&
-      length(emof_spec$columns) > 0) {
-
-    miss <- setdiff(emof_spec$columns, names(df_work))
-    if (length(miss) > 0) {
-      qc_messages <- c(
-        qc_messages,
-        paste0(
-          "WARNING: eMoF columns missing and ignored: ",
-          paste(miss, collapse = ", ")
-        )
-      )
-    }
-
-    cols_ok <- intersect(emof_spec$columns, names(df_work))
-
-    if (length(cols_ok) > 0) {
-
-      levels <- emof_spec$levels
-      if (is.null(levels) || length(levels) == 0) {
-        stop("emof_spec$levels must be a named list mapping column -> level.")
-      }
-
-      bad <- cols_ok[!cols_ok %in% names(levels)]
-      if (length(bad) > 0) {
-        stop(paste0(
-          "Missing eMoF levels for columns: ",
-          paste(bad, collapse = ", ")
-        ))
-      }
-
-      event_cols <- cols_ok[
-        vapply(cols_ok, function(x) identical(levels[[x]], "event"), logical(1))
-      ]
-      occurrence_cols <- cols_ok[
-        vapply(cols_ok, function(x) identical(levels[[x]], "occurrence"), logical(1))
-      ]
-
-      emof_parts <- list()
-
-      if (length(event_cols) > 0) {
-
-        if (!"eventID" %in% names(df_work)) {
-          qc_messages <- c(
-            qc_messages,
-            "ERROR: Cannot build event-level eMoF because eventID is missing."
-          )
-        } else {
-
-          for (cc in event_cols) {
-            conflicts <- df_work |>
-              dplyr::mutate(.tmp_val = as.character(.data[[cc]])) |>
-              dplyr::mutate(.tmp_val = trimws(.data$.tmp_val)) |>
-              dplyr::filter(!is.na(.data$.tmp_val) & .data$.tmp_val != "") |>
-              dplyr::group_by(.data$eventID) |>
-              dplyr::summarise(
-                n_values = dplyr::n_distinct(.data$.tmp_val),
-                .groups = "drop"
-              ) |>
-              dplyr::filter(.data$n_values > 1)
-
-            if (nrow(conflicts) > 0) {
-              qc_messages <- c(
-                qc_messages,
-                paste0(
-                  "WARNING: event-level eMoF column '", cc,
-                  "' has conflicting values within the same eventID; keeping the first non-empty value per event."
-                )
-              )
-            }
-          }
-
-          event_emof_wide <- df_work |>
-            dplyr::select(
-              .data$eventID,
-              dplyr::any_of(aurora_trace_cols),
-              dplyr::all_of(event_cols)
-            ) |>
-            dplyr::group_by(.data$eventID) |>
-            dplyr::summarise(
-              dplyr::across(
-                dplyr::all_of(c(aurora_trace_cols, event_cols)),
-                .first_non_empty
-              ),
-              .groups = "drop"
-            )
-
-          event_emof <- event_emof_wide |>
-            tidyr::pivot_longer(
-              cols = dplyr::all_of(event_cols),
-              names_to = "measurementType",
-              values_to = "measurementValue",
-              values_transform = list(measurementValue = as.character)
-            ) |>
-            dplyr::filter(!is.na(.data$measurementValue) & trimws(.data$measurementValue) != "") |>
-            dplyr::mutate(occurrenceID = "")
-
-          emof_parts[["event"]] <- event_emof
-        }
-      }
-
-      if (length(occurrence_cols) > 0) {
-
-        if (!"occurrenceID" %in% names(df_work)) {
-          qc_messages <- c(
-            qc_messages,
-            "ERROR: Cannot build occurrence-level eMoF because occurrenceID is missing."
-          )
-        } else {
-
-          if (!"eventID" %in% names(df_work)) {
-            qc_messages <- c(
-              qc_messages,
-              "WARNING: occurrence-level eMoF is being built without eventID in input dataframe."
-            )
-            df_work$eventID <- ""
-          }
-
-          occurrence_emof <- df_work |>
-            dplyr::select(
-              .data$eventID,
-              .data$occurrenceID,
-              dplyr::any_of(aurora_trace_cols),
-              dplyr::all_of(occurrence_cols)
-            ) |>
-            dplyr::distinct() |>
-            tidyr::pivot_longer(
-              cols = dplyr::all_of(occurrence_cols),
-              names_to = "measurementType",
-              values_to = "measurementValue",
-              values_transform = list(measurementValue = as.character)
-            ) |>
-            dplyr::filter(!is.na(.data$measurementValue) & trimws(.data$measurementValue) != "")
-
-          emof_parts[["occurrence"]] <- occurrence_emof
-        }
-      }
-
-      if (length(emof_parts) > 0) {
-        emof_table <- dplyr::bind_rows(emof_parts)
-
-        for (nm in c(
-          "measurementTypeID",
-          "measurementValueID",
-          "measurementUnit",
-          "measurementUnitID"
-        )) {
-          if (!nm %in% names(emof_table)) emof_table[[nm]] <- ""
-        }
-
-        emof_table <- emof_table |>
-          dplyr::select(
-            .data$eventID, .data$occurrenceID,
-            dplyr::any_of(aurora_trace_cols),
-            .data$measurementType, .data$measurementTypeID,
-            .data$measurementValue, .data$measurementValueID,
-            .data$measurementUnit, .data$measurementUnitID
-          ) |>
-          dplyr::distinct()
-
-        dup_event_measurements <- emof_table |>
-          dplyr::filter(.data$occurrenceID == "") |>
-          dplyr::count(.data$eventID, .data$measurementType, name = "n") |>
-          dplyr::filter(.data$n > 1)
-
-        if (nrow(dup_event_measurements) > 0) {
-          qc_messages <- c(
-            qc_messages,
-            "WARNING: duplicate event-level eMoF records were detected and collapsed."
-          )
-
-          emof_table_event <- emof_table |>
-            dplyr::filter(.data$occurrenceID == "") |>
-            dplyr::distinct(.data$eventID, .data$measurementType, .keep_all = TRUE)
-
-          emof_table_occ <- emof_table |>
-            dplyr::filter(.data$occurrenceID != "")
-
-          emof_table <- dplyr::bind_rows(emof_table_event, emof_table_occ) |>
-            dplyr::distinct()
-        }
-      }
-    }
-  }
-
-  if (!is.data.frame(event_table) || nrow(event_table) == 0) {
-    qc_messages <- c(qc_messages, "ERROR: event table is empty.")
-  } else {
-    if (!"eventID" %in% names(event_table)) {
-      qc_messages <- c(qc_messages, "ERROR: event table missing eventID.")
-    } else {
-      event_ids <- trimws(as.character(event_table$eventID))
-      if (any(is.na(event_ids) | event_ids == "")) {
-        qc_messages <- c(qc_messages, "ERROR: event table contains blank eventID.")
-      }
-      if (anyDuplicated(event_ids) > 0) {
-        qc_messages <- c(qc_messages, "ERROR: Duplicate eventID detected in event table.")
-      }
-    }
-
-    if ("parentEventID" %in% names(event_table)) {
-      pid <- trimws(as.character(event_table$parentEventID))
-      pid[is.na(pid) | pid == ""] <- NA_character_
-      if (any(!is.na(pid) & !(pid %in% as.character(event_table$eventID)))) {
-        qc_messages <- c(
-          qc_messages,
-          "WARNING: Some parentEventID values do not match any eventID in event table."
-        )
-      }
-    }
-  }
-
-  if (!is.data.frame(occurrence_table) || nrow(occurrence_table) == 0) {
-    qc_messages <- c(qc_messages, "WARNING: occurrence table is empty.")
-  } else {
-    if (!"occurrenceID" %in% names(occurrence_table)) {
-      qc_messages <- c(qc_messages, "ERROR: occurrence table missing occurrenceID.")
-    } else {
-      occurrence_ids <- trimws(as.character(occurrence_table$occurrenceID))
-      if (any(is.na(occurrence_ids) | occurrence_ids == "")) {
-        qc_messages <- c(qc_messages, "ERROR: occurrence table contains blank occurrenceID.")
-      }
-      if (anyDuplicated(occurrence_ids) > 0) {
-        qc_messages <- c(qc_messages, "ERROR: Duplicate occurrenceID detected in occurrence table.")
-      }
-    }
-
-    if ("eventID" %in% names(occurrence_table) && "eventID" %in% names(event_table)) {
-      occ_event_ids <- trimws(as.character(occurrence_table$eventID))
-      ev_ids <- trimws(as.character(event_table$eventID))
-      missing_links <- !is.na(occ_event_ids) & occ_event_ids != "" & !(occ_event_ids %in% ev_ids)
-      if (any(missing_links)) {
-        qc_messages <- c(
-          qc_messages,
-          "WARNING: Some occurrence eventID values do not match any eventID in event table."
-        )
-      }
-    }
-  }
-
-  if (!is.null(emof_table)) {
-    if (!"eventID" %in% names(emof_table)) {
-      qc_messages <- c(qc_messages, "ERROR: eMoF table missing eventID.")
-    }
-
-    if (all(c("eventID", "occurrenceID", "measurementType") %in% names(emof_table))) {
-      dup_event_measurements <- emof_table |>
-        dplyr::filter(.data$occurrenceID == "") |>
-        dplyr::count(.data$eventID, .data$measurementType, name = "n") |>
-        dplyr::filter(.data$n > 1)
-
-      if (nrow(dup_event_measurements) > 0) {
-        qc_messages <- c(
-          qc_messages,
-          "ERROR: Duplicate measurementType linked to the same eventID still exists in eMoF."
-        )
-      }
-    }
-  }
-
-  if (length(qc_messages) == 0) {
-    qc_messages <- "OK: build completed with no QC messages."
-  } else {
-    qc_messages <- unique(qc_messages)
-  }
-
-  list(
-    event = event_table,
-    occurrence = occurrence_table,
-    emof = emof_table,
-    qc = qc_messages
-  )
 }
