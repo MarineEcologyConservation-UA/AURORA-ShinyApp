@@ -355,7 +355,8 @@ mod_taxonomy_match_ui <- function(id) {
                 shiny::tags$li(shiny::tags$b("Taxonomic Matching"), " — Matches are generated from the scientificName field."),
 
                 shiny::tags$li(
-                shiny::tags$b("Database Authorities"), " — Marine taxa are validated against the World Register of Marine Species (worrms package, wm_records_taxamatch()). Terrestrial taxa are matched against the GBIF Backbone Taxonomy via the rgbif package."),
+                  shiny::tags$b("Database Authorities"), " — Marine taxa are validated against the World Register of Marine Species (worrms package, wm_records_taxamatch()). Terrestrial taxa are matched against the GBIF Backbone Taxonomy via the rgbif package."
+                ),
 
                 shiny::tags$li(shiny::tags$b("Ambiguity Resolution"), " — The results table contains one row per unique scientificName. When multiple candidate matches exist, a manual selection is required to confirm the correct taxon."),
 
@@ -428,7 +429,7 @@ mod_taxonomy_match_ui <- function(id) {
                   ),
                   shiny::tags$div(
                     class = "tax-scroll-note mt-2",
-                    "normalisedQuery, taxonMatchStatus, selectedID, and nameAccordingTo are technical columns and are not included in the final dataset by default. scientificNameID already stores the main identifier used for the selected database."
+                    "inputName, taxonMatchStatus, selectedID, and nameAccordingTo are technical columns and are not included in the final dataset by default. scientificNameID is populated with the identifier provided by the selected matching source (e.g., LSID in WoRMS or backbone key in GBIF)."
                   )
                 )
               ),
@@ -546,7 +547,9 @@ mod_taxonomy_match_server <- function(id, df_in) {
     final_match_cols_default <- c(
       "scientificName",
       "scientificNameID",
+      "taxonID",
       "acceptedNameUsage",
+      "acceptedNameUsageID",
       "taxonomicStatus",
       "taxonRank",
       "kingdom",
@@ -554,6 +557,40 @@ mod_taxonomy_match_server <- function(id, df_in) {
       "family",
       "genus",
       "scientificNameAuthorship"
+    )
+
+    worms_keep_choices <- c(
+      "scientificName ← scientificname" = "scientificName",
+      "scientificNameID ← lsid" = "scientificNameID",
+      "taxonID ← AphiaID" = "taxonID",
+      "acceptedNameUsage ← valid_name" = "acceptedNameUsage",
+      "acceptedNameUsageID ← valid_AphiaID" = "acceptedNameUsageID",
+      "taxonomicStatus ← status" = "taxonomicStatus",
+      "taxonRank ← rank" = "taxonRank",
+      "scientificNameAuthorship ← authority" = "scientificNameAuthorship",
+      "parentNameUsageID ← parentNameUsageID" = "parentNameUsageID",
+      "originalNameUsageID ← originalNameUsageID" = "originalNameUsageID",
+      "kingdom ← kingdom" = "kingdom",
+      "phylum ← phylum" = "phylum",
+      "class ← class" = "class",
+      "order ← order" = "order",
+      "family ← family" = "family",
+      "genus ← genus" = "genus"
+    )
+
+    gbif_keep_choices <- c(
+      "scientificName ← scientificName" = "scientificName",
+      "scientificNameID ← key" = "scientificNameID",
+      "acceptedNameUsage ← accepted" = "acceptedNameUsage",
+      "acceptedNameUsageID ← acceptedKey" = "acceptedNameUsageID",
+      "taxonomicStatus ← taxonomicStatus" = "taxonomicStatus",
+      "taxonRank ← rank" = "taxonRank",
+      "scientificNameAuthorship ← authorship" = "scientificNameAuthorship",
+      "kingdom ← kingdom" = "kingdom",
+      "phylum ← phylum" = "phylum",
+      "order ← order" = "order",
+      "family ← family" = "family",
+      "genus ← genus" = "genus"
     )
 
     rv <- shiny::reactiveValues(
@@ -738,53 +775,9 @@ mod_taxonomy_match_server <- function(id, df_in) {
     })
 
     output$keep_cols_ui <- shiny::renderUI({
-      choices <- if (identical(input$tax_db, "worms")) {
-        c(
-          "scientificName",
-          "scientificNameID",
-          "acceptedNameUsage",
-          "taxonomicStatus",
-          "taxonRank",
-          "scientificNameAuthorship",
-          "kingdom",
-          "phylum",
-          "class",
-          "order",
-          "family",
-          "genus",
-          "AphiaID",
-          "url",
-          "scientificname",
-          "unacceptreason",
-          "taxonRankID",
-          "valid_AphiaID",
-          "parentNameUsageID",
-          "originalNameUsageID",
-          "citation",
-          "match_type",
-          "modified"
-        )
-      } else {
-        c(
-          "scientificName",
-          "scientificNameID",
-          "acceptedNameUsage",
-          "taxonomicStatus",
-          "taxonRank",
-          "scientificNameAuthorship",
-          "kingdom",
-          "phylum",
-          "order",
-          "family",
-          "genus"#,
-          #"canonicalName",
-          #"acceptedKey",
-          #"matchType",
-          #"confidence"
-        )
-      }
+      choices <- if (identical(input$tax_db, "worms")) worms_keep_choices else gbif_keep_choices
 
-      selected <- unique(c("scientificName", "scientificNameID", intersect(final_match_cols_default, choices)))
+      selected <- unique(c("scientificName", "scientificNameID", intersect(final_match_cols_default, unname(choices))))
 
       shiny::tagList(
         shiny::checkboxGroupInput(
@@ -1897,20 +1890,12 @@ mod_taxonomy_match_server <- function(id, df_in) {
         list(
           scientificName = out$scientificName,
           scientificNameID = lk_col("lsid"),
+          taxonID = lk_col("AphiaID"),
           acceptedNameUsage = lk_col("valid_name"),
+          acceptedNameUsageID = lk_col("valid_AphiaID"),
           taxonomicStatus = lk_col("status"),
           taxonRank = lk_col("rank"),
           scientificNameAuthorship = lk_col("authority"),
-          AphiaID = lk_col("AphiaID"),
-          url = lk_col("url"),
-          scientificname = lk_col("scientificname"),
-          status = lk_col("status"),
-          unacceptreason = lk_col("unacceptreason"),
-          taxonRankID = lk_col("taxonRankID"),
-          rank = lk_col("rank"),
-          valid_AphiaID = lk_col("valid_AphiaID"),
-          valid_name = lk_col("valid_name"),
-          valid_authority = lk_col("valid_authority"),
           parentNameUsageID = lk_col("parentNameUsageID"),
           originalNameUsageID = lk_col("originalNameUsageID"),
           kingdom = lk_col("kingdom"),
@@ -1919,14 +1904,6 @@ mod_taxonomy_match_server <- function(id, df_in) {
           order = lk_col("order"),
           family = lk_col("family"),
           genus = lk_col("genus"),
-          citation = lk_col("citation"),
-          isMarine = lk_col("isMarine"),
-          isBrackish = lk_col("isBrackish"),
-          isFreshwater = lk_col("isFreshwater"),
-          isTerrestrial = lk_col("isTerrestrial"),
-          isExtinct = lk_col("isExtinct"),
-          match_type = lk_col("match_type"),
-          modified = lk_col("modified"),
           normalisedQuery = lk_col("normalisedQuery"),
           taxonMatchStatus = lk_col("taxonMatchStatus"),
           selectedID = lk_col("selectedID"),
@@ -1937,24 +1914,15 @@ mod_taxonomy_match_server <- function(id, df_in) {
           scientificName = out$scientificName,
           scientificNameID = lk_col("key"),
           acceptedNameUsage = lk_col("accepted"),
+          acceptedNameUsageID = lk_col("acceptedKey"),
           taxonomicStatus = lk_col("taxonomicStatus"),
           taxonRank = lk_col("rank"),
           scientificNameAuthorship = lk_col("authorship"),
-          nubKey = lk_col("nubKey"),
-          canonicalName = lk_col("canonicalName"),
-          rank = lk_col("rank"),
-          status = lk_col("status"),
-          authorship = lk_col("authorship"),
-          acceptedKey = lk_col("acceptedKey"),
-          accepted = lk_col("accepted"),
-          matchType = lk_col("matchType"),
-          confidence = lk_col("confidence"),
           kingdom = lk_col("kingdom"),
           phylum = lk_col("phylum"),
           order = lk_col("order"),
           family = lk_col("family"),
           genus = lk_col("genus"),
-          species = lk_col("species"),
           normalisedQuery = lk_col("normalisedQuery"),
           taxonMatchStatus = lk_col("taxonMatchStatus"),
           selectedID = lk_col("selectedID"),
