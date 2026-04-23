@@ -252,7 +252,7 @@ mod_dwc_mapping_ui <- function(id) {
           shiny::h2("Field mapping to Darwin Core"),
           shiny::p(
             class = "dwc-map-muted",
-            "Map columns to Darwin Core terms, create derived fields, configure formatting options, and review the cleaned dataset."
+            "Map columns to Darwin Core terms, create fields, configure formatting options, and review the cleaned dataset."
           ),
           shiny::tags$p(
             shiny::tags$a(

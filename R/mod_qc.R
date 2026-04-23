@@ -20,6 +20,8 @@ NULL
     rule = character(),
     message = character(),
     severity = character(),
+    original_row = character(),
+    original_id = character(),
     stringsAsFactors = FALSE
   )
 }
@@ -37,23 +39,49 @@ NULL
 }
 
 .qc_bind <- function(x) {
+  base_cols <- c(
+    "table",
+    "row_id",
+    "field",
+    "rule",
+    "message",
+    "severity",
+    "original_row",
+    "original_id"
+  )
+
+  empty <- data.frame(
+    table = character(),
+    row_id = character(),
+    field = character(),
+    rule = character(),
+    message = character(),
+    severity = character(),
+    original_row = character(),
+    original_id = character(),
+    stringsAsFactors = FALSE
+  )
+
   if (is.null(x)) {
-    return(.qc_empty_issues())
+    return(empty)
   }
 
   if (is.data.frame(x)) {
     if (nrow(x) == 0) {
-      return(.qc_empty_issues())
+      return(empty)
     }
+
+    for (nm in setdiff(base_cols, names(x))) {
+      x[[nm]] <- NA_character_
+    }
+
+    x <- x[, base_cols, drop = FALSE]
+    rownames(x) <- NULL
     return(x)
   }
 
-  if (!is.list(x)) {
-    return(.qc_empty_issues())
-  }
-
-  if (length(x) == 0) {
-    return(.qc_empty_issues())
+  if (!is.list(x) || length(x) == 0) {
+    return(empty)
   }
 
   x_filtered <- Filter(function(z) {
@@ -61,22 +89,21 @@ NULL
   }, x)
 
   if (length(x_filtered) == 0) {
-    return(.qc_empty_issues())
+    return(empty)
   }
 
-  tryCatch(
-    {
-      out <- do.call(rbind, x_filtered)
-      if (!is.data.frame(out)) {
-        out <- .qc_empty_issues()
-      }
-      rownames(out) <- NULL
-      out
-    },
-    error = function(e) {
-      .qc_empty_issues()
+  x_fixed <- lapply(x_filtered, function(z) {
+    for (nm in setdiff(base_cols, names(z))) {
+      z[[nm]] <- NA_character_
     }
-  )
+    z <- z[, base_cols, drop = FALSE]
+    rownames(z) <- NULL
+    z
+  })
+
+  out <- do.call(rbind, x_fixed)
+  rownames(out) <- NULL
+  out
 }
 
 .qc_is_blank <- function(x) {
@@ -84,6 +111,10 @@ NULL
   if (is.factor(x)) x <- as.character(x)
   if (is.character(x)) return(is.na(x) | trimws(x) == "")
   is.na(x)
+}
+
+.qc_has_nonblank <- function(x) {
+  !all(.qc_is_blank(x))
 }
 
 .qc_num <- function(x) {
@@ -428,44 +459,67 @@ NULL
   if (!is.data.frame(emof) || nrow(emof) == 0) return(.qc_empty_issues())
   if (!("measurementType" %in% names(emof))) return(.qc_empty_issues())
 
-  link_field <- if ("eventID" %in% names(emof) && !all(.qc_is_blank(emof$eventID))) {
-    "eventID"
-  } else if ("occurrenceID" %in% names(emof)) {
-    "occurrenceID"
-  } else {
-    NULL
+  occ_has <- "occurrenceID" %in% names(emof) && .qc_has_nonblank(emof$occurrenceID)
+  ev_has <- "eventID" %in% names(emof) && .qc_has_nonblank(emof$eventID)
+
+  if (!occ_has && !ev_has) {
+    return(.qc_empty_issues())
   }
-  if (is.null(link_field)) return(.qc_empty_issues())
 
-  key <- paste0(as.character(emof[[link_field]]), "||", as.character(emof$measurementType))
-  ok <- !.qc_is_blank(emof[[link_field]]) & !.qc_is_blank(emof$measurementType)
-  key2 <- key[ok]
-
-  dup <- duplicated(key2) | duplicated(key2, fromLast = TRUE)
-  if (!any(dup, na.rm = TRUE)) return(.qc_empty_issues())
-
-  vals <- unique(key2[dup])
   rid <- if ("measurementID" %in% names(emof)) {
     as.character(emof$measurementID)
   } else {
     as.character(seq_len(nrow(emof)))
   }
 
+  link_id <- rep(NA_character_, nrow(emof))
+  link_label <- rep("unknown", nrow(emof))
+
+  if (occ_has) {
+    idx_occ <- !.qc_is_blank(emof$occurrenceID)
+    link_id[idx_occ] <- as.character(emof$occurrenceID[idx_occ])
+    link_label[idx_occ] <- "occurrenceID"
+  }
+
+  if (ev_has) {
+    idx_ev <- is.na(link_id) & !.qc_is_blank(emof$eventID)
+    link_id[idx_ev] <- as.character(emof$eventID[idx_ev])
+    link_label[idx_ev] <- "eventID"
+  }
+
+  ok <- !is.na(link_id) & !.qc_is_blank(link_id) & !.qc_is_blank(emof$measurementType)
+  cat("\nDEBUG .qc_emof_duplicates()\n")
+  cat("occ_has:", occ_has, " ev_has:", ev_has, "\n")
+  cat("valid rows for duplicate key:", sum(ok), "\n")
+  if (length(link_label) > 0) {
+    print(table(link_label, useNA = "ifany"))
+  }
+  if (!any(ok)) return(.qc_empty_issues())
+
+  key <- paste0(link_label, "||", link_id, "||", as.character(emof$measurementType))
+  key2 <- key[ok]
+
+  dup <- duplicated(key2) | duplicated(key2, fromLast = TRUE)
+  if (!any(dup, na.rm = TRUE)) return(.qc_empty_issues())
+  cat("duplicate rows found:", sum(dup), "\n")
+  vals <- unique(key2[dup])
+
   out <- list()
   for (v in vals) {
-    idx <- which(key == v)
+    idx <- which(ok & key == v)
     issue_list <- lapply(idx, function(i) {
       .qc_issue(
         table = "emof",
         row_id = rid[i],
         field = "measurementType",
         rule = "duplicate_measurementType_per_link",
-        message = paste0("Duplicate measurementType linked to the same ", link_field),
+        message = paste0("Duplicate measurementType linked to the same ", link_label[i]),
         severity = "WARN"
       )
     })
     out[[length(out) + 1]] <- .qc_bind(issue_list)
   }
+
   .qc_bind(out)
 }
 
@@ -669,9 +723,19 @@ NULL
 }
 
 .qc_add_origin_columns <- function(df) {
-  if (!is.data.frame(df)) df <- data.frame()
-  if (!"original_row" %in% names(df)) df$original_row <- NA_character_
-  if (!"original_id" %in% names(df)) df$original_id <- NA_character_
+  if (!is.data.frame(df)) {
+    df <- data.frame(stringsAsFactors = FALSE)
+  }
+
+  n <- nrow(df)
+
+  if (!"original_row" %in% names(df)) {
+    df[["original_row"]] <- rep(NA_character_, n)
+  }
+  if (!"original_id" %in% names(df)) {
+    df[["original_id"]] <- rep(NA_character_, n)
+  }
+
   df
 }
 
@@ -735,6 +799,56 @@ NULL
   issues
 }
 
+.qc_export_strip_internal <- function(df) {
+  if (!is.data.frame(df)) {
+    return(data.frame())
+  }
+
+  if (nrow(df) == 0 && ncol(df) == 0) {
+    return(df)
+  }
+
+  drop_cols <- unique(c(
+    grep("^\\.aurora", names(df), value = TRUE),
+    grep("^original_", names(df), value = TRUE)
+  ))
+
+  keep_cols <- setdiff(names(df), drop_cols)
+  df[, keep_cols, drop = FALSE]
+}
+
+.qc_emof_idlink_by_row <- function(emof) {
+  if (!is.data.frame(emof) || nrow(emof) == 0) {
+    return(character(0))
+  }
+
+  out <- rep("unknown", nrow(emof))
+
+  if ("occurrenceID" %in% names(emof)) {
+    idx_occ <- !.qc_is_blank(emof$occurrenceID)
+    out[idx_occ] <- "occurrenceMoF"
+  }
+
+  if ("eventID" %in% names(emof)) {
+    idx_ev <- out == "unknown" & !.qc_is_blank(emof$eventID)
+    out[idx_ev] <- "eventMoF"
+  }
+
+  cat("\nDEBUG .qc_emof_idlink_by_row()\n")
+  cat("nrow emof:", nrow(emof), "\n")
+  cat("table of IDlink:\n")
+  print(table(out, useNA = "ifany"))
+
+  if ("eventID" %in% names(emof)) {
+    cat("nonblank eventID:", sum(!.qc_is_blank(emof$eventID)), "\n")
+  }
+  if ("occurrenceID" %in% names(emof)) {
+    cat("nonblank occurrenceID:", sum(!.qc_is_blank(emof$occurrenceID)), "\n")
+  }
+
+  out
+}
+
 # =========================================================
 # Main QC runner
 # =========================================================
@@ -751,6 +865,26 @@ NULL
 #' @export
 run_qc_dwca <- function(event, occurrence, emof = NULL, pre_issues = NULL) {
   if (is.null(emof)) emof <- data.frame()
+
+    cat("\n************** DEBUG run_qc_dwca() **************\n")
+  cat("event nrow:", if (is.data.frame(event)) nrow(event) else NA, "\n")
+  cat("occurrence nrow:", if (is.data.frame(occurrence)) nrow(occurrence) else NA, "\n")
+  cat("emof nrow:", if (is.data.frame(emof)) nrow(emof) else NA, "\n")
+  cat("pre_issues nrow:", if (is.data.frame(pre_issues)) nrow(pre_issues) else NA, "\n")
+
+  if (is.data.frame(emof) && nrow(emof) > 0) {
+    cat("emof cols:", paste(names(emof), collapse = ", "), "\n")
+
+    if ("eventID" %in% names(emof)) {
+      cat("emof nonblank eventID:", sum(!.qc_is_blank(emof$eventID)), "\n")
+    }
+    if ("occurrenceID" %in% names(emof)) {
+      cat("emof nonblank occurrenceID:", sum(!.qc_is_blank(emof$occurrenceID)), "\n")
+    }
+    if ("measurementType" %in% names(emof)) {
+      cat("emof unique measurementType:", length(unique(as.character(emof$measurementType))), "\n")
+    }
+  }
 
   issues_list <- list()
 
@@ -854,7 +988,13 @@ run_qc_dwca <- function(event, occurrence, emof = NULL, pre_issues = NULL) {
     det2 <- issues_detailed[issues_detailed$table %in% c("occurrence", "event"), , drop = FALSE]
     det2 <- det2[det2$row_id != "*" & !is.na(det2$row_id), , drop = FALSE]
     if (nrow(det2) > 0) {
-      joined <- merge(det2, map_records[, c("id", "decimalLatitude", "decimalLongitude", "source"), drop = FALSE], by.x = "row_id", by.y = "id", all = FALSE)
+      joined <- merge(
+        det2,
+        map_records[, c("id", "decimalLatitude", "decimalLongitude", "source"), drop = FALSE],
+        by.x = "row_id",
+        by.y = "id",
+        all = FALSE
+      )
       if (nrow(joined) > 0) {
         map_issues <- data.frame(
           decimalLatitude = joined$decimalLatitude,
@@ -920,12 +1060,6 @@ run_qc_dwca <- function(event, occurrence, emof = NULL, pre_issues = NULL) {
 
   overview_emof_types <- data.frame()
   if (is.data.frame(emof) && nrow(emof) > 0 && "measurementType" %in% names(emof)) {
-    idlink <- if ("eventID" %in% names(emof) && !all(.qc_is_blank(emof$eventID))) {
-      "eventMoF"
-    } else {
-      "occurrenceMoF"
-    }
-
     mt <- as.character(emof$measurementType)
     mu <- if ("measurementUnit" %in% names(emof)) {
       as.character(emof$measurementUnit)
@@ -939,7 +1073,7 @@ run_qc_dwca <- function(event, occurrence, emof = NULL, pre_issues = NULL) {
     }
 
     base <- data.frame(
-      IDlink = rep(idlink, length(mt)),
+      IDlink = .qc_emof_idlink_by_row(emof),
       measurementType = mt,
       measurementUnit = mu,
       measurementValue = mv,
@@ -971,7 +1105,12 @@ run_qc_dwca <- function(event, occurrence, emof = NULL, pre_issues = NULL) {
           do.call(rbind, value_df$x)
         },
         error = function(e) {
-          matrix(NA_real_, nrow = nrow(value_df), ncol = 2, dimnames = list(NULL, c("minValue", "maxValue")))
+          matrix(
+            NA_real_,
+            nrow = nrow(value_df),
+            ncol = 2,
+            dimnames = list(NULL, c("minValue", "maxValue"))
+          )
         }
       )
 
@@ -999,6 +1138,11 @@ run_qc_dwca <- function(event, occurrence, emof = NULL, pre_issues = NULL) {
     overview_emof_types <- overview_emof_types[order(overview_emof_types$count, decreasing = TRUE), , drop = FALSE]
     rownames(overview_emof_types) <- NULL
   }
+
+  cat("issues_detailed final nrow:", if (is.data.frame(issues_detailed)) nrow(issues_detailed) else NA, "\n")
+  cat("issues_summary final nrow:", if (is.data.frame(issues_summary)) nrow(issues_summary) else NA, "\n")
+  cat("invalid_emof final nrow:", if (is.data.frame(invalid_emof)) nrow(invalid_emof) else NA, "\n")
+  cat("***********************************************\n")
 
   list(
     overview = list(
@@ -1033,7 +1177,7 @@ mod_qc_ui <- function(id) {
   has_plotly <- requireNamespace("plotly", quietly = TRUE)
 
   bslib::nav_panel(
-    title = "DwC-A Overview & QC",
+    title = "DwC Tables Overview & QC",
     value = "qc",
 
     shiny::tags$style(shiny::HTML("
@@ -1053,6 +1197,18 @@ mod_qc_ui <- function(id) {
       .qc-map-wrap .leaflet.html-widget,
       .qc-map-wrap .leaflet-container { height: 100% !important; min-height: 420px !important; }
       .qc-dt { width: 100%; overflow-x: auto; clear: both; }
+      .qc-export-wrap {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        flex-wrap: wrap;
+      }
+      .qc-export-wrap .btn {
+        white-space: nowrap;
+      }
+      .qc-export-btn {
+        padding: 0.45rem 0.8rem;
+      }
     ")),
 
     bslib::navset_card_tab(
@@ -1171,8 +1327,20 @@ mod_qc_ui <- function(id) {
 #' @export
 mod_qc_server <- function(id, event_in, occ_in, emof_in = NULL, pre_issues_in = NULL) {
   shiny::moduleServer(id, function(input, output, session) {
+    ns <- session$ns
     has_leaflet <- requireNamespace("leaflet", quietly = TRUE)
     has_plotly <- requireNamespace("plotly", quietly = TRUE)
+
+    # qc_res <- shiny::reactive({
+    #   ev <- event_in()
+    #   oc <- occ_in()
+    #   em <- if (!is.null(emof_in)) emof_in() else data.frame()
+    #   pi <- if (!is.null(pre_issues_in)) pre_issues_in() else NULL
+
+    #   shiny::req(is.data.frame(ev), is.data.frame(oc))
+    #   run_qc_dwca(ev, oc, em, pi)
+    # })
+
 
     qc_res <- shiny::reactive({
       ev <- event_in()
@@ -1181,12 +1349,143 @@ mod_qc_server <- function(id, event_in, occ_in, emof_in = NULL, pre_issues_in = 
       pi <- if (!is.null(pre_issues_in)) pre_issues_in() else NULL
 
       shiny::req(is.data.frame(ev), is.data.frame(oc))
-      run_qc_dwca(ev, oc, em, pi)
+
+      cat("\n================ DEBUG QC INPUT =================\n")
+
+      cat("\n--- event_in ---\n")
+      cat("nrow:", nrow(ev), " ncol:", ncol(ev), "\n")
+      cat("cols:", paste(names(ev), collapse = ", "), "\n")
+      print(utils::head(ev, 4))
+
+      cat("\n--- occ_in ---\n")
+      cat("nrow:", nrow(oc), " ncol:", ncol(oc), "\n")
+      cat("cols:", paste(names(oc), collapse = ", "), "\n")
+      print(utils::head(oc, 4))
+
+      cat("\n--- emof_in ---\n")
+      if (is.null(em)) {
+        cat("NULL\n")
+      } else if (!is.data.frame(em)) {
+        cat("Not a data.frame\n")
+      } else {
+        cat("nrow:", nrow(em), " ncol:", ncol(em), "\n")
+        cat("cols:", paste(names(em), collapse = ", "), "\n")
+
+        if ("eventID" %in% names(em)) {
+          cat("nonblank eventID:", sum(!is.na(em$eventID) & trimws(as.character(em$eventID)) != ""), "\n")
+        }
+        if ("occurrenceID" %in% names(em)) {
+          cat("nonblank occurrenceID:", sum(!is.na(em$occurrenceID) & trimws(as.character(em$occurrenceID)) != ""), "\n")
+        }
+        if ("measurementID" %in% names(em)) {
+          cat("nonblank measurementID:", sum(!is.na(em$measurementID) & trimws(as.character(em$measurementID)) != ""), "\n")
+        }
+        if ("measurementType" %in% names(em)) {
+          cat("unique measurementType:", length(unique(as.character(em$measurementType))), "\n")
+        }
+
+        print(utils::head(em, 8))
+      }
+
+      cat("\n--- pre_issues_in ---\n")
+      if (is.null(pi)) {
+        cat("NULL\n")
+      } else if (!is.data.frame(pi)) {
+        cat("Not a data.frame\n")
+      } else {
+        cat("nrow:", nrow(pi), " ncol:", ncol(pi), "\n")
+        cat("cols:", paste(names(pi), collapse = ", "), "\n")
+        print(utils::head(pi, 8))
+      }
+
+      res <- run_qc_dwca(ev, oc, em, pi)
+
+      cat("\n--- QC OUTPUT ---\n")
+      cat("issues_summary nrow:", if (is.data.frame(res$issues_summary)) nrow(res$issues_summary) else NA, "\n")
+      cat("issues_detailed nrow:", if (is.data.frame(res$issues_detailed)) nrow(res$issues_detailed) else NA, "\n")
+      cat("invalid event nrow:", if (is.data.frame(res$invalid$event)) nrow(res$invalid$event) else NA, "\n")
+      cat("invalid occurrence nrow:", if (is.data.frame(res$invalid$occurrence)) nrow(res$invalid$occurrence) else NA, "\n")
+      cat("invalid emof nrow:", if (is.data.frame(res$invalid$emof)) nrow(res$invalid$emof) else NA, "\n")
+      cat("errors:", res$counts$errors, " warnings:", res$counts$warnings, "\n")
+
+      if (is.data.frame(res$issues_detailed) && nrow(res$issues_detailed) > 0) {
+        cat("\nissues_detailed head:\n")
+        print(utils::head(res$issues_detailed, 10))
+      }
+
+      cat("===============================================\n")
+
+      res
     })
 
     can_export <- shiny::reactive({
       isTRUE(qc_res()$can_export)
     })
+
+    export_tables <- shiny::reactive({
+      ev <- event_in()
+      oc <- occ_in()
+      em <- if (!is.null(emof_in)) emof_in() else data.frame()
+
+      ev_out <- if (is.data.frame(ev) && nrow(ev) > 0) .qc_export_strip_internal(ev) else data.frame()
+      oc_out <- if (is.data.frame(oc) && nrow(oc) > 0) .qc_export_strip_internal(oc) else data.frame()
+      em_out <- if (is.data.frame(em) && nrow(em) > 0) .qc_export_strip_internal(em) else data.frame()
+
+      list(
+        event = ev_out,
+        occurrence = oc_out,
+        emof = em_out
+      )
+    })
+
+    output$download_dwca_zip <- shiny::downloadHandler(
+      filename = function() {
+        paste0("dwca_tables_", format(Sys.time(), "%Y%m%d_%H%M%S"), ".zip")
+      },
+      content = function(file) {
+        shiny::req(isTRUE(can_export()))
+
+        tabs <- export_tables()
+
+        tmp_dir <- tempfile("dwca_export_")
+        dir.create(tmp_dir, recursive = TRUE, showWarnings = FALSE)
+
+        files_to_zip <- character(0)
+
+        if (is.data.frame(tabs$event) && nrow(tabs$event) > 0) {
+          event_path <- file.path(tmp_dir, "event.csv")
+          utils::write.csv(tabs$event, event_path, row.names = FALSE, na = "")
+          files_to_zip <- c(files_to_zip, event_path)
+        }
+
+        if (is.data.frame(tabs$occurrence) && nrow(tabs$occurrence) > 0) {
+          occ_path <- file.path(tmp_dir, "occurrence.csv")
+          utils::write.csv(tabs$occurrence, occ_path, row.names = FALSE, na = "")
+          files_to_zip <- c(files_to_zip, occ_path)
+        }
+
+        if (is.data.frame(tabs$emof) && nrow(tabs$emof) > 0) {
+          emof_path <- file.path(tmp_dir, "emof.csv")
+          utils::write.csv(tabs$emof, emof_path, row.names = FALSE, na = "")
+          files_to_zip <- c(files_to_zip, emof_path)
+        }
+
+        if (length(files_to_zip) == 0) {
+          placeholder_path <- file.path(tmp_dir, "README.txt")
+          writeLines("No exportable DwC-A tables were available.", placeholder_path, useBytes = TRUE)
+          files_to_zip <- c(files_to_zip, placeholder_path)
+        }
+
+        old_wd <- getwd()
+        on.exit(setwd(old_wd), add = TRUE)
+
+        setwd(tmp_dir)
+        utils::zip(
+          zipfile = file,
+          files = basename(files_to_zip)
+        )
+      }
+    )
 
     output$kpi_errors <- shiny::renderText({ qc_res()$counts$errors })
     output$kpi_warnings <- shiny::renderText({ qc_res()$counts$warnings })
@@ -1198,11 +1497,22 @@ mod_qc_server <- function(id, event_in, occ_in, emof_in = NULL, pre_issues_in = 
 
     output$export_status_ui <- shiny::renderUI({
       ok <- isTRUE(can_export())
-      if (ok) {
-        shiny::tags$div(class = "qc-kpi qc-ok", "OK")
-      } else {
-        shiny::tags$div(class = "qc-kpi qc-err", "ERROR found")
-      }
+
+      shiny::div(
+        class = "qc-export-wrap",
+        if (ok) {
+          shiny::tags$div(class = "qc-kpi qc-ok", "OK")
+        } else {
+          shiny::tags$div(class = "qc-kpi qc-err", "ERROR found")
+        },
+        if (ok) {
+          shiny::downloadButton(
+            outputId = ns("download_dwca_zip"),
+            label = "Download ZIP",
+            class = "btn btn-outline-success qc-export-btn"
+          )
+        }
+      )
     })
 
     output$overview_event_occ_tbl <- DT::renderDT({

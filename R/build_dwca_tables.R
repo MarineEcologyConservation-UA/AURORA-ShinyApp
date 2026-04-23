@@ -70,8 +70,26 @@ build_dwca_tables <- function(df,
     x[[1]]
   }
 
+  .normalize_aurora_types <- function(x) {
+    if (!is.data.frame(x)) {
+      return(x)
+    }
+
+    if (".aurora_origin_row" %in% names(x)) {
+      x$.aurora_origin_row <- suppressWarnings(as.integer(x$.aurora_origin_row))
+    }
+
+    if (".aurora_origin_id" %in% names(x)) {
+      x$.aurora_origin_id <- as.character(x$.aurora_origin_id)
+    }
+
+    x
+  }
+
   resource_type <- normalize_resource_type(resource_type)
   df_work <- df
+
+  df_work <- .normalize_aurora_types(df_work)
 
   aurora_trace_cols <- intersect(
     aurora_internal_cols(),
@@ -225,6 +243,8 @@ build_dwca_tables <- function(df,
       event_table <- df_work |>
         dplyr::select(dplyr::any_of(event_terms)) |>
         dplyr::distinct(.data$eventID, .keep_all = TRUE)
+
+      event_table <- .normalize_aurora_types(event_table)
     }
   }
 
@@ -233,6 +253,8 @@ build_dwca_tables <- function(df,
       occurrence_table <- df_work |>
         dplyr::select(dplyr::any_of(occurrence_terms)) |>
         dplyr::distinct(.data$occurrenceID, .keep_all = TRUE)
+
+      occurrence_table <- .normalize_aurora_types(occurrence_table)
     }
   }
 
@@ -348,6 +370,7 @@ build_dwca_tables <- function(df,
             dplyr::filter(!is.na(.data$measurementValue) & trimws(.data$measurementValue) != "") |>
             dplyr::mutate(occurrenceID = "")
 
+          event_emof <- .normalize_aurora_types(event_emof)
           emof_parts[["event"]] <- event_emof
         }
       }
@@ -378,12 +401,17 @@ build_dwca_tables <- function(df,
               values_transform = list(measurementValue = as.character)
             ) |>
             dplyr::filter(!is.na(.data$measurementValue) & trimws(.data$measurementValue) != "")
-        emof_parts[["occurrence"]] <- occurrence_emof
+
+          occurrence_emof <- .normalize_aurora_types(occurrence_emof)
+          emof_parts[["occurrence"]] <- occurrence_emof
         }
       }
 
       if (length(emof_parts) > 0) {
+        emof_parts <- lapply(emof_parts, .normalize_aurora_types)
+
         emof_table <- dplyr::bind_rows(emof_parts)
+        emof_table <- .normalize_aurora_types(emof_table)
 
         for (nm in c(
           "measurementTypeID",
@@ -408,6 +436,8 @@ build_dwca_tables <- function(df,
           ) |>
           dplyr::distinct()
 
+        emof_table <- .normalize_aurora_types(emof_table)
+
         dup_event_measurements <- emof_table |>
           dplyr::filter(.data$occurrenceID == "") |>
           dplyr::count(.data$eventID, .data$measurementType, name = "n") |>
@@ -428,6 +458,8 @@ build_dwca_tables <- function(df,
 
           emof_table <- dplyr::bind_rows(emof_table_event, emof_table_occ) |>
             dplyr::distinct()
+
+          emof_table <- .normalize_aurora_types(emof_table)
         }
       }
     }

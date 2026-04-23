@@ -201,11 +201,7 @@ mod_identification_cleaning_ui <- function(id) {
                     "Build Editable Table",
                     class = "idc-btn-build"
                   ),
-                  shiny::actionButton(
-                    ns("use_all_suggestions"),
-                    "Use all suggestions",
-                    class = "idc-btn-secondary"
-                  ),
+                  shiny::uiOutput(ns("use_all_btn_ui"), inline = TRUE),
                   shiny::uiOutput(ns("apply_btn_ui"), inline = TRUE)
                 ),
                 shiny::hr(),
@@ -750,6 +746,17 @@ mod_identification_cleaning_server <- function(id, df_in, mapping_in) {
         "Editable table built successfully.",
         type = "message",
         duration = 3
+      )
+    })
+
+    output$use_all_btn_ui <- shiny::renderUI({
+      shiny::req(rv$table_seed > 0L)
+      shiny::req(rv$display_data)
+
+      shiny::actionButton(
+        ns("use_all_suggestions"),
+        "Apply all suggestions",
+        class = "idc-btn-secondary"
       )
     })
 

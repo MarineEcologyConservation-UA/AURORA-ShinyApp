@@ -28,8 +28,8 @@ mod_ingest_ui <- function(id) {
         condition = sprintf("input['%s'] == 'upload'", ns("source")),
         shiny::fileInput(
           ns("file"),
-          "Upload (CSV/TSV/XLSX)",
-          accept = c(".csv", ".tsv", ".txt", ".xlsx", ".xls")
+          "Upload (CSV)",
+          accept = c(".csv")
         )
       ),
 
@@ -57,7 +57,7 @@ mod_ingest_ui <- function(id) {
 
       shiny::selectInput(
         ns("delim"),
-        "Delimiter (CSV/TSV)",
+        "Delimiter (CSV)",
         choices = c("," = ",", ";" = ";", "TAB" = "\t", "|" = "|"),
         selected = ","
       ),

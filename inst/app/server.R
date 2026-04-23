@@ -2,9 +2,7 @@ server <- function(input, output, session) {
 
   example_map <- list(
     "Example (dataset_example.csv)" = system.file("extdata", "dataset_example.csv", package = "shinyRv02"),
-    "Example (event.csv)" = system.file("extdata", "event.csv", package = "shinyRv02"),
-    "Example (occurrence.csv)" = system.file("extdata", "occurrence.csv", package = "shinyRv02"),
-    "Example (aurora.xlsx)" = system.file("extdata", "aurora_good_quality_data_densitydata_id_corrected.xlsx", package = "shinyRv02")
+    "Example (occurrence.csv)" = system.file("extdata", "occurrence.csv", package = "shinyRv02")
   )
 
   `%||%` <- function(x, y) if (is.null(x)) y else x

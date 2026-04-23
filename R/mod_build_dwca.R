@@ -63,8 +63,19 @@ mod_build_dwca_ui <- function(id) {
 
         .dwca-build-actions-bottom {
           display: flex;
-          justify-content: flex-end;
+          justify-content: space-between;
+          align-items: center;
+          gap: 0.75rem;
           margin-top: 1rem;
+          flex-wrap: wrap;
+        }
+
+        .dwca-build-actions-right {
+          display: flex;
+          justify-content: flex-end;
+          align-items: center;
+          gap: 0.75rem;
+          flex-wrap: wrap;
         }
 
         .dwca-build-btn {
@@ -72,15 +83,6 @@ mod_build_dwca_ui <- function(id) {
           padding: 0.7rem 1.1rem;
           font-weight: 600;
           border-radius: 12px;
-        }
-
-        .dwca-tab-footer {
-          margin-top: 12px;
-          margin-bottom: 6px;
-          display: flex;
-          gap: 10px;
-          justify-content: flex-start;
-          align-items: center;
         }
 
         .dwca-dt-wrap {
@@ -102,13 +104,6 @@ mod_build_dwca_ui <- function(id) {
 
         .dwca-preview-card .tab-content {
           padding-top: 0.5rem;
-        }
-
-        .dwca-main-grid {
-          display: grid;
-          grid-template-columns: 1fr 1fr;
-          gap: 1rem;
-          align-items: start;
         }
 
         .dwca-subgrid {
@@ -212,11 +207,7 @@ mod_build_dwca_ui <- function(id) {
         }
 
         .dwca-build-error {
-          margin-bottom: 1rem;
-        }
-
-        .dwca-card-spacer {
-          height: 1rem;
+          margin-bottom: 0;
         }
 
         .dwca-resource-type-wrap .radio {
@@ -228,13 +219,72 @@ mod_build_dwca_ui <- function(id) {
           margin-bottom: 0;
         }
 
+        .dwca-stepper {
+          display: flex;
+          gap: 0.65rem;
+          flex-wrap: wrap;
+          margin-top: 0.75rem;
+        }
+
+        .dwca-step-pill {
+          display: inline-flex;
+          align-items: center;
+          gap: 0.45rem;
+          border-radius: 999px;
+          padding: 0.45rem 0.8rem;
+          font-size: 0.9rem;
+          font-weight: 600;
+          background: #f3f4f6;
+          color: #4b5563;
+          border: 1px solid #e5e7eb;
+        }
+
+        .dwca-step-pill.is-active {
+          background: #e0f2fe;
+          color: #0369a1;
+          border-color: #bae6fd;
+        }
+
+        .dwca-step-pill.is-done {
+          background: #ecfdf5;
+          color: #047857;
+          border-color: #a7f3d0;
+        }
+
+        .dwca-search-box {
+          margin-bottom: 0.75rem;
+        }
+
+        .dwca-search-box .form-control {
+          border-radius: 10px;
+        }
+
+        .dwca-warning-box {
+          border: 1px solid #f59e0b;
+          background: #fffbeb;
+          border-radius: 12px;
+          padding: 0.85rem 1rem;
+        }
+
+        .dwca-warning-box .alert,
+        .dwca-warning-box p:last-child,
+        .dwca-warning-box ul:last-child {
+          margin-bottom: 0;
+        }
+
+        .dwca-selection-summary {
+          color: #6b7280;
+          font-size: 0.92rem;
+          margin-top: 0.75rem;
+        }
+
         @media (max-width: 991.98px) {
-          .dwca-main-grid,
           .dwca-subgrid {
             grid-template-columns: 1fr;
           }
 
-          .dwca-build-actions-bottom {
+          .dwca-build-actions-bottom,
+          .dwca-build-actions-right {
             justify-content: flex-start;
           }
         }
@@ -249,7 +299,7 @@ mod_build_dwca_ui <- function(id) {
         shiny::h3(class = "dwca-title", "Build Darwin Core Tables"),
         shiny::p(
           class = "dwca-subtitle",
-          "Choose the archive resource type, review the allowed fields for that architecture, and build the Darwin Core tables."
+          "Choose the archive resource type and review the allowed fields step by step before building the Darwin Core tables."
         )
       ),
 
@@ -261,22 +311,25 @@ mod_build_dwca_ui <- function(id) {
         )
       ),
 
-      shiny::uiOutput(ns("table_cards_ui")),
-
-      shiny::div(style = "height: 1rem;"),
+      bslib::card(
+        class = "dwca-section-card mb-4",
+        bslib::card_header("Selection warnings / status"),
+        bslib::card_body(
+          shiny::uiOutput(ns("selection_warning_ui"))
+        )
+      ),
 
       bslib::card(
         class = "dwca-section-card mb-4",
-        bslib::card_header("eMoF table"),
+        bslib::card_header(shiny::uiOutput(ns("current_step_title_ui"))),
         bslib::card_body(
-          shiny::uiOutput(ns("build_error_ui")),
-          shiny::uiOutput(ns("emof_terms_ui")),
+          shiny::uiOutput(ns("step_body_ui")),
           shiny::div(
             class = "dwca-build-actions-bottom",
-            shiny::actionButton(
-              ns("build"),
-              "Build DwC-A",
-              class = "btn-primary dwca-build-btn"
+            shiny::uiOutput(ns("wizard_left_actions_ui")),
+            shiny::div(
+              class = "dwca-build-actions-right",
+              shiny::uiOutput(ns("wizard_right_actions_ui"))
             )
           )
         )
@@ -294,7 +347,7 @@ mod_build_dwca_ui <- function(id) {
       ),
 
       bslib::card(
-        class = "dwca-preview-card",
+        class = "dwca-preview-card mb-4",
         bslib::card_header("Table previews"),
         bslib::card_body(
           shiny::tabsetPanel(
@@ -303,10 +356,6 @@ mod_build_dwca_ui <- function(id) {
               shiny::div(
                 class = "dwca-dt-wrap",
                 DT::DTOutput(ns("event_preview"))
-              ),
-              shiny::div(
-                class = "dwca-tab-footer",
-                shiny::downloadButton(ns("download_event"), "Download Event CSV")
               )
             ),
 
@@ -315,10 +364,6 @@ mod_build_dwca_ui <- function(id) {
               shiny::div(
                 class = "dwca-dt-wrap",
                 DT::DTOutput(ns("occ_preview"))
-              ),
-              shiny::div(
-                class = "dwca-tab-footer",
-                shiny::downloadButton(ns("download_occ"), "Download Occurrence CSV")
               )
             ),
 
@@ -327,12 +372,19 @@ mod_build_dwca_ui <- function(id) {
               shiny::div(
                 class = "dwca-dt-wrap",
                 DT::DTOutput(ns("emof_preview"))
-              ),
-              shiny::div(
-                class = "dwca-tab-footer",
-                shiny::downloadButton(ns("download_emof"), "Download eMoF CSV")
               )
             )
+          )
+        )
+      ),
+
+      bslib::card(
+        class = "dwca-section-card",
+        bslib::card_header("Pre-issues from Field Mapping"),
+        bslib::card_body(
+          shiny::div(
+            class = "dwca-dt-wrap",
+            DT::DTOutput(ns("pre_issues_preview"))
           )
         )
       )
@@ -341,7 +393,7 @@ mod_build_dwca_ui <- function(id) {
 }
 
 #' @export
-mod_build_dwca_server <- function(id, df_in, dwc_terms, target_database_in) {
+mod_build_dwca_server <- function(id, df_in, dwc_terms, target_database_in, pre_issues_in = NULL) {
   shiny::moduleServer(id, function(input, output, session) {
 
     `%||%` <- function(x, y) if (is.null(x)) y else x
@@ -349,7 +401,8 @@ mod_build_dwca_server <- function(id, df_in, dwc_terms, target_database_in) {
     rv <- shiny::reactiveValues(
       ready = FALSE,
       result = NULL,
-      build_error = NULL
+      build_error = NULL,
+      current_step = NULL
     )
 
     normalize_repo_name <- function(x) {
@@ -423,6 +476,48 @@ mod_build_dwca_server <- function(id, df_in, dwc_terms, target_database_in) {
       )
     }
 
+    step_index <- function(step_name, steps) {
+      idx <- match(step_name, steps)
+      if (length(idx) == 0 || is.na(idx)) {
+        return(NULL)
+      }
+      idx
+    }
+
+    first_step_from_steps <- function(steps) {
+      if (length(steps) == 0) return(NULL)
+      steps[[1]]
+    }
+
+    last_step_from_steps <- function(steps) {
+      if (length(steps) == 0) return(NULL)
+      steps[[length(steps)]]
+    }
+
+    set_step_to_first <- function(steps) {
+      rv$current_step <- first_step_from_steps(steps)
+    }
+
+    clear_built_result <- function() {
+      rv$ready <- FALSE
+      rv$result <- NULL
+      rv$build_error <- NULL
+    }
+
+    get_pre_issues <- shiny::reactive({
+      if (is.null(pre_issues_in)) {
+        return(data.frame())
+      }
+
+      x <- tryCatch(pre_issues_in(), error = function(e) NULL)
+
+      if (is.null(x) || !is.data.frame(x)) {
+        return(data.frame())
+      }
+
+      x
+    })
+
     repo_col <- shiny::reactive({
       normalize_repo_name(target_database_in())
     })
@@ -444,7 +539,8 @@ mod_build_dwca_server <- function(id, df_in, dwc_terms, target_database_in) {
           show_emof_event = TRUE,
           show_emof_occurrence = TRUE,
           occurrence_card_title = "Occurrence table",
-          architecture_label = "Sampling event (Event core)"
+          architecture_label = "Sampling event (Event core)",
+          steps = c("event", "occurrence", "emof")
         ))
       }
 
@@ -457,7 +553,8 @@ mod_build_dwca_server <- function(id, df_in, dwc_terms, target_database_in) {
         show_emof_event = FALSE,
         show_emof_occurrence = TRUE,
         occurrence_card_title = "Occurrence.Core table",
-        architecture_label = "Occurrence (Occurrence core)"
+        architecture_label = "Occurrence (Occurrence core)",
+        steps = c("occurrence", "emof")
       )
     })
 
@@ -539,9 +636,60 @@ mod_build_dwca_server <- function(id, df_in, dwc_terms, target_database_in) {
       )
     })
 
+    checkbox_value_or_default <- function(input_id, default = FALSE) {
+      val <- input[[input_id]]
+      if (is.null(val)) {
+        return(isTRUE(default))
+      }
+      isTRUE(val)
+    }
+
+    selected_table_terms <- shiny::reactive({
+      specs <- table_term_specs()
+      cfg <- resource_config()
+
+      event_keep <- character(0)
+      if (isTRUE(cfg$show_event) && nrow(specs$Event) > 0) {
+        event_keep <- vapply(seq_len(nrow(specs$Event)), function(i) {
+          term <- specs$Event$term[i]
+          if (isTRUE(specs$Event$locked[i])) {
+            return(term)
+          }
+          cid <- paste0("event_term__", safe_id_piece(term))
+          keep <- checkbox_value_or_default(cid, default = specs$Event$selected_default[i])
+          if (keep) term else NA_character_
+        }, character(1))
+        event_keep <- event_keep[!is.na(event_keep)]
+      }
+
+      occ_keep <- character(0)
+      if (isTRUE(cfg$show_occurrence) && nrow(specs$Occurrence) > 0) {
+        occ_keep <- vapply(seq_len(nrow(specs$Occurrence)), function(i) {
+          term <- specs$Occurrence$term[i]
+          if (isTRUE(specs$Occurrence$locked[i])) {
+            return(term)
+          }
+          cid <- paste0("occ_term__", safe_id_piece(term))
+          keep <- checkbox_value_or_default(cid, default = specs$Occurrence$selected_default[i])
+          if (keep) term else NA_character_
+        }, character(1))
+        occ_keep <- occ_keep[!is.na(occ_keep)]
+      }
+
+      list(
+        event = unique(event_keep),
+        occurrence = unique(occ_keep)
+      )
+    })
+
     emof_candidate_specs <- shiny::reactive({
       df <- df_in()
       shiny::req(is.data.frame(df))
+
+      chosen_core_terms <- unique(c(
+        selected_table_terms()$event %||% character(0),
+        selected_table_terms()$occurrence %||% character(0)
+      ))
 
       cols <- names(df)
 
@@ -553,6 +701,7 @@ mod_build_dwca_server <- function(id, df_in, dwc_terms, target_database_in) {
 
       cols <- setdiff(cols, structural_exclude)
       cols <- cols[!grepl("^\\.aurora", cols)]
+      cols <- setdiff(cols, chosen_core_terms)
       cols <- sort(unique(cols))
 
       dt <- dwc_terms_norm()
@@ -568,7 +717,7 @@ mod_build_dwca_server <- function(id, df_in, dwc_terms, target_database_in) {
       out <- data.frame(
         term = cols,
         status = status,
-        selected_default = status == "strongly recommended",
+        selected_default = FALSE,
         stringsAsFactors = FALSE
       )
 
@@ -577,16 +726,58 @@ mod_build_dwca_server <- function(id, df_in, dwc_terms, target_database_in) {
       out
     })
 
-    checkbox_value_or_default <- function(input_id, default = FALSE) {
-      val <- input[[input_id]]
-      if (is.null(val)) {
-        return(isTRUE(default))
+    emof_selected <- shiny::reactive({
+      cfg <- resource_config()
+      spec <- emof_candidate_specs()
+
+      event_cols <- character(0)
+      occ_cols <- character(0)
+
+      if (nrow(spec) > 0 && isTRUE(cfg$show_emof_event)) {
+        event_cols <- vapply(seq_len(nrow(spec)), function(i) {
+          term <- spec$term[i]
+          cid <- paste0("emof_event__", safe_id_piece(term))
+          keep <- checkbox_value_or_default(cid, default = FALSE)
+          if (keep) term else NA_character_
+        }, character(1))
+        event_cols <- event_cols[!is.na(event_cols)]
       }
-      isTRUE(val)
-    }
+
+      if (nrow(spec) > 0 && isTRUE(cfg$show_emof_occurrence)) {
+        occ_cols <- vapply(seq_len(nrow(spec)), function(i) {
+          term <- spec$term[i]
+          cid <- paste0("emof_occ__", safe_id_piece(term))
+          keep <- checkbox_value_or_default(cid, default = FALSE)
+          if (keep) term else NA_character_
+        }, character(1))
+        occ_cols <- occ_cols[!is.na(occ_cols)]
+      }
+
+      list(
+        event = unique(event_cols),
+        occurrence = unique(occ_cols)
+      )
+    })
+
+    emof_levels <- shiny::reactive({
+      sel <- emof_selected()
+
+      ev <- sel$event %||% character(0)
+      oc <- sel$occurrence %||% character(0)
+
+      levs <- c(
+        setNames(as.list(rep("event", length(ev))), ev),
+        setNames(as.list(rep("occurrence", length(oc))), oc)
+      )
+
+      if (length(levs) == 0) return(NULL)
+      levs
+    })
 
     reset_table_checkboxes <- function(spec_df, prefix) {
-      if (nrow(spec_df) == 0) return(invisible(NULL))
+      if (is.null(spec_df) || !is.data.frame(spec_df) || nrow(spec_df) == 0) {
+        return(invisible(NULL))
+      }
 
       session$onFlushed(function() {
         for (i in seq_len(nrow(spec_df))) {
@@ -601,12 +792,49 @@ mod_build_dwca_server <- function(id, df_in, dwc_terms, target_database_in) {
       }, once = TRUE)
     }
 
-    render_scroll_choices <- function(spec_df, prefix) {
+    reset_emof_checkboxes <- function(spec_df, cfg_snapshot) {
+      if (is.null(spec_df) || !is.data.frame(spec_df) || nrow(spec_df) == 0) {
+        return(invisible(NULL))
+      }
+
+      show_emof_event <- isTRUE(cfg_snapshot$show_emof_event)
+      show_emof_occurrence <- isTRUE(cfg_snapshot$show_emof_occurrence)
+
+      session$onFlushed(function() {
+        for (i in seq_len(nrow(spec_df))) {
+          term <- spec_df$term[i]
+
+          if (show_emof_event) {
+            shiny::updateCheckboxInput(
+              session,
+              inputId = paste0("emof_event__", safe_id_piece(term)),
+              value = FALSE
+            )
+          }
+
+          if (show_emof_occurrence) {
+            shiny::updateCheckboxInput(
+              session,
+              inputId = paste0("emof_occ__", safe_id_piece(term)),
+              value = FALSE
+            )
+          }
+        }
+      }, once = TRUE)
+    }
+
+    render_scroll_choices <- function(spec_df, prefix, search_text = "") {
       if (!"locked" %in% names(spec_df)) {
         spec_df$locked <- FALSE
       }
 
       sel_df <- spec_df[!as.logical(spec_df$locked), , drop = FALSE]
+
+      query <- trimws(tolower(as.character(search_text %||% "")))
+      if (nzchar(query) && nrow(sel_df) > 0) {
+        keep <- grepl(query, tolower(sel_df$term), fixed = TRUE)
+        sel_df <- sel_df[keep, , drop = FALSE]
+      }
 
       if (nrow(sel_df) == 0) {
         return(
@@ -658,8 +886,72 @@ mod_build_dwca_server <- function(id, df_in, dwc_terms, target_database_in) {
       )
     }
 
+    current_step_title <- shiny::reactive({
+      cfg <- resource_config()
+      steps <- cfg$steps
+      step <- rv$current_step %||% first_step_from_steps(steps)
+
+      idx <- step_index(step, steps)
+      if (is.null(idx)) {
+        step <- first_step_from_steps(steps)
+      }
+
+      if (identical(step, "event")) return("Step 1 — Event table")
+      if (identical(step, "occurrence") && identical(cfg$resource_type, "sampling_event")) {
+        return("Step 2 — Occurrence table")
+      }
+      if (identical(step, "occurrence") && identical(cfg$resource_type, "occurrence_core")) {
+        return("Step 1 — Occurrence.Core table")
+      }
+      if (identical(step, "emof") && identical(cfg$resource_type, "sampling_event")) {
+        return("Step 3 — eMoF tables")
+      }
+      if (identical(step, "emof") && identical(cfg$resource_type, "occurrence_core")) {
+        return("Step 2 — eMoF table")
+      }
+
+      "Build Darwin Core Tables"
+    })
+
+    output$current_step_title_ui <- shiny::renderUI({
+      shiny::span(current_step_title())
+    })
+
     output$build_info_ui <- shiny::renderUI({
       cfg <- resource_config()
+      steps <- cfg$steps
+
+      current_step_safe <- rv$current_step %||% first_step_from_steps(steps)
+      current_idx <- step_index(current_step_safe, steps)
+
+      if (is.null(current_idx)) {
+        current_idx <- 1L
+      }
+
+      pill_label <- function(step_name) {
+        if (identical(step_name, "event")) return("Event")
+        if (identical(step_name, "occurrence") && identical(cfg$resource_type, "occurrence_core")) return("Occurrence.Core")
+        if (identical(step_name, "occurrence")) return("Occurrence")
+        if (identical(step_name, "emof")) return("eMoF")
+        step_name
+      }
+
+      pills <- lapply(seq_along(steps), function(i) {
+        st <- steps[[i]]
+        cls <- "dwca-step-pill"
+
+        if (i < current_idx) {
+          cls <- paste(cls, "is-done")
+        }
+        if (i == current_idx) {
+          cls <- paste(cls, "is-active")
+        }
+
+        shiny::tags$div(
+          class = cls,
+          shiny::tags$span(pill_label(st))
+        )
+      })
 
       shiny::tagList(
         shiny::div(
@@ -684,255 +976,253 @@ mod_build_dwca_server <- function(id, df_in, dwc_terms, target_database_in) {
             cfg$architecture_label,
             ". Required fields are included automatically and are not shown here. Strongly recommended fields start selected. Recommended and optional fields start unselected."
           )
+        ),
+        shiny::div(
+          class = "dwca-stepper",
+          pills
         )
       )
     })
 
-    output$table_cards_ui <- shiny::renderUI({
+    output$selection_warning_ui <- shiny::renderUI({
       cfg <- resource_config()
-      specs <- table_term_specs()
+      steps <- cfg$steps
+      sel <- selected_table_terms()
+      emof_sel <- emof_selected()
+      emof_spec <- emof_candidate_specs()
 
-      cards <- list()
+      current_step_safe <- rv$current_step %||% first_step_from_steps(steps)
+      if (is.null(step_index(current_step_safe, steps))) {
+        current_step_safe <- first_step_from_steps(steps)
+      }
 
-      if (isTRUE(cfg$show_event)) {
-        cards[[length(cards) + 1]] <- bslib::card(
-          class = "dwca-section-card",
-          bslib::card_header("Event table"),
-          bslib::card_body(
-            render_table_card_body(
-              spec_df = specs$Event,
-              prefix = "event_term__",
-              help_text = "Required fields are included automatically and are not shown here. Only non-required fields are selectable below."
-            )
+      msg_parts <- list()
+
+      if (!is.null(rv$build_error) && nzchar(rv$build_error)) {
+        msg_parts[[length(msg_parts) + 1]] <- shiny::tags$div(
+          class = "alert alert-danger dwca-build-error",
+          shiny::tags$strong("Build error: "),
+          rv$build_error
+        )
+      }
+
+      both <- intersect(emof_sel$event, emof_sel$occurrence)
+      if (length(both) > 0) {
+        msg_parts[[length(msg_parts) + 1]] <- shiny::tags$div(
+          class = "alert alert-danger",
+          shiny::tags$strong("eMoF conflict: "),
+          paste0(
+            "These columns were selected in both eMoF levels: ",
+            paste(both, collapse = ", "),
+            ". Choose only one level for each field."
           )
         )
       }
 
-      if (isTRUE(cfg$show_occurrence)) {
-        cards[[length(cards) + 1]] <- bslib::card(
-          class = "dwca-section-card",
-          bslib::card_header(cfg$occurrence_card_title),
-          bslib::card_body(
-            render_table_card_body(
-              spec_df = specs$Occurrence,
-              prefix = "occ_term__",
-              help_text = "Required fields are included automatically and are not shown here. Only non-required fields are selectable below."
-            )
-          )
+      if (identical(current_step_safe, "emof") && nrow(emof_spec) == 0) {
+        msg_parts[[length(msg_parts) + 1]] <- shiny::tags$div(
+          class = "alert alert-warning",
+          "No eligible columns remain for eMoF after excluding structural fields and the columns already selected for Event / Occurrence."
         )
       }
 
-      if (length(cards) == 0) {
-        return(NULL)
-      }
+      summary_text <- paste0(
+        "Current selections — Event: ",
+        length(sel$event %||% character(0)),
+        " field(s); Occurrence: ",
+        length(sel$occurrence %||% character(0)),
+        " field(s); eMoF event: ",
+        length(emof_sel$event %||% character(0)),
+        " field(s); eMoF occurrence: ",
+        length(emof_sel$occurrence %||% character(0)),
+        " field(s)."
+      )
 
-      if (length(cards) == 1) {
-        return(cards[[1]])
-      }
-
-      shiny::tags$div(class = "dwca-main-grid", cards)
-    })
-
-    output$build_error_ui <- shiny::renderUI({
-      msg <- rv$build_error
-      if (is.null(msg) || !nzchar(msg)) return(NULL)
+      msg_parts[[length(msg_parts) + 1]] <- shiny::tags$div(
+        class = "dwca-selection-summary",
+        summary_text
+      )
 
       shiny::tags$div(
-        class = "alert alert-danger dwca-build-error",
-        shiny::tags$strong("Build error: "),
-        msg
+        class = "dwca-warning-box",
+        msg_parts
       )
     })
 
-    output$emof_terms_ui <- shiny::renderUI({
-      cfg <- resource_config()
+    output$emof_event_terms_ui <- shiny::renderUI({
       spec <- emof_candidate_specs()
+      render_scroll_choices(
+        spec_df = spec,
+        prefix = "emof_event__",
+        search_text = input$emof_event_search %||% ""
+      )
+    })
 
-      make_emof_panel <- function(level_prefix, title) {
+    output$emof_occ_terms_ui <- shiny::renderUI({
+      spec <- emof_candidate_specs()
+      render_scroll_choices(
+        spec_df = spec,
+        prefix = "emof_occ__",
+        search_text = input$emof_occ_search %||% ""
+      )
+    })
+
+    output$step_body_ui <- shiny::renderUI({
+      cfg <- resource_config()
+      steps <- cfg$steps
+      specs <- table_term_specs()
+
+      step <- rv$current_step %||% first_step_from_steps(steps)
+      if (is.null(step_index(step, steps))) {
+        step <- first_step_from_steps(steps)
+      }
+
+      make_emof_panel <- function(title, search_id, terms_output_id) {
         shiny::tags$div(
           shiny::tags$div(class = "dwca-term-group-title", title),
-          shiny::tags$div(
+          shiny::div(
             class = "dwca-help-block",
             "Select the columns that should become eMoF records at this level."
           ),
-          render_scroll_choices(spec, level_prefix)
+          shiny::div(
+            class = "dwca-search-box",
+            shiny::textInput(
+              session$ns(search_id),
+              "Search terms",
+              value = "",
+              placeholder = "Type to filter terms"
+            )
+          ),
+          shiny::uiOutput(session$ns(terms_output_id))
         )
       }
 
-      if (nrow(spec) == 0) {
+      if (identical(step, "event")) {
         return(
-          shiny::tags$div(
-            class = "dwca-help-block",
-            "No eligible columns are available for eMoF in the current dataset."
+          render_table_card_body(
+            spec_df = specs$Event,
+            prefix = "event_term__",
+            help_text = "Required fields are included automatically and are not shown here. Only non-required fields are selectable below."
           )
         )
       }
 
-      if (isTRUE(cfg$show_emof_event) && isTRUE(cfg$show_emof_occurrence)) {
+      if (identical(step, "occurrence")) {
         return(
-          shiny::tagList(
+          render_table_card_body(
+            spec_df = specs$Occurrence,
+            prefix = "occ_term__",
+            help_text = "Required fields are included automatically and are not shown here. Only non-required fields are selectable below."
+          )
+        )
+      }
+
+      if (identical(step, "emof")) {
+        spec <- emof_candidate_specs()
+
+        if (nrow(spec) == 0) {
+          return(
             shiny::tags$div(
               class = "dwca-help-block",
-              "The available eMoF levels depend on the selected resource type. Do not select the same field in both lists."
-            ),
-            shiny::tags$div(
-              class = "dwca-subgrid",
-              make_emof_panel("emof_event__", "eMoF - event"),
-              make_emof_panel("emof_occ__", "eMoF - occurrence")
+              "No eligible columns are available for eMoF in the current dataset after excluding structural fields and the fields already selected for the core tables."
             )
           )
-        )
-      }
+        }
 
-      if (isTRUE(cfg$show_emof_occurrence)) {
-        return(
-          shiny::tagList(
-            shiny::tags$div(
-              class = "dwca-help-block",
-              "For Occurrence core, only occurrence-level eMoF is available."
-            ),
-            make_emof_panel("emof_occ__", "eMoF - occurrence")
+        if (isTRUE(cfg$show_emof_event) && isTRUE(cfg$show_emof_occurrence)) {
+          return(
+            shiny::tagList(
+              shiny::tags$div(
+                class = "dwca-help-block",
+                "Only fields not already selected in Event or Occurrence are shown here. Choose each remaining field in at most one eMoF level."
+              ),
+              shiny::tags$div(
+                class = "dwca-subgrid",
+                make_emof_panel("eMoF - event", "emof_event_search", "emof_event_terms_ui"),
+                make_emof_panel("eMoF - occurrence", "emof_occ_search", "emof_occ_terms_ui")
+              )
+            )
           )
-        )
+        }
+
+        if (isTRUE(cfg$show_emof_occurrence)) {
+          return(
+            shiny::tagList(
+              shiny::tags$div(
+                class = "dwca-help-block",
+                "For Occurrence core, only occurrence-level eMoF is available. Only fields not already selected in the core table are shown here."
+              ),
+              make_emof_panel("eMoF - occurrence", "emof_occ_search", "emof_occ_terms_ui")
+            )
+          )
+        }
       }
 
       shiny::tags$div(
         class = "dwca-help-block",
-        "eMoF is not available for the active architecture."
+        "No step content available."
       )
     })
 
-    selected_table_terms <- shiny::reactive({
-      specs <- table_term_specs()
+    output$wizard_left_actions_ui <- shiny::renderUI({
       cfg <- resource_config()
+      steps <- cfg$steps
 
-      event_keep <- character(0)
-      if (isTRUE(cfg$show_event) && nrow(specs$Event) > 0) {
-        event_keep <- vapply(seq_len(nrow(specs$Event)), function(i) {
-          term <- specs$Event$term[i]
-          if (isTRUE(specs$Event$locked[i])) {
-            return(term)
-          }
-          cid <- paste0("event_term__", safe_id_piece(term))
-          keep <- checkbox_value_or_default(cid, default = specs$Event$selected_default[i])
-          if (keep) term else NA_character_
-        }, character(1))
-        event_keep <- event_keep[!is.na(event_keep)]
+      step <- rv$current_step %||% first_step_from_steps(steps)
+      idx <- step_index(step, steps)
+
+      if (is.null(idx)) {
+        idx <- 1L
       }
 
-      occ_keep <- character(0)
-      if (isTRUE(cfg$show_occurrence) && nrow(specs$Occurrence) > 0) {
-        occ_keep <- vapply(seq_len(nrow(specs$Occurrence)), function(i) {
-          term <- specs$Occurrence$term[i]
-          if (isTRUE(specs$Occurrence$locked[i])) {
-            return(term)
-          }
-          cid <- paste0("occ_term__", safe_id_piece(term))
-          keep <- checkbox_value_or_default(cid, default = specs$Occurrence$selected_default[i])
-          if (keep) term else NA_character_
-        }, character(1))
-        occ_keep <- occ_keep[!is.na(occ_keep)]
+      out <- list()
+
+      if (idx > 1) {
+        out[[length(out) + 1]] <- shiny::actionButton(
+          session$ns("go_back"),
+          "Back",
+          class = "btn-outline-secondary dwca-build-btn"
+        )
       }
 
-      list(
-        event = unique(event_keep),
-        occurrence = unique(occ_keep)
-      )
+      if (!is.null(rv$result)) {
+        out[[length(out) + 1]] <- shiny::actionButton(
+          session$ns("restart_wizard"),
+          "Start over",
+          class = "btn-outline-danger dwca-build-btn"
+        )
+      }
+
+      do.call(shiny::tagList, out)
     })
 
-    emof_selected <- shiny::reactive({
+    output$wizard_right_actions_ui <- shiny::renderUI({
       cfg <- resource_config()
-      spec <- emof_candidate_specs()
+      steps <- cfg$steps
 
-      event_cols <- character(0)
-      occ_cols <- character(0)
+      step <- rv$current_step %||% first_step_from_steps(steps)
+      idx <- step_index(step, steps)
 
-      if (nrow(spec) > 0 && isTRUE(cfg$show_emof_event)) {
-        event_cols <- vapply(seq_len(nrow(spec)), function(i) {
-          term <- spec$term[i]
-          cid <- paste0("emof_event__", safe_id_piece(term))
-          keep <- checkbox_value_or_default(cid, default = FALSE)
-          if (keep) term else NA_character_
-        }, character(1))
-        event_cols <- event_cols[!is.na(event_cols)]
+      if (is.null(idx)) {
+        step <- first_step_from_steps(steps)
       }
 
-      if (nrow(spec) > 0 && isTRUE(cfg$show_emof_occurrence)) {
-        occ_cols <- vapply(seq_len(nrow(spec)), function(i) {
-          term <- spec$term[i]
-          cid <- paste0("emof_occ__", safe_id_piece(term))
-          keep <- checkbox_value_or_default(cid, default = FALSE)
-          if (keep) term else NA_character_
-        }, character(1))
-        occ_cols <- occ_cols[!is.na(occ_cols)]
+      if (!identical(step, last_step_from_steps(steps))) {
+        return(
+          shiny::actionButton(
+            session$ns("go_next"),
+            "Next",
+            class = "btn-primary dwca-build-btn"
+          )
+        )
       }
 
-      list(
-        event = unique(event_cols),
-        occurrence = unique(occ_cols)
+      shiny::actionButton(
+        session$ns("build"),
+        "Build Darwin Core tables",
+        class = "btn-primary dwca-build-btn"
       )
     })
-
-    emof_levels <- shiny::reactive({
-      sel <- emof_selected()
-
-      ev <- sel$event %||% character(0)
-      oc <- sel$occurrence %||% character(0)
-
-      levs <- c(
-        setNames(as.list(rep("event", length(ev))), ev),
-        setNames(as.list(rep("occurrence", length(oc))), oc)
-      )
-
-      if (length(levs) == 0) return(NULL)
-      levs
-    })
-
-    shiny::observeEvent(list(df_in(), target_database_in(), input$resource_type), {
-      rv$ready <- FALSE
-      rv$result <- NULL
-      rv$build_error <- NULL
-    }, ignoreInit = FALSE)
-
-    shiny::observeEvent(list(table_term_specs(), input$resource_type), {
-      specs <- table_term_specs()
-      cfg <- resource_config()
-
-      if (isTRUE(cfg$show_event)) {
-        reset_table_checkboxes(specs$Event, "event_term__")
-      }
-
-      if (isTRUE(cfg$show_occurrence)) {
-        reset_table_checkboxes(specs$Occurrence, "occ_term__")
-      }
-    }, ignoreInit = TRUE)
-
-    shiny::observeEvent(list(emof_candidate_specs(), input$resource_type), {
-      spec <- emof_candidate_specs()
-      cfg <- resource_config()
-
-      session$onFlushed(function() {
-        for (i in seq_len(nrow(spec))) {
-          term <- spec$term[i]
-
-          if (isTRUE(cfg$show_emof_event)) {
-            shiny::updateCheckboxInput(
-              session,
-              inputId = paste0("emof_event__", safe_id_piece(term)),
-              value = FALSE
-            )
-          }
-
-          if (isTRUE(cfg$show_emof_occurrence)) {
-            shiny::updateCheckboxInput(
-              session,
-              inputId = paste0("emof_occ__", safe_id_piece(term)),
-              value = FALSE
-            )
-          }
-        }
-      }, once = TRUE)
-    }, ignoreInit = TRUE)
 
     build_once <- function() {
       df <- df_in()
@@ -965,6 +1255,101 @@ mod_build_dwca_server <- function(id, df_in, dwc_terms, target_database_in) {
         )
       )
     }
+
+    shiny::observeEvent(list(df_in(), target_database_in(), input$resource_type), {
+      cfg_snapshot <- resource_config()
+      clear_built_result()
+      set_step_to_first(cfg_snapshot$steps)
+    }, ignoreInit = FALSE)
+
+    shiny::observeEvent(list(table_term_specs(), input$resource_type), {
+      specs_snapshot <- table_term_specs()
+      cfg_snapshot <- resource_config()
+
+      if (isTRUE(cfg_snapshot$show_event)) {
+        reset_table_checkboxes(specs_snapshot$Event, "event_term__")
+      }
+
+      if (isTRUE(cfg_snapshot$show_occurrence)) {
+        reset_table_checkboxes(specs_snapshot$Occurrence, "occ_term__")
+      }
+    }, ignoreInit = TRUE)
+
+    shiny::observeEvent(list(emof_candidate_specs(), input$resource_type), {
+      spec_snapshot <- emof_candidate_specs()
+      cfg_snapshot <- resource_config()
+      reset_emof_checkboxes(spec_snapshot, cfg_snapshot)
+    }, ignoreInit = TRUE)
+
+    shiny::observeEvent(input$go_back, {
+      cfg_snapshot <- resource_config()
+      steps_snapshot <- cfg_snapshot$steps
+
+      cur <- rv$current_step %||% first_step_from_steps(steps_snapshot)
+      idx <- step_index(cur, steps_snapshot)
+
+      if (is.null(idx)) {
+        rv$current_step <- first_step_from_steps(steps_snapshot)
+        return(invisible(NULL))
+      }
+
+      if (idx > 1) {
+        rv$current_step <- steps_snapshot[[idx - 1]]
+      }
+    }, ignoreInit = TRUE)
+
+    shiny::observeEvent(input$go_next, {
+      cfg_snapshot <- resource_config()
+      steps_snapshot <- cfg_snapshot$steps
+      specs_snapshot <- table_term_specs()
+      emof_spec_snapshot <- emof_candidate_specs()
+
+      cur <- rv$current_step %||% first_step_from_steps(steps_snapshot)
+      idx <- step_index(cur, steps_snapshot)
+
+      if (is.null(idx)) {
+        rv$current_step <- first_step_from_steps(steps_snapshot)
+        return(invisible(NULL))
+      }
+
+      if (idx >= length(steps_snapshot)) {
+        return(invisible(NULL))
+      }
+
+      clear_built_result()
+
+      if (identical(cur, "event")) {
+        if (isTRUE(cfg_snapshot$show_occurrence)) {
+          reset_table_checkboxes(specs_snapshot$Occurrence, "occ_term__")
+        }
+        reset_emof_checkboxes(emof_spec_snapshot, cfg_snapshot)
+      }
+
+      if (identical(cur, "occurrence")) {
+        reset_emof_checkboxes(emof_spec_snapshot, cfg_snapshot)
+      }
+
+      rv$current_step <- steps_snapshot[[idx + 1]]
+    }, ignoreInit = TRUE)
+
+    shiny::observeEvent(input$restart_wizard, {
+      cfg_snapshot <- resource_config()
+      specs_snapshot <- table_term_specs()
+      emof_spec_snapshot <- emof_candidate_specs()
+
+      clear_built_result()
+      set_step_to_first(cfg_snapshot$steps)
+
+      if (isTRUE(cfg_snapshot$show_event)) {
+        reset_table_checkboxes(specs_snapshot$Event, "event_term__")
+      }
+
+      if (isTRUE(cfg_snapshot$show_occurrence)) {
+        reset_table_checkboxes(specs_snapshot$Occurrence, "occ_term__")
+      }
+
+      reset_emof_checkboxes(emof_spec_snapshot, cfg_snapshot)
+    }, ignoreInit = TRUE)
 
     shiny::observeEvent(input$build, {
       rv$build_error <- NULL
@@ -1056,46 +1441,24 @@ mod_build_dwca_server <- function(id, df_in, dwc_terms, target_database_in) {
       )
     })
 
-    output$download_event <- shiny::downloadHandler(
-      filename = function() "event.csv",
-      content = function(file) {
-        shiny::req(rv$result)
-        x <- rv$result$event
-        if (is.null(x)) x <- data.frame()
-        utils::write.csv(
-          aurora_drop_internal_cols(x),
-          file,
-          row.names = FALSE,
-          na = ""
+    output$pre_issues_preview <- DT::renderDT({
+      x <- get_pre_issues()
+      if (!is.data.frame(x) || nrow(x) == 0) {
+        x <- data.frame(
+          message = "No pre-issues available.",
+          stringsAsFactors = FALSE
         )
       }
-    )
 
-    output$download_occ <- shiny::downloadHandler(
-      filename = function() "occurrence.csv",
-      content = function(file) {
-        shiny::req(rv$result)
-        x <- rv$result$occurrence
-        if (is.null(x)) x <- data.frame()
-        utils::write.csv(
-          aurora_drop_internal_cols(x),
-          file,
-          row.names = FALSE,
-          na = ""
+      DT::datatable(
+        x,
+        rownames = FALSE,
+        options = list(
+          scrollX = TRUE,
+          pageLength = 10
         )
-      }
-    )
-
-    output$download_emof <- shiny::downloadHandler(
-      filename = function() "emof.csv",
-      content = function(file) {
-        shiny::req(rv$result)
-        x <- rv$result$emof
-        if (is.null(x)) x <- data.frame()
-        x <- aurora_drop_internal_cols(x)
-        utils::write.csv(x, file, row.names = FALSE, na = "")
-      }
-    )
+      )
+    })
 
     result_rx <- shiny::reactive({
       shiny::req(rv$result)
