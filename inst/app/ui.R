@@ -3,11 +3,11 @@ ui <- bslib::page_navbar(
   title = shiny::div(
     style = "display:flex; align-items:center; gap:.65rem;",
     shiny::tags$img(
-      src = "aurora_logo.png",
+      src = "aurora_logo_home.png",
       alt = "AURORA logo",
       style = "height:34px; width:auto;"
     ),
-    shiny::tags$span("AURORA Biodiversity Data App")
+    shiny::tags$span("AURORA Shiny App")
   ),
 
   theme = bslib::bs_theme(
@@ -46,6 +46,12 @@ ui <- bslib::page_navbar(
       }
 
       table.dataTable { font-size: 0.95rem; }
+
+       .navbar .navbar-collapse {
+        flex-grow: 0;
+        margin-left: auto;
+        margin-right: 2rem; /* adjust to taste */
+      }
 
       .nav-link.disabled-tab,
       .dropdown-item.disabled-tab {
@@ -227,7 +233,7 @@ ui <- bslib::page_navbar(
     shiny::tags$script(shiny::HTML("
       Shiny.addCustomMessageHandler('toggleMainTabs', function(message) {
         var allowed = message.allowed || [];
-        var allTabs = ['home', 'ingest', 'field_mapping', 'id_cleaning', 'taxonomy', 'darwin_tables', 'qc', 'metadata', 'about'];
+        var allTabs = ['home', 'ingest', 'field_mapping', 'id_cleaning', 'taxonomy', 'darwin_tables', 'emof_editor', 'qc', 'metadata', 'about'];
 
         allTabs.forEach(function(value) {
           var navLink = document.querySelector('[data-value=\"' + value + '\"]');
@@ -304,17 +310,26 @@ ui <- bslib::page_navbar(
   ),
 
   # -------------------------------------------------------
-  # 6 QC & DIAGNOSTICS
+  # 6 eMOF DATA EDITOR
+  # -------------------------------------------------------
+  bslib::nav_panel(
+    title = "eMoF Editor",
+    value = "emof_editor",
+    mod_emof_data_editor_ui("emof_editor")
+  ),
+
+  # -------------------------------------------------------
+  # 7 QC & DIAGNOSTICS
   # -------------------------------------------------------
   mod_qc_ui("qc"),
 
   # -------------------------------------------------------
-  # 7 METADATA
+  # 8 METADATA
   # -------------------------------------------------------
   mod_metadata_ui("metadata"),
 
   # -------------------------------------------------------
-  # 8 ABOUT
+  # 9 ABOUT
   # -------------------------------------------------------
   bslib::nav_panel(
     title = "About",
