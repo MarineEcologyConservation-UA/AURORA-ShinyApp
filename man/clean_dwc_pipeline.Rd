@@ -10,9 +10,9 @@ clean_dwc_pipeline(
   target_epsg = 4326,
   force_parzer = TRUE,
   bathy = NULL,
+  swap_auto_fixes = FALSE,
   bathy_auto_download = TRUE,
   bathy_depth_tolerance_m = 200,
-  swap_auto_fix = FALSE,
   preserve_original_coords = FALSE,
   create_geodetic_datum = FALSE,
   geodetic_datum_value = "WGS84",
@@ -34,8 +34,6 @@ clean_dwc_pipeline(
 \item{bathy_auto_download}{logical; if TRUE and bathy is NULL, tries to fetch bathymetry with marmap for the dataset extent}
 
 \item{bathy_depth_tolerance_m}{numeric; tolerance (meters) to compare reported depth with bathymetry}
-
-\item{swap_auto_fix}{logical; if TRUE, auto-swap coordinates in clear range-based cases}
 
 \item{preserve_original_coords}{logical; if TRUE, preserve original decimalLatitude/decimalLongitude
 into verbatimLatitude/verbatimLongitude before any parsing/reprojection, when those

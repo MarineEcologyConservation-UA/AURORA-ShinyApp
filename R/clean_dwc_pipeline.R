@@ -11,7 +11,6 @@
 #' @param bathy optional marmap bathy object already loaded/downloaded
 #' @param bathy_auto_download logical; if TRUE and bathy is NULL, tries to fetch bathymetry with marmap for the dataset extent
 #' @param bathy_depth_tolerance_m numeric; tolerance (meters) to compare reported depth with bathymetry
-#' @param swap_auto_fix logical; if TRUE, auto-swap coordinates in clear range-based cases
 #' @param preserve_original_coords logical; if TRUE, preserve original decimalLatitude/decimalLongitude
 #'   into verbatimLatitude/verbatimLongitude before any parsing/reprojection, when those
 #'   verbatim fields do not already exist
@@ -26,9 +25,9 @@ clean_dwc_pipeline <- function(df,
                                target_epsg = 4326,
                                force_parzer = TRUE,
                                bathy = NULL,
+                               swap_auto_fixes = FALSE,
                                bathy_auto_download = TRUE,
                                bathy_depth_tolerance_m = 200,
-                               swap_auto_fix = FALSE,
                                preserve_original_coords = FALSE,
                                create_geodetic_datum = FALSE,
                                geodetic_datum_value = "WGS84",
@@ -201,304 +200,404 @@ clean_dwc_pipeline <- function(df,
 
 
 
-  # ------------------------------------------------------------
-  # 3) Coordinate cleanup (decimalLatitude/decimalLongitude)
-  # ------------------------------------------------------------
-  has_decimal_lat <- "decimalLatitude" %in% names(out)
-  has_decimal_lon <- "decimalLongitude" %in% names(out)
-  has_vlat <- "verbatimLatitude" %in% names(out)
-  has_vlon <- "verbatimLongitude" %in% names(out)
-  has_geo_fields <- has_decimal_lat || has_decimal_lon || has_vlat || has_vlon
-
-  if (!has_geo_fields) {
-    lat <- rep(NA_real_, nrow(out))
-    lon <- rep(NA_real_, nrow(out))
-    dmin <- rep(NA_real_, nrow(out))
-    dmax <- rep(NA_real_, nrow(out))
-  } else {
-    if (!has_decimal_lat) {
-      out$decimalLatitude <- NA_real_
-      add_issue(NA_integer_, "decimalLatitude", "coord_missing_created",
-                "INFO", "decimalLatitude is missing.")
-      has_decimal_lat <- TRUE
-    }
-    if (!has_decimal_lon) {
-      out$decimalLongitude <- NA_real_
-      add_issue(NA_integer_, "decimalLongitude", "coord_missing_created",
-                "INFO", "decimalLongitude is missing.")
-      has_decimal_lon <- TRUE
-    }
-
-
-
-    if (isTRUE(preserve_original_coords)) {
-      if ("decimalLatitude" %in% names(out) && !("verbatimLatitude" %in% names(out))) {
-        out$verbatimLatitude <- as.character(out$decimalLatitude)
-        add_issue(
-          NA_integer_,
-          "verbatimLatitude",
-          "verbatim_created_from_decimalLatitude",
-          "INFO",
-          "verbatimLatitude created from decimalLatitude before transformation."
-        )
-      }
-
-
-
-      if ("decimalLongitude" %in% names(out) && !("verbatimLongitude" %in% names(out))) {
-        out$verbatimLongitude <- as.character(out$decimalLongitude)
-        add_issue(
-          NA_integer_,
-          "verbatimLongitude",
-          "verbatim_created_from_decimalLongitude",
-          "INFO",
-          "verbatimLongitude created from decimalLongitude before transformation."
-        )
-      }
-    }
-
-
-
-    vlat_raw <- if (has_vlat) out$verbatimLatitude else rep(NA, nrow(out))
-    vlon_raw <- if (has_vlon) out$verbatimLongitude else rep(NA, nrow(out))
-
-
-
-    lat_raw <- out$decimalLatitude
-    lon_raw <- out$decimalLongitude
-
-
-
-    lat_num <- suppressWarnings(as.numeric(lat_raw))
-    lon_num <- suppressWarnings(as.numeric(lon_raw))
-
-
-
-    vlat_chr <- trimws(as.character(vlat_raw))
-    vlon_chr <- trimws(as.character(vlon_raw))
-    lat_chr  <- trimws(as.character(lat_raw))
-    lon_chr  <- trimws(as.character(lon_raw))
-
-
-
-    use_vlat <- !is.na(vlat_chr) & vlat_chr != ""
-    use_vlon <- !is.na(vlon_chr) & vlon_chr != ""
-
-
-
-    lat_candidate <- ifelse(use_vlat, vlat_chr, lat_chr)
-    lon_candidate <- ifelse(use_vlon, vlon_chr, lon_chr)
-
-
-
-    need_parse_lat <- force_parzer || any(is.na(lat_num) & lat_candidate != "" & !is.na(lat_candidate))
-    need_parse_lon <- force_parzer || any(is.na(lon_num) & lon_candidate != "" & !is.na(lon_candidate))
-
-
-
-    lat <- lat_num
-    lon <- lon_num
-
-
-
-    lat_parsed <- rep(NA_real_, nrow(out))
-    lon_parsed <- rep(NA_real_, nrow(out))
-
-
-
-    if ((need_parse_lat || need_parse_lon) && requireNamespace("parzer", quietly = TRUE)) {
-      lat_parsed <- suppressWarnings(parzer::parse_lat(lat_candidate))
-      lon_parsed <- suppressWarnings(parzer::parse_lon(lon_candidate))
-
-
-
-      lat[is.na(lat) & !is.na(lat_parsed)] <- lat_parsed[is.na(lat) & !is.na(lat_parsed)]
-      lon[is.na(lon) & !is.na(lon_parsed)] <- lon_parsed[is.na(lon) & !is.na(lon_parsed)]
-
-
-
-      idx_changed <- which(
-        (is.na(lat_num) & !is.na(lat_parsed) & lat_candidate != "") |
-          (is.na(lon_num) & !is.na(lon_parsed) & lon_candidate != "")
-      )
-      if (length(idx_changed) > 0) {
-        for (i in idx_changed) {
-          add_issue(i, "decimalLatitude/decimalLongitude", "coord_parzer",
-                    "INFO",
-                    "Coordinates converted to decimal degrees from verbatim.")
-        }
-      }
-    } else if (need_parse_lat || need_parse_lon) {
-      idx <- which(
-        (is.na(lat) & !is.na(lat_candidate) & lat_candidate != "") |
-          (is.na(lon) & !is.na(lon_candidate) & lon_candidate != "")
-      )
-      if (length(idx) > 0) {
-        for (i in idx) {
-          add_issue(i, "decimalLatitude/decimalLongitude", "coord_parse_missing_pkg",
-                    "ERROR", "Could not parse coordinates. Install the 'parzer' package.")
-        }
-      }
-    }
-
-
-
-    lat_nonempty <- !is.na(lat_candidate) & lat_candidate != ""
-    lon_nonempty <- !is.na(lon_candidate) & lon_candidate != ""
-
-
-
-    bad_lat_non_numeric <- lat_nonempty & is.na(suppressWarnings(as.numeric(lat_candidate))) & is.na(lat_parsed)
-    bad_lon_non_numeric <- lon_nonempty & is.na(suppressWarnings(as.numeric(lon_candidate))) & is.na(lon_parsed)
-
-
-
-    if (any(bad_lat_non_numeric | bad_lon_non_numeric)) {
-      idx <- which(bad_lat_non_numeric | bad_lon_non_numeric)
-      for (i in idx) {
-        add_issue(
-          i,
-          "decimalLatitude/decimalLongitude",
-          "coord_non_numeric",
-          "ERROR",
-          paste0(
-            "Coordinates are not numeric or could not be parsed. latitude='",
-            lat_candidate[i], "', longitude='", lon_candidate[i], "'."
-          )
-        )
-      }
-    }
-
-
-
-    lat_in_range <- !is.na(lat) & lat >= -90 & lat <= 90
-    lon_in_range <- !is.na(lon) & lon >= -180 & lon <= 180
-
-
-
-    miss <- is.na(lat) | is.na(lon)
-    if (any(miss)) {
-      idx <- which(miss)
-      for (i in idx) {
-        add_issue(i, "decimalLatitude/decimalLongitude", "empty_coordinates",
-                  "WARNING", "Missing coordinates (lat/lon) after parsing attempt.")
-      }
-    }
-
-
-
-    zero_zero <- !is.na(lat) & !is.na(lon) & lat == 0 & lon == 0
-    if (any(zero_zero)) {
-      idx <- which(zero_zero)
-      for (i in idx) {
-        add_issue(
-          i,
-          "decimalLatitude/decimalLongitude",
-          "coords_zero_zero",
-          "WARNING",
-          "Coordinates at 0,0 detected (Null Island). Review whether this is an error."
-        )
-      }
-    }
-
-
-
-    epsg_in <- suppressWarnings(as.integer(coord_epsg_in))
-    epsg_target <- suppressWarnings(as.integer(target_epsg))
-
-
-
-    if (!is.na(epsg_in) && epsg_in == 4326) {
-      oor_lat <- !is.na(lat) & (lat < -90 | lat > 90)
-      oor_lon <- !is.na(lon) & (lon < -180 | lon > 180)
-
-
-
-      if (any(oor_lat | oor_lon)) {
-        idx <- which(oor_lat | oor_lon)
-        for (i in idx) {
-          add_issue(i, "decimalLatitude/decimalLongitude", "out_of_range",
-                    "ERROR", "Coordinates outside the valid range for EPSG:4326.")
-        }
-      }
-    }
-
-
-
-    if (!is.na(epsg_in) && !is.na(epsg_target) &&
-        epsg_in != epsg_target) {
-
-
-
-      if (requireNamespace("sf", quietly = TRUE)) {
-        ok <- !is.na(lat) & !is.na(lon)
-        if (any(ok)) {
-          pts <- sf::st_as_sf(
-            data.frame(lon = lon[ok], lat = lat[ok]),
-            coords = c("lon", "lat"),
-            crs = epsg_in
-          )
-
-
-
-          pts2 <- tryCatch(sf::st_transform(pts, crs = epsg_target), error = function(e) e)
-
-
-
-          if (inherits(pts2, "error")) {
-            idx <- which(ok)
-            for (i in idx) {
-              add_issue(i, "decimalLatitude/decimalLongitude", "reproject_failed",
-                        "ERROR",
-                        paste0("Failed to reproject to EPSG:[", epsg_target, "]: ", pts2$message))
-            }
-          } else {
-            coords <- sf::st_coordinates(pts2)
-            lon[ok] <- coords[, "X"]
-            lat[ok] <- coords[, "Y"]
-
-
-
-            idx <- which(ok)
-            for (i in idx) {
-              add_issue(i, "decimalLatitude/decimalLongitude", "reproject_to_target",
-                        "INFO",
-                        paste0("Reprojected from EPSG:[", epsg_in, "] to EPSG:[", epsg_target, "]."))
-            }
-          }
-        }
-      } else {
-        idx <- which(!is.na(lat) & !is.na(lon))
-        if (length(idx) > 0) {
-          for (i in idx) {
-            add_issue(i, "decimalLatitude/decimalLongitude", "reproject_missing_pkg",
-                      "ERROR", "The 'sf' package is required to reproject coordinates.")
-          }
-        }
-      }
-    }
-
-
-
-    if (!is.na(epsg_target) && epsg_target == 4326) {
-      oor_lat2 <- !is.na(lat) & (lat < -90 | lat > 90)
-      oor_lon2 <- !is.na(lon) & (lon < -180 | lon > 180)
-      if (any(oor_lat2 | oor_lon2)) {
-        idx <- which(oor_lat2 | oor_lon2)
-        for (i in idx) {
-          add_issue(i, "decimalLatitude/decimalLongitude", "out_of_range_after",
-                    "ERROR", "Coordinates outside the valid range after conversion/reprojection.")
-        }
-      }
-    }
-
-
-
-    out$decimalLatitude <- lat
-    out$decimalLongitude <- lon
+# ------------------------------------------------------------
+# 3) Coordinate cleanup (decimalLatitude/decimalLongitude)
+# ------------------------------------------------------------
+has_decimal_lat <- "decimalLatitude" %in% names(out)
+has_decimal_lon <- "decimalLongitude" %in% names(out)
+has_vlat <- "verbatimLatitude" %in% names(out)
+has_vlon <- "verbatimLongitude" %in% names(out)
+
+has_decimal_coords <- has_decimal_lat && has_decimal_lon
+
+if (!has_decimal_coords) {
+  lat <- rep(NA_real_, nrow(out))
+  lon <- rep(NA_real_, nrow(out))
+  dmin <- rep(NA_real_, nrow(out))
+  dmax <- rep(NA_real_, nrow(out))
+
+  if (!has_decimal_lat) {
+    add_issue(
+      NA_integer_,
+      "decimalLatitude",
+      "coord_missing",
+      "INFO",
+      "decimalLatitude is missing."
+    )
+  }
+
+  if (!has_decimal_lon) {
+    add_issue(
+      NA_integer_,
+      "decimalLongitude",
+      "coord_missing",
+      "INFO",
+      "decimalLongitude is missing."
+    )
+  }
+
+  add_issue(
+    NA_integer_,
+    "decimalLatitude/decimalLongitude",
+    "coord_original_system_disabled",
+    "INFO",
+    paste(
+      "Original coordinate system functions were disabled because both",
+      "decimalLatitude and decimalLongitude are required."
+    )
+  )
+
+  if (!is.null(coord_epsg_in) && !is.na(suppressWarnings(as.integer(coord_epsg_in)))) {
+    add_issue(
+      NA_integer_,
+      "coord_epsg_in",
+      "option_blocked",
+      "INFO",
+      "Input CRS EPSG was ignored because decimalLatitude and decimalLongitude are not both available."
+    )
+  }
+
+  if (!is.null(target_epsg) && !is.na(suppressWarnings(as.integer(target_epsg)))) {
+    add_issue(
+      NA_integer_,
+      "target_epsg",
+      "option_blocked",
+      "INFO",
+      "Target CRS transformation was ignored because decimalLatitude and decimalLongitude are not both available."
+    )
+  }
+
+  if (isTRUE(force_parzer)) {
+    add_issue(
+      NA_integer_,
+      "force_parzer",
+      "option_blocked",
+      "INFO",
+      "force_parzer was disabled because decimalLatitude and decimalLongitude are not both available."
+    )
   }
 
 
+  if (isTRUE(preserve_original_coords)) {
+    add_issue(
+      NA_integer_,
+      "preserve_original_coords",
+      "option_blocked",
+      "INFO",
+      "Preserve original coordinates in verbatimLatitude/verbatimLongitude was disabled because decimalLatitude and decimalLongitude are not both available."
+    )
+  }
+
+  if (isTRUE(create_geodetic_datum)) {
+    add_issue(
+      NA_integer_,
+      "create_geodetic_datum",
+      "option_blocked",
+      "INFO",
+      "Create/fill geodeticDatum was disabled because decimalLatitude and decimalLongitude are not both available."
+    )
+  }
+
+  coord_epsg_in <- NA_integer_
+  target_epsg <- NA_integer_
+  force_parzer <- FALSE
+  preserve_original_coords <- FALSE
+  create_geodetic_datum <- FALSE
+
+} else {
+
+  lat_raw <- out$decimalLatitude
+  lon_raw <- out$decimalLongitude
+
+  lat_num <- suppressWarnings(as.numeric(lat_raw))
+  lon_num <- suppressWarnings(as.numeric(lon_raw))
+
+  lat_chr <- trimws(as.character(lat_raw))
+  lon_chr <- trimws(as.character(lon_raw))
+
+  epsg_in <- suppressWarnings(as.integer(coord_epsg_in))
+  epsg_target <- suppressWarnings(as.integer(target_epsg))
+
+  reprojection_needed <- !is.na(epsg_in) &&
+    !is.na(epsg_target) &&
+    epsg_in != epsg_target
+
+  lat_candidate <- lat_chr
+  lon_candidate <- lon_chr
+
+  need_parse_lat <- force_parzer || any(is.na(lat_num) & lat_candidate != "" & !is.na(lat_candidate))
+  need_parse_lon <- force_parzer || any(is.na(lon_num) & lon_candidate != "" & !is.na(lon_candidate))
+
+  lat <- lat_num
+  lon <- lon_num
+
+  lat_parsed <- rep(NA_real_, nrow(out))
+  lon_parsed <- rep(NA_real_, nrow(out))
+
+  if ((need_parse_lat || need_parse_lon) && requireNamespace("parzer", quietly = TRUE)) {
+    lat_parsed <- suppressWarnings(parzer::parse_lat(lat_candidate))
+    lon_parsed <- suppressWarnings(parzer::parse_lon(lon_candidate))
+
+    lat[is.na(lat) & !is.na(lat_parsed)] <- lat_parsed[is.na(lat) & !is.na(lat_parsed)]
+    lon[is.na(lon) & !is.na(lon_parsed)] <- lon_parsed[is.na(lon) & !is.na(lon_parsed)]
+
+    idx_changed <- which(
+      (is.na(lat_num) & !is.na(lat_parsed) & lat_candidate != "") |
+      (is.na(lon_num) & !is.na(lon_parsed) & lon_candidate != "")
+    )
+
+    if (length(idx_changed) > 0) {
+      for (i in idx_changed) {
+        add_issue(
+          i,
+          "decimalLatitude/decimalLongitude",
+          "coord_parzer",
+          "INFO",
+          "Coordinates converted to decimal degrees from original values."
+        )
+      }
+    }
+
+  } else if (need_parse_lat || need_parse_lon) {
+    idx <- which(
+      (is.na(lat) & !is.na(lat_candidate) & lat_candidate != "") |
+      (is.na(lon) & !is.na(lon_candidate) & lon_candidate != "")
+    )
+
+    if (length(idx) > 0) {
+      for (i in idx) {
+        add_issue(
+          i,
+          "decimalLatitude/decimalLongitude",
+          "coord_parse_missing_pkg",
+          "ERROR",
+          "Could not parse coordinates. Install the 'parzer' package."
+        )
+      }
+    }
+  }
+
+  lat_parsed_idx <- is.na(lat_num) & !is.na(lat) & !is.na(lat_candidate) & lat_candidate != ""
+  lon_parsed_idx <- is.na(lon_num) & !is.na(lon) & !is.na(lon_candidate) & lon_candidate != ""
+
+  reprojection_idx <- reprojection_needed & !is.na(lat) & !is.na(lon)
+
+  lat_preserve_idx <- lat_parsed_idx | reprojection_idx
+  lon_preserve_idx <- lon_parsed_idx | reprojection_idx
+
+  if (isTRUE(preserve_original_coords)) {
+    if (!("verbatimLatitude" %in% names(out)) && any(lat_preserve_idx)) {
+      out$verbatimLatitude <- rep(NA_character_, nrow(out))
+      out$verbatimLatitude[lat_preserve_idx] <- lat_chr[lat_preserve_idx]
+
+      idx_created <- which(lat_preserve_idx)
+      for (i in idx_created) {
+        msg <- paste(
+          c(
+            if (lat_parsed_idx[i]) {
+              "verbatimLatitude created from original decimalLatitude because conversion to decimal degrees was needed."
+            },
+            if (reprojection_idx[i]) {
+              paste0(
+                "verbatimLatitude preserved because CRS reprojection from EPSG:[",
+                epsg_in, "] to EPSG:[", epsg_target, "] was needed."
+              )
+            }
+          ),
+          collapse = " "
+        )
+
+        add_issue(
+          i,
+          "verbatimLatitude",
+          "verbatim_created_from_decimalLatitude",
+          "INFO",
+          msg
+        )
+      }
+    }
+
+    if (!("verbatimLongitude" %in% names(out)) && any(lon_preserve_idx)) {
+      out$verbatimLongitude <- rep(NA_character_, nrow(out))
+      out$verbatimLongitude[lon_preserve_idx] <- lon_chr[lon_preserve_idx]
+
+      idx_created <- which(lon_preserve_idx)
+      for (i in idx_created) {
+        msg <- paste(
+          c(
+            if (lon_parsed_idx[i]) {
+              "verbatimLongitude created from original decimalLongitude because conversion to decimal degrees was needed."
+            },
+            if (reprojection_idx[i]) {
+              paste0(
+                "verbatimLongitude preserved because CRS reprojection from EPSG:[",
+                epsg_in, "] to EPSG:[", epsg_target, "] was needed."
+              )
+            }
+          ),
+          collapse = " "
+        )
+
+        add_issue(
+          i,
+          "verbatimLongitude",
+          "verbatim_created_from_decimalLongitude",
+          "INFO",
+          msg
+        )
+      }
+    }
+  }
+
+  lat_nonempty <- !is.na(lat_candidate) & lat_candidate != ""
+  lon_nonempty <- !is.na(lon_candidate) & lon_candidate != ""
+
+  bad_lat_non_numeric <- lat_nonempty & is.na(suppressWarnings(as.numeric(lat_candidate))) & is.na(lat_parsed)
+  bad_lon_non_numeric <- lon_nonempty & is.na(suppressWarnings(as.numeric(lon_candidate))) & is.na(lon_parsed)
+
+  if (any(bad_lat_non_numeric | bad_lon_non_numeric)) {
+    idx <- which(bad_lat_non_numeric | bad_lon_non_numeric)
+    for (i in idx) {
+      add_issue(
+        i,
+        "decimalLatitude/decimalLongitude",
+        "coord_non_numeric",
+        "ERROR",
+        paste0(
+          "Coordinates are not numeric or could not be parsed. latitude='",
+          lat_candidate[i], "', longitude='", lon_candidate[i], "'."
+        )
+      )
+    }
+  }
+
+  miss <- is.na(lat) | is.na(lon)
+  if (any(miss)) {
+    idx <- which(miss)
+    for (i in idx) {
+      add_issue(
+        i,
+        "decimalLatitude/decimalLongitude",
+        "empty_coordinates",
+        "WARNING",
+        "Missing coordinates (lat/lon) after parsing attempt."
+      )
+    }
+  }
+
+  zero_zero <- !is.na(lat) & !is.na(lon) & lat == 0 & lon == 0
+  if (any(zero_zero)) {
+    idx <- which(zero_zero)
+    for (i in idx) {
+      add_issue(
+        i,
+        "decimalLatitude/decimalLongitude",
+        "coords_zero_zero",
+        "WARNING",
+        "Coordinates at 0,0 detected (Null Island). Review whether this is an error."
+      )
+    }
+  }
+
+  if (!is.na(epsg_in) && epsg_in == 4326) {
+    oor_lat <- !is.na(lat) & (lat < -90 | lat > 90)
+    oor_lon <- !is.na(lon) & (lon < -180 | lon > 180)
+
+    if (any(oor_lat | oor_lon)) {
+      idx <- which(oor_lat | oor_lon)
+      for (i in idx) {
+        add_issue(
+          i,
+          "decimalLatitude/decimalLongitude",
+          "out_of_range",
+          "ERROR",
+          "Coordinates outside the valid range for EPSG:4326."
+        )
+      }
+    }
+  }
+
+  if (!is.na(epsg_in) && !is.na(epsg_target) && epsg_in != epsg_target) {
+    if (requireNamespace("sf", quietly = TRUE)) {
+      ok <- !is.na(lat) & !is.na(lon)
+
+      if (any(ok)) {
+        pts <- sf::st_as_sf(
+          data.frame(lon = lon[ok], lat = lat[ok]),
+          coords = c("lon", "lat"),
+          crs = epsg_in
+        )
+
+        pts2 <- tryCatch(
+          sf::st_transform(pts, crs = epsg_target),
+          error = function(e) e
+        )
+
+        if (inherits(pts2, "error")) {
+          idx <- which(ok)
+          for (i in idx) {
+            add_issue(
+              i,
+              "decimalLatitude/decimalLongitude",
+              "reproject_failed",
+              "ERROR",
+              paste0("Failed to reproject to EPSG:[", epsg_target, "]: ", pts2$message)
+            )
+          }
+        } else {
+          coords <- sf::st_coordinates(pts2)
+          lon[ok] <- coords[, "X"]
+          lat[ok] <- coords[, "Y"]
+
+          idx <- which(ok)
+          for (i in idx) {
+            add_issue(
+              i,
+              "decimalLatitude/decimalLongitude",
+              "reproject_to_target",
+              "INFO",
+              paste0("Reprojected from EPSG:[", epsg_in, "] to EPSG:[", epsg_target, "].")
+            )
+          }
+        }
+      }
+
+    } else {
+      idx <- which(!is.na(lat) & !is.na(lon))
+      if (length(idx) > 0) {
+        for (i in idx) {
+          add_issue(
+            i,
+            "decimalLatitude/decimalLongitude",
+            "reproject_missing_pkg",
+            "ERROR",
+            "The 'sf' package is required to reproject coordinates."
+          )
+        }
+      }
+    }
+  }
+
+  if (!is.na(epsg_target) && epsg_target == 4326) {
+    oor_lat2 <- !is.na(lat) & (lat < -90 | lat > 90)
+    oor_lon2 <- !is.na(lon) & (lon < -180 | lon > 180)
+
+    if (any(oor_lat2 | oor_lon2)) {
+      idx <- which(oor_lat2 | oor_lon2)
+      for (i in idx) {
+        add_issue(
+          i,
+          "decimalLatitude/decimalLongitude",
+          "out_of_range_after",
+          "ERROR",
+          "Coordinates outside the valid range after conversion/reprojection."
+        )
+      }
+    }
+  }
+
+  out$decimalLatitude <- lat
+  out$decimalLongitude <- lon
 
   if (isTRUE(create_geodetic_datum)) {
     if (!("geodeticDatum" %in% names(out))) {
@@ -512,8 +611,6 @@ clean_dwc_pipeline <- function(df,
       )
     }
 
-
-
     idx_fill <- is.na(out$geodeticDatum) | trimws(as.character(out$geodeticDatum)) == ""
     if (any(idx_fill)) {
       out$geodeticDatum[idx_fill] <- geodetic_datum_value
@@ -526,6 +623,7 @@ clean_dwc_pipeline <- function(df,
       )
     }
   }
+}
 
 
 
@@ -886,292 +984,133 @@ clean_dwc_pipeline <- function(df,
 }
 
 
+# ------------------------------------------------------------
+# 7) Date and time processing
+# ------------------------------------------------------------
 
-# ---- internal: null coalesce ----
-`%||%` <- function(x, y) if (is.null(x)) y else x
-
-
-
-.looks_like_datetime <- function(s) {
-  s <- trimws(as.character(s %||% ""))
-  if (!nzchar(s)) return(FALSE)
-
-
-
-  grepl(
-    "^\\d{4}-\\d{2}-\\d{2}[T ]\\d{2}:\\d{2}(:\\d{2})?(\\.\\d+)?([zZ]|[+-]\\d{2}:?\\d{2})?$",
-    s
-  ) ||
-    grepl(
-      "^\\d{1,2}[/-]\\d{1,2}[/-]\\d{2,4}[ T]\\d{1,2}:\\d{2}(:\\d{2})?(\\.\\d+)?$",
-      s
-    )
+`%||%` <- function(x, y) {
+  if (is.null(x)) y else x
 }
 
-
-
-.format_posix_iso <- function(x) {
-  if (inherits(x, c("POSIXct", "POSIXt")) && !is.na(x)) {
-    return(format(x, "%Y-%m-%dT%H:%M:%S", tz = "UTC"))
+.normalize_ambiguous_date_order <- function(ambiguous_date_order = "dmy") {
+  ambiguous_date_order <- tolower(trimws(as.character(ambiguous_date_order %||% "dmy")))
+  if (!ambiguous_date_order %in% c("dmy", "mdy")) {
+    ambiguous_date_order <- "dmy"
   }
-  NA_character_
+  ambiguous_date_order
 }
 
-
-
-.standardize_event_date_value <- function(s, ambiguous_date_order = "dmy") {
+# ----------------------------
+# CORE ISO 8601 HANDLING (ROBUST)
+# ----------------------------
+.parse_iso8601 <- function(s) {
   s <- trimws(as.character(s %||% ""))
   if (!nzchar(s)) return(NA_character_)
 
+  if (!grepl("^\\d{4}-\\d{2}-\\d{2}T", s)) return(NA_character_)
 
-
-  ambiguous_date_order <- tolower(trimws(as.character(ambiguous_date_order %||% "dmy")))
-  if (!(ambiguous_date_order %in% c("dmy", "mdy"))) {
-    ambiguous_date_order <- "dmy"
+  if (!requireNamespace("lubridate", quietly = TRUE)) {
+    return(NA_character_)
   }
 
+  # Parse WITHOUT forcing UTC
+  dt <- suppressWarnings(lubridate::ymd_hms(s))
 
+  if (is.na(dt)) return(NA_character_)
 
-  # Keep already valid reduced ISO forms
-  if (grepl("^\\d{4}$", s)) return(s)
-  if (grepl("^\\d{4}-\\d{2}$", s)) return(s)
-  if (grepl("^\\d{4}-\\d{2}-\\d{2}$", s)) return(s)
-  if (grepl("^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}$", s)) return(s)
+  # Extract original timezone from string
+  tz_str <- regmatches(s, regexpr("(Z|[+-]\\d{2}:?\\d{2})$", s))
 
-
-
-  # Month/year like 01/2033
-  if (grepl("^\\d{1,2}/\\d{4}$", s)) {
-    p <- strsplit(s, "/", fixed = TRUE)[[1]]
-    mm <- suppressWarnings(as.integer(p[1]))
-    yy <- suppressWarnings(as.integer(p[2]))
-    if (!is.na(mm) && !is.na(yy) && mm >= 1 && mm <= 12) {
-      return(sprintf("%04d-%02d", yy, mm))
-    }
+  if (length(tz_str) == 0 || tz_str == "") {
+    # No timezone provided → return naive ISO
+    return(format(dt, "%Y-%m-%dT%H:%M:%S"))
   }
 
+  # Normalize offset format (+0200 → +02:00)
+  tz_str <- sub("^([+-]\\d{2})(\\d{2})$", "\\1:\\2", tz_str)
 
-
-  # Possible date interval: only treat as interval if both sides look date-like
-  if (grepl("/", s, fixed = TRUE) && !.looks_like_datetime(s)) {
-    parts <- strsplit(s, "/", fixed = TRUE)[[1]]
-    parts <- trimws(parts)
-    if (length(parts) == 2 &&
-        .is_date_like_token(parts[1]) &&
-        .is_date_like_token(parts[2])) {
-      a <- .parse_single_date_with_parsedate(parts[1], ambiguous_date_order = ambiguous_date_order)
-      b <- .parse_single_date_with_parsedate(parts[2], ambiguous_date_order = ambiguous_date_order)
-      if (!is.na(a) && !is.na(b)) {
-        return(paste0(a, "/", b))
-      }
-    }
-  }
-
-
-
-  .parse_single_date_with_parsedate(s, ambiguous_date_order = ambiguous_date_order)
+  paste0(format(dt, "%Y-%m-%dT%H:%M:%S"), tz_str)
 }
 
-
-
-.is_date_like_token <- function(s) {
-  s <- trimws(as.character(s %||% ""))
-  if (!nzchar(s)) return(FALSE)
-
-
-
-  grepl("^\\d{4}$", s) ||
-    grepl("^\\d{4}-\\d{2}$", s) ||
-    grepl("^\\d{4}-\\d{2}-\\d{2}$", s) ||
-    grepl("^\\d{1,2}[/-]\\d{1,2}[/-]\\d{4}$", s) ||
-    grepl("^\\d{1,2}\\s+[A-Za-z]{3,9}\\s+\\d{4}$", s) ||
-    grepl("^[A-Za-z]{3,9}\\s+\\d{1,2},?\\s+\\d{4}$", s)
-}
-
-
-
-.parse_single_date_with_parsedate <- function(s, ambiguous_date_order = "dmy") {
+# ----------------------------
+# AMBIGUOUS NUMERIC DATES ONLY (dd/mm vs mm/dd)
+# ----------------------------
+.parse_ambiguous_numeric_date <- function(s, ambiguous_date_order = "dmy") {
   s <- trimws(as.character(s %||% ""))
   if (!nzchar(s)) return(NA_character_)
 
+  ambiguous_date_order <- .normalize_ambiguous_date_order(ambiguous_date_order)
 
-
-  ambiguous_date_order <- tolower(trimws(as.character(ambiguous_date_order %||% "dmy")))
-  if (!(ambiguous_date_order %in% c("dmy", "mdy"))) {
-    ambiguous_date_order <- "dmy"
+  if (!grepl("^\\d{1,2}[/-]\\d{1,2}[/-]\\d{2,4}$", s)) {
+    return(NA_character_)
   }
 
+  sep <- if (grepl("/", s, fixed = TRUE)) "/" else "-"
+  parts <- strsplit(s, sep, fixed = TRUE)[[1]]
 
+  a <- suppressWarnings(as.integer(parts[1]))
+  b <- suppressWarnings(as.integer(parts[2]))
+  y <- suppressWarnings(as.integer(parts[3]))
 
-  # Keep already valid reduced ISO forms
+  if (any(is.na(c(a, b, y)))) return(NA_character_)
+
+  # disambiguation logic
+  if (a > 12 && b <= 12) {
+    return(sprintf("%04d-%02d-%02d", y, b, a))
+  }
+  if (b > 12 && a <= 12) {
+    return(sprintf("%04d-%02d-%02d", y, a, b))
+  }
+
+  if (ambiguous_date_order == "dmy") {
+    return(sprintf("%04d-%02d-%02d", y, b, a))
+  } else {
+    return(sprintf("%04d-%02d-%02d", y, a, b))
+  }
+}
+
+# ----------------------------
+# MAIN SINGLE ENTRY PARSER
+# ----------------------------
+.parse_single_date <- function(s, ambiguous_date_order = "dmy") {
+
+  s <- trimws(as.character(s %||% ""))
+  if (!nzchar(s)) return(NA_character_)
+
+  ambiguous_date_order <- .normalize_ambiguous_date_order(ambiguous_date_order)
+
+  # 1. ISO 8601 (highest priority)
+  iso <- .parse_iso8601(s)
+  if (!is.na(iso)) return(iso)
+
+  # 2. Year-only / partial ISO-like tokens (no guessing)
   if (grepl("^\\d{4}$", s)) return(s)
   if (grepl("^\\d{4}-\\d{2}$", s)) return(s)
   if (grepl("^\\d{4}-\\d{2}-\\d{2}$", s)) return(s)
 
+  # 3. Ambiguous numeric formats (ONLY place where ambiguity is allowed)
+  num <- .parse_ambiguous_numeric_date(s, ambiguous_date_order)
+  if (!is.na(num)) return(num)
 
+  # 4. Human-readable formats via lubridate (trusted parsing layer)
+  if (requireNamespace("lubridate", quietly = TRUE)) {
 
-  # Explicit handling of ambiguous numeric dates before parser guessing
-  if (grepl("^\\d{1,2}[/-]\\d{1,2}[/-]\\d{4}$", s)) {
-    sep <- if (grepl("/", s, fixed = TRUE)) "/" else "-"
-    p <- strsplit(s, sep, fixed = TRUE)[[1]]
-
-
-
-    a <- suppressWarnings(as.integer(p[1]))
-    b <- suppressWarnings(as.integer(p[2]))
-    y <- suppressWarnings(as.integer(p[3]))
-
-
-
-    if (!is.na(a) && !is.na(b) && !is.na(y)) {
-      if (a > 12 && b >= 1 && b <= 12) {
-        return(sprintf("%04d-%02d-%02d", y, b, a))
-      }
-      if (b > 12 && a >= 1 && a <= 12) {
-        return(sprintf("%04d-%02d-%02d", y, a, b))
-      }
-      if (identical(ambiguous_date_order, "dmy")) {
-        return(sprintf("%04d-%02d-%02d", y, b, a))
-      } else {
-        return(sprintf("%04d-%02d-%02d", y, a, b))
-      }
-    }
-  }
-
-
-
-  # Explicit handling of "2 Feb 2023" / "02 February 2023"
-  if (grepl("^\\d{1,2}\\s+[A-Za-z]{3,9}\\s+\\d{4}$", s)) {
-    # Try lubridate first: it is designed to handle heterogeneous orders
-    if (requireNamespace("lubridate", quietly = TRUE)) {
-      dt <- suppressWarnings(tryCatch(
-        lubridate::parse_date_time(
-          s,
-          orders = c("d b Y", "d B Y"),
-          exact = FALSE,
-          quiet = TRUE,
-          locale = "C",
-          tz = "UTC"
-        ),
-        error = function(e) NA
-      ))
-
-
-
-      if (inherits(dt, c("POSIXct", "POSIXt")) && !is.na(dt)) {
-        return(format(as.Date(dt, tz = "UTC"), "%Y-%m-%d"))
-      }
-    }
-
-
-
-    # Base R fallback
-    dt <- suppressWarnings(tryCatch(
-      strptime(s, format = "%d %b %Y", tz = "UTC"),
-      error = function(e) NA
-    ))
-    if (inherits(dt, "POSIXlt") && !is.na(dt)) {
-      return(format(as.Date(dt), "%Y-%m-%d"))
-    }
-
-
-
-    dt <- suppressWarnings(tryCatch(
-      strptime(s, format = "%d %B %Y", tz = "UTC"),
-      error = function(e) NA
-    ))
-    if (inherits(dt, "POSIXlt") && !is.na(dt)) {
-      return(format(as.Date(dt), "%Y-%m-%d"))
-    }
-  }
-
-
-
-  # Explicit handling of "Feb 2 2023" / "February 2, 2023"
-  if (grepl("^[A-Za-z]{3,9}\\s+\\d{1,2},?\\s+\\d{4}$", s)) {
-    if (requireNamespace("lubridate", quietly = TRUE)) {
-      dt <- suppressWarnings(tryCatch(
-        lubridate::parse_date_time(
-          s,
-          orders = c("b d Y", "B d Y"),
-          exact = FALSE,
-          quiet = TRUE,
-          locale = "C",
-          tz = "UTC"
-        ),
-        error = function(e) NA
-      ))
-
-
-
-      if (inherits(dt, c("POSIXct", "POSIXt")) && !is.na(dt)) {
-        return(format(as.Date(dt, tz = "UTC"), "%Y-%m-%d"))
-      }
-    }
-
-
-
-    dt <- suppressWarnings(tryCatch(
-      strptime(s, format = "%b %d %Y", tz = "UTC"),
-      error = function(e) NA
-    ))
-    if (inherits(dt, "POSIXlt") && !is.na(dt)) {
-      return(format(as.Date(dt), "%Y-%m-%d"))
-    }
-
-
-
-    dt <- suppressWarnings(tryCatch(
-      strptime(s, format = "%B %d %Y", tz = "UTC"),
-      error = function(e) NA
-    ))
-    if (inherits(dt, "POSIXlt") && !is.na(dt)) {
-      return(format(as.Date(dt), "%Y-%m-%d"))
-    }
-
-
-
-    dt <- suppressWarnings(tryCatch(
-      strptime(s, format = "%b %d, %Y", tz = "UTC"),
-      error = function(e) NA
-    ))
-    if (inherits(dt, "POSIXlt") && !is.na(dt)) {
-      return(format(as.Date(dt), "%Y-%m-%d"))
-    }
-
-
-
-    dt <- suppressWarnings(tryCatch(
-      strptime(s, format = "%B %d, %Y", tz = "UTC"),
-      error = function(e) NA
-    ))
-    if (inherits(dt, "POSIXlt") && !is.na(dt)) {
-      return(format(as.Date(dt), "%Y-%m-%d"))
-    }
-  }
-
-
-
-  # parsedate main path
-  if (requireNamespace("parsedate", quietly = TRUE)) {
-    s_norm <- gsub("\\s+", " ", s)
-    s_norm <- sub("Z$", "+00:00", s_norm, ignore.case = FALSE)
-    s_norm <- sub("([+-]\\d{2})(\\d{2})$", "\\1:\\2", s_norm)
-
-
-
-    dt <- suppressWarnings(tryCatch(
-      parsedate::parse_date(s_norm, approx = FALSE),
-      error = function(e) NA
+    dt <- suppressWarnings(lubridate::parse_date_time(
+      s,
+      orders = c(
+        "d b Y", "d B Y",
+        "b d Y", "B d Y",
+        "dmy", "mdy",
+        "Ymd HMS", "Ymd HM"
+      ),
+      tz = "UTC",
+      quiet = TRUE
     ))
 
+    if (inherits(dt, "POSIXct") && !is.na(dt)) {
 
-
-    if (inherits(dt, c("POSIXct", "POSIXt")) && !is.na(dt)) {
-      has_time <- grepl("[T ]\\d{1,2}:\\d{2}", s_norm) ||
-        grepl("^\\d{4}-\\d{2}-\\d{2}T", s_norm)
-
-
+      # detect if time exists in input
+      has_time <- grepl("\\d{1,2}:\\d{2}", s)
 
       if (has_time) {
         return(format(dt, "%Y-%m-%dT%H:%M:%S", tz = "UTC"))
@@ -1181,7 +1120,48 @@ clean_dwc_pipeline <- function(df,
     }
   }
 
+  # 5. parsedate fallback (last resort)
+  if (requireNamespace("parsedate", quietly = TRUE)) {
+    s_norm <- gsub("\\s+", " ", s)
+    s_norm <- sub("Z$", "+00:00", s_norm)
 
+    dt <- suppressWarnings(parsedate::parse_date(s_norm, approx = FALSE))
+
+    if (inherits(dt, "POSIXct") && !is.na(dt)) {
+      return(format(dt, "%Y-%m-%dT%H:%M:%S", tz = "UTC"))
+    }
+  }
 
   NA_character_
+}
+
+# ----------------------------
+# PUBLIC STANDARDIZER
+# ----------------------------
+.standardize_event_date_value <- function(s, ambiguous_date_order = "dmy") {
+  .parse_single_date(s, ambiguous_date_order)
+}
+
+# ----------------------------
+# DETECTION HELPERS
+# ----------------------------
+.looks_like_datetime <- function(s) {
+  s <- trimws(as.character(s %||% ""))
+  if (!nzchar(s)) return(FALSE)
+
+  grepl("^\\d{4}-\\d{2}-\\d{2}T", s) ||
+    grepl("^\\d{4}-\\d{2}-\\d{2}[ T]\\d{2}:\\d{2}", s) ||
+    grepl("^\\d{1,2}[/-]\\d{1,2}[/-]\\d{4}[ T]", s)
+}
+
+.is_date_like_token <- function(s) {
+  s <- trimws(as.character(s %||% ""))
+  if (!nzchar(s)) return(FALSE)
+
+  grepl("^\\d{4}$", s) ||
+    grepl("^\\d{4}-\\d{2}$", s) ||
+    grepl("^\\d{4}-\\d{2}-\\d{2}$", s) ||
+    grepl("^\\d{1,2}[/-]\\d{1,2}[/-]\\d{4}$", s) ||
+    grepl("^\\d{1,2}\\s+[A-Za-z]{3,9}\\s+\\d{4}$", s) ||
+    grepl("^[A-Za-z]{3,9}\\s+\\d{1,2},?\\s+\\d{4}$", s)
 }

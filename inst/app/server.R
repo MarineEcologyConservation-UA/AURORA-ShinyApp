@@ -17,11 +17,6 @@ server <- function(input, output, session) {
     isTRUE(out)
   }
 
-  safe_df_ready <- function(rx) {
-    out <- try(rx(), silent = TRUE)
-    is.data.frame(out) && !inherits(out, "try-error")
-  }
-
   ingest <- mod_ingest_server("ingest", example_map = example_map)
 
   dwc_map <- mod_dwc_mapping_server(
@@ -72,10 +67,9 @@ server <- function(input, output, session) {
     id_clean_done <- mapping_done && safe_flag(id_cleaning$ready())
     taxonomy_done <- id_clean_done && safe_flag(tax_match$ready())
 
-    dwca_ready_flag   <- safe_flag(dwca$ready())
-    dwca_tables_ready <- safe_df_ready(dwca$event) && safe_df_ready(dwca$occurrence)
+    dwca_ready_flag <- safe_flag(dwca$ready())
 
-    build_done <- taxonomy_done && (dwca_ready_flag || dwca_tables_ready)
+    build_done <- taxonomy_done && dwca_ready_flag
 
     emof_editor_done <- build_done && safe_flag(emof_editor$ready())
 
