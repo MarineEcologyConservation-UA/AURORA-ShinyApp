@@ -24,6 +24,36 @@ ui <- bslib::page_navbar(
     shiny::tags$style(shiny::HTML("
       body { background: #f3f7f5; }
 
+      .navbar {
+        min-height: 56px !important;
+        padding-top: 4px !important;
+        padding-bottom: 4px !important;
+      }
+
+      .navbar > .container-fluid,
+      .navbar > .container,
+      .navbar .container-fluid {
+        min-height: 56px !important;
+        padding-top: 0 !important;
+        padding-bottom: 0 !important;
+        align-items: center !important;
+      }
+
+      .navbar-brand {
+        padding-top: 2px !important;
+        padding-bottom: 2px !important;
+        font-size: 1.25rem !important;
+        line-height: 1.2 !important;
+        font-weight: 500 !important;
+      }
+
+      .navbar-nav .nav-link {
+        font-size: 1rem !important;
+        padding-top: 8px !important;
+        padding-bottom: 8px !important;
+        line-height: 1.2 !important;
+      }
+
       .bslib-page-main { padding: 1rem 1rem; }
 
       .card {
@@ -31,6 +61,7 @@ ui <- bslib::page_navbar(
         box-shadow: 0 10px 24px rgba(0,0,0,.06);
         border-radius: 16px;
       }
+
       .card-header {
         background: rgba(27,153,139,.06);
         font-weight: 650;
@@ -47,10 +78,10 @@ ui <- bslib::page_navbar(
 
       table.dataTable { font-size: 0.95rem; }
 
-       .navbar .navbar-collapse {
+      .navbar .navbar-collapse {
         flex-grow: 0;
         margin-left: auto;
-        margin-right: 2rem; /* adjust to taste */
+        margin-right: 2rem;
       }
 
       .nav-link.disabled-tab,
@@ -255,82 +286,52 @@ ui <- bslib::page_navbar(
     "))
   ),
 
-  # -------------------------------------------------------
-  # 0 HOME
-  # -------------------------------------------------------
   bslib::nav_panel(
     title = "Home",
     value = "home",
     mod_homepage_ui("home")
   ),
 
-  # -------------------------------------------------------
-  # 1 INGEST
-  # -------------------------------------------------------
   bslib::nav_panel(
     title = "Ingest",
     value = "ingest",
     mod_ingest_ui("ingest")
   ),
 
-  # -------------------------------------------------------
-  # 2 MAPPING
-  # -------------------------------------------------------
   bslib::nav_panel(
     title = "Field Mapping",
     value = "field_mapping",
     mod_dwc_mapping_ui("dwc_map")
   ),
 
-  # -------------------------------------------------------
-  # 3 IDENTIFICATION DATA CLEANING
-  # -------------------------------------------------------
   bslib::nav_panel(
     title = "Identification Data Cleaning",
     value = "id_cleaning",
     mod_identification_cleaning_ui("id_cleaning")
   ),
 
-  # -------------------------------------------------------
-  # 4 TAXONOMY
-  # -------------------------------------------------------
   bslib::nav_panel(
     title = "Taxonomy",
     value = "taxonomy",
     mod_taxonomy_match_ui("tax_match")
   ),
 
-  # -------------------------------------------------------
-  # 5 BUILD DWC-A
-  # -------------------------------------------------------
   bslib::nav_panel(
     title = "Darwin Core Tables",
     value = "darwin_tables",
     mod_build_dwca_ui("dwca")
   ),
 
-  # -------------------------------------------------------
-  # 6 eMOF DATA EDITOR
-  # -------------------------------------------------------
   bslib::nav_panel(
     title = "eMoF Editor",
     value = "emof_editor",
     mod_emof_data_editor_ui("emof_editor")
   ),
 
-  # -------------------------------------------------------
-  # 7 QC & DIAGNOSTICS
-  # -------------------------------------------------------
   mod_qc_ui("qc"),
 
-  # -------------------------------------------------------
-  # 8 METADATA
-  # -------------------------------------------------------
   mod_metadata_ui("metadata"),
 
-  # -------------------------------------------------------
-  # 9 ABOUT
-  # -------------------------------------------------------
   bslib::nav_panel(
     title = "About",
     value = "about",

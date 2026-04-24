@@ -306,13 +306,13 @@ mod_emof_data_editor_ui <- function(id) {
           shiny::tags$div(
             class = "emofed-warning",
             shiny::tags$strong("Note: "),
-            "The table below edits only the measurement vocabulary fields shown here. ",
-            "Internal AURORA traceability columns are preserved in the returned eMoF table. ",
-            "QC and Metadata are unlocked only after you click ",
-            shiny::tags$strong("Apply"),
-            " or ",
-            shiny::tags$strong("Skip"),
-            "."
+            "Consult the controlled vocabulary at ",
+            shiny::tags$a(
+              href = "https://vocab.nerc.ac.uk/search_nvs/",
+              target = "_blank",
+              rel = "noopener noreferrer",
+              "BODC-NERC controlled vocabulary."
+            )
           ),
 
           bslib::layout_columns(

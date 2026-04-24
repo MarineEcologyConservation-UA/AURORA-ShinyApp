@@ -376,17 +376,6 @@ mod_build_dwca_ui <- function(id) {
             )
           )
         )
-      ),
-
-      bslib::card(
-        class = "dwca-section-card",
-        bslib::card_header("Pre-issues from Field Mapping"),
-        bslib::card_body(
-          shiny::div(
-            class = "dwca-dt-wrap",
-            DT::DTOutput(ns("pre_issues_preview"))
-          )
-        )
       )
     )
   )
@@ -503,20 +492,6 @@ mod_build_dwca_server <- function(id, df_in, dwc_terms, target_database_in, pre_
       rv$result <- NULL
       rv$build_error <- NULL
     }
-
-    get_pre_issues <- shiny::reactive({
-      if (is.null(pre_issues_in)) {
-        return(data.frame())
-      }
-
-      x <- tryCatch(pre_issues_in(), error = function(e) NULL)
-
-      if (is.null(x) || !is.data.frame(x)) {
-        return(data.frame())
-      }
-
-      x
-    })
 
     repo_col <- shiny::reactive({
       normalize_repo_name(target_database_in())
@@ -686,11 +661,6 @@ mod_build_dwca_server <- function(id, df_in, dwc_terms, target_database_in, pre_
       df <- df_in()
       shiny::req(is.data.frame(df))
 
-      chosen_core_terms <- unique(c(
-        selected_table_terms()$event %||% character(0),
-        selected_table_terms()$occurrence %||% character(0)
-      ))
-
       cols <- names(df)
 
       structural_exclude <- c(
@@ -701,7 +671,6 @@ mod_build_dwca_server <- function(id, df_in, dwc_terms, target_database_in, pre_
 
       cols <- setdiff(cols, structural_exclude)
       cols <- cols[!grepl("^\\.aurora", cols)]
-      cols <- setdiff(cols, chosen_core_terms)
       cols <- sort(unique(cols))
 
       dt <- dwc_terms_norm()
@@ -879,10 +848,15 @@ mod_build_dwca_server <- function(id, df_in, dwc_terms, target_database_in, pre_
       )
     }
 
-    render_table_card_body <- function(spec_df, prefix, help_text) {
-      shiny::tagList(
-        shiny::tags$div(class = "dwca-help-block", help_text),
-        render_scroll_choices(spec_df, prefix)
+    make_search_box <- function(search_id) {
+      shiny::div(
+        class = "dwca-search-box",
+        shiny::textInput(
+          session$ns(search_id),
+          "Search terms",
+          value = "",
+          placeholder = "Type to filter terms"
+        )
       )
     }
 
@@ -1022,7 +996,7 @@ mod_build_dwca_server <- function(id, df_in, dwc_terms, target_database_in, pre_
       if (identical(current_step_safe, "emof") && nrow(emof_spec) == 0) {
         msg_parts[[length(msg_parts) + 1]] <- shiny::tags$div(
           class = "alert alert-warning",
-          "No eligible columns remain for eMoF after excluding structural fields and the columns already selected for Event / Occurrence."
+          "No eligible columns are available for eMoF after excluding structural fields."
         )
       }
 
@@ -1046,6 +1020,24 @@ mod_build_dwca_server <- function(id, df_in, dwc_terms, target_database_in, pre_
       shiny::tags$div(
         class = "dwca-warning-box",
         msg_parts
+      )
+    })
+
+    output$event_terms_ui <- shiny::renderUI({
+      specs <- table_term_specs()
+      render_scroll_choices(
+        spec_df = specs$Event,
+        prefix = "event_term__",
+        search_text = input$event_search %||% ""
+      )
+    })
+
+    output$occ_terms_ui <- shiny::renderUI({
+      specs <- table_term_specs()
+      render_scroll_choices(
+        spec_df = specs$Occurrence,
+        prefix = "occ_term__",
+        search_text = input$occ_search %||% ""
       )
     })
 
@@ -1077,6 +1069,14 @@ mod_build_dwca_server <- function(id, df_in, dwc_terms, target_database_in, pre_
         step <- first_step_from_steps(steps)
       }
 
+      make_table_panel <- function(search_id, terms_output_id, help_text) {
+        shiny::tagList(
+          shiny::tags$div(class = "dwca-help-block", help_text),
+          make_search_box(search_id),
+          shiny::uiOutput(session$ns(terms_output_id))
+        )
+      }
+
       make_emof_panel <- function(title, search_id, terms_output_id) {
         shiny::tags$div(
           shiny::tags$div(class = "dwca-term-group-title", title),
@@ -1084,24 +1084,16 @@ mod_build_dwca_server <- function(id, df_in, dwc_terms, target_database_in, pre_
             class = "dwca-help-block",
             "Select the columns that should become eMoF records at this level."
           ),
-          shiny::div(
-            class = "dwca-search-box",
-            shiny::textInput(
-              session$ns(search_id),
-              "Search terms",
-              value = "",
-              placeholder = "Type to filter terms"
-            )
-          ),
+          make_search_box(search_id),
           shiny::uiOutput(session$ns(terms_output_id))
         )
       }
 
       if (identical(step, "event")) {
         return(
-          render_table_card_body(
-            spec_df = specs$Event,
-            prefix = "event_term__",
+          make_table_panel(
+            search_id = "event_search",
+            terms_output_id = "event_terms_ui",
             help_text = "Required fields are included automatically and are not shown here. Only non-required fields are selectable below."
           )
         )
@@ -1109,9 +1101,9 @@ mod_build_dwca_server <- function(id, df_in, dwc_terms, target_database_in, pre_
 
       if (identical(step, "occurrence")) {
         return(
-          render_table_card_body(
-            spec_df = specs$Occurrence,
-            prefix = "occ_term__",
+          make_table_panel(
+            search_id = "occ_search",
+            terms_output_id = "occ_terms_ui",
             help_text = "Required fields are included automatically and are not shown here. Only non-required fields are selectable below."
           )
         )
@@ -1124,7 +1116,7 @@ mod_build_dwca_server <- function(id, df_in, dwc_terms, target_database_in, pre_
           return(
             shiny::tags$div(
               class = "dwca-help-block",
-              "No eligible columns are available for eMoF in the current dataset after excluding structural fields and the fields already selected for the core tables."
+              "No eligible columns are available for eMoF in the current dataset after excluding structural fields."
             )
           )
         }
@@ -1134,7 +1126,7 @@ mod_build_dwca_server <- function(id, df_in, dwc_terms, target_database_in, pre_
             shiny::tagList(
               shiny::tags$div(
                 class = "dwca-help-block",
-                "Only fields not already selected in Event or Occurrence are shown here. Choose each remaining field in at most one eMoF level."
+                "Fields already selected in Event or Occurrence remain available here. Only structural identifiers and internal AURORA columns are hidden. Choose each eMoF field in at most one eMoF level."
               ),
               shiny::tags$div(
                 class = "dwca-subgrid",
@@ -1150,7 +1142,7 @@ mod_build_dwca_server <- function(id, df_in, dwc_terms, target_database_in, pre_
             shiny::tagList(
               shiny::tags$div(
                 class = "dwca-help-block",
-                "For Occurrence core, only occurrence-level eMoF is available. Only fields not already selected in the core table are shown here."
+                "For Occurrence core, only occurrence-level eMoF is available. Fields already selected in the core table remain available here; only structural identifiers and internal AURORA columns are hidden."
               ),
               make_emof_panel("eMoF - occurrence", "emof_occ_search", "emof_occ_terms_ui")
             )
@@ -1223,6 +1215,14 @@ mod_build_dwca_server <- function(id, df_in, dwc_terms, target_database_in, pre_
         class = "btn-primary dwca-build-btn"
       )
     })
+
+    occurrence_table_is_empty <- function(res) {
+      occ <- res$occurrence
+
+      is.null(occ) ||
+        !is.data.frame(occ) ||
+        nrow(occ) == 0
+    }
 
     build_once <- function() {
       df <- df_in()
@@ -1373,10 +1373,28 @@ mod_build_dwca_server <- function(id, df_in, dwc_terms, target_database_in, pre_
           type = "error",
           duration = 8
         )
+
         return(invisible(NULL))
       }
 
       rv$result <- res
+
+      if (isTRUE(occurrence_table_is_empty(res))) {
+        rv$ready <- FALSE
+        rv$build_error <- paste0(
+          "The Occurrence table is empty. ",
+          "Please review the selected fields and resolve the QC errors before continuing."
+        )
+
+        shiny::showNotification(
+          rv$build_error,
+          type = "error",
+          duration = 10
+        )
+
+        return(invisible(NULL))
+      }
+
       rv$ready <- TRUE
 
       shiny::showNotification(
@@ -1400,55 +1418,20 @@ mod_build_dwca_server <- function(id, df_in, dwc_terms, target_database_in, pre_
       x <- aurora_drop_internal_cols(x)
 
       DT::datatable(
-        utils::head(x, 50),
+        x,
         rownames = FALSE,
         options = list(
           scrollX = TRUE,
           pageLength = 10
         )
       )
-    })
+    }, server = TRUE)
 
     output$occ_preview <- DT::renderDT({
       shiny::req(rv$result)
       x <- rv$result$occurrence
       if (is.null(x)) x <- data.frame()
       x <- aurora_drop_internal_cols(x)
-
-      DT::datatable(
-        utils::head(x, 50),
-        rownames = FALSE,
-        options = list(
-          scrollX = TRUE,
-          pageLength = 10
-        )
-      )
-    })
-
-    output$emof_preview <- DT::renderDT({
-      shiny::req(rv$result)
-      x <- rv$result$emof
-      if (is.null(x)) x <- data.frame()
-      x <- aurora_drop_internal_cols(x)
-
-      DT::datatable(
-        utils::head(x, 50),
-        rownames = FALSE,
-        options = list(
-          scrollX = TRUE,
-          pageLength = 10
-        )
-      )
-    })
-
-    output$pre_issues_preview <- DT::renderDT({
-      x <- get_pre_issues()
-      if (!is.data.frame(x) || nrow(x) == 0) {
-        x <- data.frame(
-          message = "No pre-issues available.",
-          stringsAsFactors = FALSE
-        )
-      }
 
       DT::datatable(
         x,
@@ -1458,7 +1441,23 @@ mod_build_dwca_server <- function(id, df_in, dwc_terms, target_database_in, pre_
           pageLength = 10
         )
       )
-    })
+    }, server = TRUE)
+
+    output$emof_preview <- DT::renderDT({
+      shiny::req(rv$result)
+      x <- rv$result$emof
+      if (is.null(x)) x <- data.frame()
+      x <- aurora_drop_internal_cols(x)
+
+      DT::datatable(
+        x,
+        rownames = FALSE,
+        options = list(
+          scrollX = TRUE,
+          pageLength = 10
+        )
+      )
+    }, server = TRUE)
 
     result_rx <- shiny::reactive({
       shiny::req(rv$result)

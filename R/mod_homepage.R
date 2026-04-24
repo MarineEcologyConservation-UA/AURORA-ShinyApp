@@ -37,7 +37,7 @@ mod_homepage_ui <- function(id) {
               ),
               shiny::p(
                 class = "hero-subtitle",
-                "An integrated Shiny application designed to streamline the preparation, validation, and export of both marine and terrestrial biodiversity datasets into Darwin Core Archives for sharing on public repositories such as GBIF — the Global Biodiversity Information Facility."
+                "An integrated Shiny application designed to streamline the preparation, validation, and export of both marine and terrestrial biodiversity datasets into Darwin Core tables for sharing on public repositories such as GBIF — the Global Biodiversity Information Facility."
               ),
               shiny::div(
                 class = "badge-row",
@@ -90,7 +90,7 @@ mod_homepage_ui <- function(id) {
               shiny::div(class = "step-title", "Identification Data Cleaning"),
               shiny::div(
                 class = "step-text",
-                "Review and refine identification-related fields, especially scientificName and related Darwin Core terms, before taxonomic matching."
+                "Review and edit identification-related fields, especially scientificName and related Darwin Core terms, before taxonomic matching."
               )
             ),
 
@@ -110,23 +110,33 @@ mod_homepage_ui <- function(id) {
               shiny::div(class = "step-title", "Darwin Core Tables"),
               shiny::div(
                 class = "step-text",
-                "Build structured Darwin Core tables for Event, Occurrence, and eMoF."
+                "Build structured Darwin Core tables for Event, Occurrence, and Extended Measurement or Fact (eMoF)."
               )
             ),
 
             shiny::div(
               class = "step-box",
               shiny::div(class = "step-n", "6"),
-              shiny::div(class = "step-title", "QC & Diagnostics"),
+              shiny::div(class = "step-title", "eMoF Editor"),
               shiny::div(
                 class = "step-text",
-                "Inspect issues, diagnostics, summary outputs, and validation results before final metadata preparation and export."
+                "Review and edit eMoF-related fields and controlled vocabulary entries."
               )
             ),
 
             shiny::div(
               class = "step-box",
               shiny::div(class = "step-n", "7"),
+              shiny::div(class = "step-title", "DwC Tables Overview & Quality Control (QC)"),
+              shiny::div(
+                class = "step-text",
+                "Inspect issues, diagnostics, summary outputs, and validation results for export."
+              )
+            ),
+
+            shiny::div(
+              class = "step-box",
+              shiny::div(class = "step-n", "8"),
               shiny::div(class = "step-title", "Metadata"),
               shiny::div(
                 class = "step-text",
@@ -136,7 +146,7 @@ mod_homepage_ui <- function(id) {
           ),
 
           # =========================
-          # MANUAL (FULL WIDTH, BELOW STEP 7)
+          # MANUAL (FULL WIDTH)
           # =========================
           bslib::card(
             class = "mt-4 w-100",
@@ -155,7 +165,7 @@ mod_homepage_ui <- function(id) {
                 ),
 
                 shiny::tags$a(
-                  href = "",
+                  href = "https://doi.org/10.5281/zenodo.19495004",
                   target = "_blank",
                   rel = "noopener noreferrer",
                   class = "btn btn-primary",
@@ -232,7 +242,7 @@ mod_homepage_ui <- function(id) {
                 shiny::div(class = "feature-title", "Build Darwin Core Tables"),
                 shiny::div(
                   class = "feature-text",
-                  "Structure the data into relational Event, Occurrence, and Extended Measurement or Fact (eMoF) tables to comply with the DwC-A star schema."
+                  "Structure the data into relational Event, Occurrence, and eMoF tables to comply with the DwC-A star schema."
                 )
               )
             ),

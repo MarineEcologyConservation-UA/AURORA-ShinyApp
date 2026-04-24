@@ -68,8 +68,8 @@ server <- function(input, output, session) {
   # --- Sequential tab locking ------------------------------------------------
   shiny::observe({
     ingest_done   <- safe_flag(ingest$ready())
-    mapping_done  <- ingest_done   && safe_flag(dwc_map$ready())
-    id_clean_done <- mapping_done  && safe_flag(id_cleaning$ready())
+    mapping_done  <- ingest_done  && safe_flag(dwc_map$ready())
+    id_clean_done <- mapping_done && safe_flag(id_cleaning$ready())
     taxonomy_done <- id_clean_done && safe_flag(tax_match$ready())
 
     dwca_ready_flag   <- safe_flag(dwca$ready())
@@ -140,72 +140,6 @@ server <- function(input, output, session) {
     emof_in = emof_editor$emof,
     pre_issues_in = dwc_map$issues %||% NULL
   )
-
-    # --- DEBUG: dwca / emof editor / qc inputs --------------------------------
-  shiny::observe({
-    dwca_emof <- tryCatch(dwca$emof(), error = function(e) NULL)
-    editor_emof <- tryCatch(emof_editor$emof(), error = function(e) NULL)
-    pre_issues <- tryCatch(dwc_map$issues(), error = function(e) NULL)
-
-    cat("\n================ DEBUG PIPELINE =================\n")
-
-    cat("\n--- dwca$emof() ---\n")
-    if (is.null(dwca_emof)) {
-      cat("NULL\n")
-    } else if (!is.data.frame(dwca_emof)) {
-      cat("Not a data.frame\n")
-    } else {
-      cat("nrow:", nrow(dwca_emof), " ncol:", ncol(dwca_emof), "\n")
-      cat("cols:", paste(names(dwca_emof), collapse = ", "), "\n")
-
-      if ("eventID" %in% names(dwca_emof)) {
-        cat("nonblank eventID:", sum(!is.na(dwca_emof$eventID) & trimws(as.character(dwca_emof$eventID)) != ""), "\n")
-      }
-      if ("occurrenceID" %in% names(dwca_emof)) {
-        cat("nonblank occurrenceID:", sum(!is.na(dwca_emof$occurrenceID) & trimws(as.character(dwca_emof$occurrenceID)) != ""), "\n")
-      }
-      if ("measurementType" %in% names(dwca_emof)) {
-        cat("unique measurementType:", length(unique(as.character(dwca_emof$measurementType))), "\n")
-      }
-
-      print(utils::head(dwca_emof, 6))
-    }
-
-    cat("\n--- emof_editor$emof() ---\n")
-    if (is.null(editor_emof)) {
-      cat("NULL\n")
-    } else if (!is.data.frame(editor_emof)) {
-      cat("Not a data.frame\n")
-    } else {
-      cat("nrow:", nrow(editor_emof), " ncol:", ncol(editor_emof), "\n")
-      cat("cols:", paste(names(editor_emof), collapse = ", "), "\n")
-
-      if ("eventID" %in% names(editor_emof)) {
-        cat("nonblank eventID:", sum(!is.na(editor_emof$eventID) & trimws(as.character(editor_emof$eventID)) != ""), "\n")
-      }
-      if ("occurrenceID" %in% names(editor_emof)) {
-        cat("nonblank occurrenceID:", sum(!is.na(editor_emof$occurrenceID) & trimws(as.character(editor_emof$occurrenceID)) != ""), "\n")
-      }
-      if ("measurementType" %in% names(editor_emof)) {
-        cat("unique measurementType:", length(unique(as.character(editor_emof$measurementType))), "\n")
-      }
-
-      print(utils::head(editor_emof, 6))
-    }
-
-    cat("\n--- dwc_map$issues() / pre_issues ---\n")
-    if (is.null(pre_issues)) {
-      cat("NULL\n")
-    } else if (!is.data.frame(pre_issues)) {
-      cat("Not a data.frame\n")
-    } else {
-      cat("nrow:", nrow(pre_issues), " ncol:", ncol(pre_issues), "\n")
-      cat("cols:", paste(names(pre_issues), collapse = ", "), "\n")
-      print(utils::head(pre_issues, 6))
-    }
-
-    cat("===============================================\n")
-  })
 
   invisible(list(
     ingest = ingest,

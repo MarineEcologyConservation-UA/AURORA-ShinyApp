@@ -2,7 +2,7 @@
 % Please edit documentation in R/read_any_table.R
 \name{read_any_table}
 \alias{read_any_table}
-\title{Read a tabular file (CSV/TSV/TXT/XLSX/XLS) into a data.frame}
+\title{Read a tabular file (CSV only) into a data.frame}
 \usage{
 read_any_table(
   path,
@@ -15,39 +15,19 @@ read_any_table(
 \arguments{
 \item{path}{Character scalar. Path to the input file.}
 
-\item{ext}{Character scalar (optional). File extension override. If \code{NULL}, it
-is inferred from \code{path}.}
+\item{ext}{Character scalar (optional). File extension override. If NULL, inferred from path.}
 
-\item{delim}{Character scalar. Field delimiter used for delimited text files.
-Ignored for Excel files. If \code{ext == "tsv"}, delimiter is forced to tab.}
+\item{delim}{Character scalar. Field delimiter (default ",").}
 
 \item{has_header}{Logical scalar. Whether the first row contains column names.}
 
-\item{encoding}{Character scalar. Preferred encoding to try first for text
-files (e.g., \code{"UTF-8"}, \code{"Windows-1252"}, \code{"Latin1"}).}
+\item{encoding}{Character scalar. Preferred encoding to try first.}
 }
 \value{
-A \link{data.frame} with the imported data. The returned object includes
-attribute \code{"encoding_used"} indicating which encoding successfully read the
-file.
+A data.frame with attribute "encoding_used".
 }
 \description{
-Reads a tabular file from disk and returns its content as a base
-\link{data.frame}. For delimited text files (CSV/TSV/TXT), it attempts multiple
-encodings in sequence until one succeeds. The encoding that worked is stored
-in an attribute \code{"encoding_used"} in the returned object.
-}
-\details{
-Supported extensions:
-\itemize{
-\item \code{.csv}, \code{.tsv}, \code{.txt} via \code{\link[readr:read_delim]{readr::read_delim()}}
-\item \code{.xlsx}, \code{.xls} via \code{\link[readxl:read_excel]{readxl::read_excel()}}
-}
-}
-\examples{
-tmp <- tempfile(fileext = ".csv")
-writeLines(c("a,b", "1,2", "3,4"), tmp)
-df <- read_any_table(tmp)
-attr(df, "encoding_used")
-
+Reads a CSV file from disk and returns its content as a base
+\link{data.frame}. It attempts multiple encodings in sequence until one succeeds.
+The encoding that worked is stored in attribute "encoding_used".
 }

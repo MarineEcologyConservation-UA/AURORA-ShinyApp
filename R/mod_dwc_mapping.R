@@ -276,6 +276,7 @@ mod_dwc_mapping_ui <- function(id) {
 
           bslib::navset_tab(
             id = ns("main_tabs"),
+            selected = "mapping",
 
             bslib::nav_panel(
               "Mapping",
@@ -491,14 +492,14 @@ mod_dwc_mapping_ui <- function(id) {
                 shiny::div(class = "dwc-map-section-gap"),
 
                 shiny::div(
-                style = "display:flex; justify-content:flex-end;",
-                shiny::actionButton(
-                  ns("continue_to_formatting"),
-                  "Continuing with the formatting",
-                  icon = shiny::icon("arrow-right"),
-                  class = "btn-primary"
+                  style = "display:flex; justify-content:flex-end;",
+                  shiny::actionButton(
+                    ns("continue_to_formatting"),
+                    "Continuing with the formatting",
+                    icon = shiny::icon("arrow-right"),
+                    class = "btn-primary"
+                  )
                 )
-              )
               )
             ),
 
@@ -543,11 +544,23 @@ mod_dwc_mapping_ui <- function(id) {
                   bslib::card(
                     fill = FALSE,
                     bslib::card_header("Date formatting"),
+
                     shiny::checkboxInput(
                       ns("standardize_event_date"),
                       label = "Standardize eventDate to ISO-8601",
                       value = TRUE
                     ),
+
+                    shiny::tags$p(
+                      shiny::icon("triangle-exclamation", style = "margin-right: 7px; color: #d9534f;"),
+                      shiny::tags$strong("Note:"),
+                      "While our date-formatting engine works hard, it isn't flawless. ",
+                      "Handling every possible date and time combination is a bit like solving a Rubik's Cube in a blender. ",
+                      "It will do its best, but please review the results carefully. If your ",
+                      shiny::tags$code("eventDate"),
+                      " is too messy, please preprocess values before ingestion."
+                    ),
+
                     shiny::radioButtons(
                       ns("event_date_order"),
                       label = "Interpret ambiguous numeric dates as",
@@ -558,6 +571,7 @@ mod_dwc_mapping_ui <- function(id) {
                       selected = "dmy",
                       inline = FALSE
                     ),
+
                     shiny::div(
                       class = "dwc-map-date-help",
                       "This option is only used for ambiguous numeric dates such as 01/02/2024. ",
@@ -970,16 +984,6 @@ mod_dwc_mapping_ui <- function(id) {
     ))
   }
 
-  # if (length(v$missing_strong) > 0) {
-  #   tag_list <- c(tag_list, list(
-  #     make_alert(
-  #       "warning",
-  #       "Strongly recommended terms still missing:",
-  #       v$missing_strong
-  #     )
-  #   ))
-  # }
-
   if (length(v$duplicate_terms) > 0) {
     tag_list <- c(tag_list, list(
       make_alert(
@@ -1240,6 +1244,16 @@ mod_dwc_mapping_server <- function(id, df_in) {
       )
     })
 
+    reset_to_mapping_tab <- function() {
+      session$onFlushed(function() {
+        bslib::nav_select(
+          id = "main_tabs",
+          selected = "mapping",
+          session = session
+        )
+      }, once = TRUE)
+    }
+
     run_clean_pipeline <- function(df_to_clean) {
       if (!exists("clean_dwc_pipeline", mode = "function")) {
         rv$cleaned <- df_to_clean
@@ -1296,6 +1310,9 @@ mod_dwc_mapping_server <- function(id, df_in) {
     }
 
     shiny::observeEvent(df_in(), {
+      df <- df_in()
+      shiny::req(df)
+
       rv$formatting_done <- FALSE
       rv$mapping <- NULL
       rv$mapped <- NULL
@@ -1306,6 +1323,8 @@ mod_dwc_mapping_server <- function(id, df_in) {
       rv$corella_checks <- NULL
       rv$corella_suggest <- NULL
       rv$ready <- FALSE
+
+      reset_to_mapping_tab()
     }, ignoreInit = FALSE)
 
     shiny::observeEvent(df_in(), {
@@ -1666,12 +1685,6 @@ mod_dwc_mapping_server <- function(id, df_in) {
       rv$formatting_done <- FALSE
       rv$ready <- FALSE
 
-      # .show_missing_terms_modal(
-      #   session = session,
-      #   validation = current_validation(),
-      #   step_label = "applying mapping"
-      # )
-
       bslib::nav_select(
         id = "main_tabs",
         selected = "create_fields",
@@ -1817,12 +1830,6 @@ mod_dwc_mapping_server <- function(id, df_in) {
     shiny::observeEvent(input$continue_to_formatting, {
       shiny::req(!is.null(rv$mapped))
 
-      # .show_missing_terms_modal(
-      #   session = session,
-      #   validation = current_validation(),
-      #   step_label = "continuing to formatting"
-      # )
-
       bslib::nav_select(
         id = "main_tabs",
         selected = "formatting",
@@ -1876,9 +1883,10 @@ mod_dwc_mapping_server <- function(id, df_in) {
 
     output$issues_tbl <- DT::renderDT({
       iss <- rv$issues
+
       if (is.null(iss) || !is.data.frame(iss) || nrow(iss) == 0) {
         iss <- data.frame(
-          row = integer(),
+          original_row = integer(),
           field = character(),
           rule = character(),
           severity = character(),
@@ -1886,6 +1894,15 @@ mod_dwc_mapping_server <- function(id, df_in) {
           stringsAsFactors = FALSE
         )
       }
+
+      hide_cols <- intersect(c("row", "original_id"), names(iss))
+      if (length(hide_cols) > 0) {
+        iss <- iss[, setdiff(names(iss), hide_cols), drop = FALSE]
+      }
+
+      preferred_order <- c("original_row", "field", "rule", "severity", "message")
+      iss <- iss[, c(intersect(preferred_order, names(iss)),
+                    setdiff(names(iss), preferred_order)), drop = FALSE]
 
       DT::datatable(
         iss,
@@ -1906,6 +1923,16 @@ mod_dwc_mapping_server <- function(id, df_in) {
       content = function(file) {
         iss <- rv$issues
         if (is.null(iss) || !is.data.frame(iss)) iss <- data.frame()
+
+        hide_cols <- intersect(c("row", "original_id"), names(iss))
+        if (length(hide_cols) > 0) {
+          iss <- iss[, setdiff(names(iss), hide_cols), drop = FALSE]
+        }
+
+        preferred_order <- c("original_row", "field", "rule", "severity", "message")
+        iss <- iss[, c(intersect(preferred_order, names(iss)),
+                      setdiff(names(iss), preferred_order)), drop = FALSE]
+
         utils::write.csv(iss, file, row.names = FALSE, fileEncoding = "UTF-8")
       }
     )
