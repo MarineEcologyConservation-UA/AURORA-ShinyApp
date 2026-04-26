@@ -198,6 +198,14 @@ mod_dwc_mapping_ui <- function(id) {
         display: flex;
         justify-content: flex-end;
       }
+
+      .dwc-map-preview-wrap table.dataTable th,
+      .dwc-map-preview-wrap table.dataTable td {
+        white-space: nowrap !important;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        max-width: 360px;
+      }
     ")),
 
     bslib::layout_sidebar(
@@ -1870,13 +1878,24 @@ mod_dwc_mapping_server <- function(id, df_in) {
 
     output$preview_tbl <- DT::renderDT({
       shiny::req(rv$cleaned)
+
       DT::datatable(
         utils::head(aurora_drop_internal_cols(rv$cleaned), 200),
         rownames = FALSE,
+        escape = TRUE,
+        class = "stripe hover compact",
         options = list(
           scrollX = TRUE,
           scrollY = "500px",
-          pageLength = 25
+          pageLength = 25,
+          autoWidth = FALSE,
+          deferRender = TRUE,
+          columnDefs = list(
+            list(
+              targets = "_all",
+              className = "dt-nowrap"
+            )
+          )
         )
       )
     })

@@ -298,7 +298,11 @@ mod_emof_data_editor_ui <- function(id) {
             ),
             shiny::tags$ul(
               shiny::tags$li("Repeated non-numeric measurement rows are grouped into a single editable row."),
-              shiny::tags$li("Rows with numeric measurementValue are grouped separately and their value cell is locked to avoid accidental bulk edits."),
+              shiny::tags$li(
+                "Rows containing numeric ",
+                shiny::tags$b("measurementValues"),
+                " are grouped, and their values are locked to prevent accidental bulk edits."
+              ),
               shiny::tags$li("Edits remain as a draft until you click Apply changes to eMoF.")
             )
           ),

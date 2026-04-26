@@ -249,7 +249,7 @@ mod_metadata_ui <- function(id) {
                     ns("basic_title"),
                     "Title *",
                     placeholder = "Ex.: Megafauna composition in Aurora seamount...",
-                    help = "Título descritivo do recurso."
+                    help = "Descriptive title of the resource."
                   )
                 )
               ),
@@ -260,7 +260,7 @@ mod_metadata_ui <- function(id) {
                     ns("basic_short_name"),
                     "Short Name",
                     placeholder = "Ex.: aurora_megafauna_2019",
-                    help = "Nome curto do recurso."
+                    help = "Short name of the resource."
                   )
                 ),
                 shiny::column(
@@ -269,7 +269,7 @@ mod_metadata_ui <- function(id) {
                     ns("basic_publishing_organization"),
                     "Publishing Organization *",
                     choices = c("", "No organization"),
-                    help = "Organização responsável pela publicação do recurso."
+                    help = "Organization responsible for publishing the resource."
                   )
                 )
               )
@@ -302,7 +302,6 @@ mod_metadata_ui <- function(id) {
                       "Specimen",
                       "Observation"
                     ),
-                    help = "Opção inspirada na folha info da planilha."
                   )
                 ),
                 shiny::column(
@@ -362,19 +361,19 @@ mod_metadata_ui <- function(id) {
                 ns("basic_description"),
                 "Description *",
                 rows = 7,
-                help = "Visão geral do recurso."
+                help = "Overview of the resource."
               ),
               .metadata_textarea(
                 ns("basic_maintenance"),
                 "Maintenance",
                 rows = 4,
-                help = "Descrição geral da manutenção do recurso."
+                help = "General description of resource maintenance."
               ),
               .metadata_textarea(
                 ns("basic_maintenance_description"),
                 "Maintenance Description",
                 rows = 4,
-                help = "Descrição da frequência de manutenção."
+                help = "Description of the maintenance frequency."
               )
             ),
 
@@ -417,7 +416,7 @@ mod_metadata_ui <- function(id) {
                 ns("ack_text"),
                 "Metadata that acknowledges funders and contributors",
                 rows = 8,
-                help = "Agradecimentos a financiadores e principais colaboradores."
+                help = "Acknowledgements to funders and main contributors."
               )
             ),
             .metadata_nav_buttons(ns, current = "ack", prev_tab = "contacts", next_tab = "geo")
@@ -444,7 +443,7 @@ mod_metadata_ui <- function(id) {
                 ns("geo_description"),
                 "Description *",
                 rows = 4,
-                help = "Descrição geográfica da área de estudo."
+                help = "Geographic description of the study area."
               )
             ),
             .metadata_nav_buttons(ns, current = "geo", prev_tab = "ack", next_tab = "tax")
@@ -465,7 +464,7 @@ mod_metadata_ui <- function(id) {
                 ns("tax_description"),
                 "Description",
                 rows = 4,
-                help = "Descrição do escopo taxonómico."
+                help = "Description of the taxonomic scope."
               ),
               shiny::fluidRow(
                 shiny::column(
@@ -799,7 +798,7 @@ mod_metadata_server <- function(id) {
     )
 
     go_to_tab <- function(target_tab) {
-      cat("DEBUG go_to_tab() ->", target_tab, "\n")
+      #cat("DEBUG go_to_tab() ->", target_tab, "\n")
       session$sendCustomMessage(
         paste0("metadata-click-tab-", id),
         list(target = target_tab)
@@ -816,7 +815,7 @@ mod_metadata_server <- function(id) {
           btn_id <- paste0("prev_", current)
           target <- prev_tab
           shiny::observeEvent(input[[btn_id]], {
-            cat("DEBUG click ->", btn_id, "| target:", target, "\n")
+            #cat("DEBUG click ->", btn_id, "| target:", target, "\n")
             go_to_tab(target)
           }, ignoreInit = TRUE)
         })
@@ -827,16 +826,16 @@ mod_metadata_server <- function(id) {
           btn_id <- paste0("next_", current)
           target <- next_tab
           shiny::observeEvent(input[[btn_id]], {
-            cat("DEBUG click ->", btn_id, "| target:", target, "\n")
+            #cat("DEBUG click ->", btn_id, "| target:", target, "\n")
             go_to_tab(target)
           }, ignoreInit = TRUE)
         })
       }
     }
 
-    shiny::observe({
-      cat("DEBUG current metadata tab input ->", input$metadata_tabs %||% "NULL", "\n")
-    })
+    #shiny::observe({
+      #cat("DEBUG current metadata tab input ->", input$metadata_tabs %||% "NULL", "\n")
+    #})
 
 
     export_metadata_path <- shiny::reactive({

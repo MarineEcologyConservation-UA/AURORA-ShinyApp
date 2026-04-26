@@ -1454,6 +1454,20 @@ mod_qc_ui <- function(id) {
         margin: 10px 0px 20px 0px;
         color: #303d34;
       }
+
+      .qc-tabs-right .nav-tabs {
+        justify-content: flex-end !important;
+        width: 100%;
+      }
+
+      .qc-tabs-right .card-header {
+        display: flex !important;
+        align-items: center;
+      }
+
+      .qc-tabs-right .card-header .nav {
+        margin-left: auto !important;
+      }
     ")),
 
     shiny::tags$div(
@@ -1467,109 +1481,113 @@ mod_qc_ui <- function(id) {
       )
     ),
 
-    bslib::navset_card_tab(
-      id = ns("qc_tabs"),
-      selected = "data_overview",
-      title = "Data overview",
+    shiny::div(
+      class = "qc-tabs-right",
 
-      bslib::nav_panel(
-        "Data overview",
-        value = "data_overview",
+      bslib::navset_card_tab(
+        id = ns("qc_tabs"),
+        selected = "data_overview",
+        title = "Data overview",
 
-        shiny::div(
-          class = "qc-title",
-          shiny::h3("Data Overview & Summary")
-        ),
+        bslib::nav_panel(
+          "Data overview",
+          value = "data_overview",
 
-        shiny::fluidRow(
-          shiny::column(
-            3,
-            shiny::div(
-              class = "qc-box",
-              shiny::div(class = "qc-kpi-label", "Export status"),
-              shiny::div(shiny::uiOutput(ns("export_status_ui")))
+          shiny::div(
+            class = "qc-title",
+            shiny::h3("Data Overview & Summary")
+          ),
+
+          shiny::fluidRow(
+            shiny::column(
+              3,
+              shiny::div(
+                class = "qc-box",
+                shiny::div(class = "qc-kpi-label", "Export status"),
+                shiny::div(shiny::uiOutput(ns("export_status_ui")))
+              )
+            ),
+            shiny::column(
+              3,
+              shiny::div(
+                class = "qc-box",
+                shiny::div(class = "qc-kpi-label", "Errors"),
+                shiny::div(class = "qc-kpi qc-err", shiny::textOutput(ns("kpi_errors")))
+              )
+            ),
+            shiny::column(
+              3,
+              shiny::div(
+                class = "qc-box",
+                shiny::div(class = "qc-kpi-label", "Warnings"),
+                shiny::div(class = "qc-kpi qc-warn", shiny::textOutput(ns("kpi_warnings")))
+              )
+            ),
+            shiny::column(
+              3,
+              shiny::div(
+                class = "qc-box",
+                shiny::div(class = "qc-kpi-label", "Records (occurrence)"),
+                shiny::div(class = "qc-kpi", shiny::textOutput(ns("kpi_n_occ")))
+              )
             )
           ),
-          shiny::column(
-            3,
-            shiny::div(
-              class = "qc-box",
-              shiny::div(class = "qc-kpi-label", "Errors"),
-              shiny::div(class = "qc-kpi qc-err", shiny::textOutput(ns("kpi_errors")))
+
+          shiny::hr(),
+          shiny::h4(shiny::uiOutput(ns("overview_event_occ_title"))),
+          shiny::div(class = "qc-dt-report", DT::DTOutput(ns("overview_event_occ_tbl"))),
+
+          shiny::hr(),
+          shiny::h4("Overview of measurement or fact records"),
+          shiny::div(class = "qc-dt-report", DT::DTOutput(ns("overview_emof_types_tbl"))),
+
+          shiny::hr(),
+          shiny::h4("Geographic coverage of the dataset"),
+          shiny::uiOutput(ns("overview_map_info")),
+
+          if (has_leaflet) {
+            shiny::div(class = "qc-map-wrap", leaflet::leafletOutput(ns("overview_map"), height = "100%"))
+          } else {
+            shiny::div(class = "qc-muted", "Map unavailable: install 'leaflet' to enable this section.")
+          },
+
+          shiny::hr(),
+          shiny::h4(shiny::uiOutput(ns("overview_date_title"))),
+          shiny::div(
+            style = "width: 100%; overflow: visible; box-sizing: border-box;",
+            shiny::plotOutput(
+              ns("overview_date_plot"),
+              height = "380px",
+              width = "100%"
             )
           ),
-          shiny::column(
-            3,
-            shiny::div(
-              class = "qc-box",
-              shiny::div(class = "qc-kpi-label", "Warnings"),
-              shiny::div(class = "qc-kpi qc-warn", shiny::textOutput(ns("kpi_warnings")))
-            )
-          ),
-          shiny::column(
-            3,
-            shiny::div(
-              class = "qc-box",
-              shiny::div(class = "qc-kpi-label", "Records (occurrence)"),
-              shiny::div(class = "qc-kpi", shiny::textOutput(ns("kpi_n_occ")))
+
+          shiny::hr(),
+          shiny::h4("Taxonomic coverage of the dataset"),
+          shiny::fluidRow(
+            shiny::column(
+              12,
+              if (has_plotly) {
+                plotly::plotlyOutput(ns("overview_tax_plot"), height = "500px")
+              } else {
+                shiny::div(class = "qc-muted", "Sunburst chart unavailable: install 'plotly' to enable this visualization.")
+              }
             )
           )
         ),
 
-        shiny::hr(),
-        shiny::h4(shiny::uiOutput(ns("overview_event_occ_title"))),
-        shiny::div(class = "qc-dt-report", DT::DTOutput(ns("overview_event_occ_tbl"))),
-
-        shiny::hr(),
-        shiny::h4("Overview of measurement or fact records"),
-        shiny::div(class = "qc-dt-report", DT::DTOutput(ns("overview_emof_types_tbl"))),
-
-        shiny::hr(),
-        shiny::h4("Geographic coverage of the dataset"),
-        shiny::uiOutput(ns("overview_map_info")),
-
-        if (has_leaflet) {
-          shiny::div(class = "qc-map-wrap", leaflet::leafletOutput(ns("overview_map"), height = "100%"))
-        } else {
-          shiny::div(class = "qc-muted", "Map unavailable: install 'leaflet' to enable this section.")
-        },
-
-        shiny::hr(),
-        shiny::h4(shiny::uiOutput(ns("overview_date_title"))),
-        shiny::div(
-          style = "width: 100%; overflow: visible; box-sizing: border-box;",
-          shiny::plotOutput(
-            ns("overview_date_plot"),
-            height = "380px",
-            width = "100%"
-          )
-        ),
-
-        shiny::hr(),
-        shiny::h4("Taxonomic coverage of the dataset"),
-        shiny::fluidRow(
-          shiny::column(
-            12,
-            if (has_plotly) {
-              plotly::plotlyOutput(ns("overview_tax_plot"), height = "500px")
-            } else {
-              shiny::div(class = "qc-muted", "Sunburst chart unavailable: install 'plotly' to enable this visualization.")
-            }
-          )
+        bslib::nav_panel(
+          "Issues found",
+          value = "issues_found",
+          shiny::h4("Overview of all issues"),
+          shiny::div(class = "qc-dt", DT::DTOutput(ns("issues_summary_tbl"))),
+          shiny::hr(),
+          shiny::h4("Details"),
+          shiny::div(class = "qc-dt", DT::DTOutput(ns("issues_detailed_tbl"))),
+          shiny::hr(),
+          shiny::h4("eMoF issues"),
+          shiny::div(class = "qc-dt", DT::DTOutput(ns("emof_issues_tbl")))
         )
-      ),
-
-      bslib::nav_panel(
-        "Issues found",
-        value = "issues_found",
-        shiny::h4("Overview of all issues"),
-        shiny::div(class = "qc-dt", DT::DTOutput(ns("issues_summary_tbl"))),
-        shiny::hr(),
-        shiny::h4("Details"),
-        shiny::div(class = "qc-dt", DT::DTOutput(ns("issues_detailed_tbl"))),
-        shiny::hr(),
-        shiny::h4("eMoF issues"),
-        shiny::div(class = "qc-dt", DT::DTOutput(ns("emof_issues_tbl")))
       )
     )
   )

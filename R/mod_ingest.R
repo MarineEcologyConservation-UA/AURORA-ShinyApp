@@ -73,19 +73,19 @@ mod_ingest_ui <- function(id) {
         shiny::tags$strong("Note"),
         shiny::tags$br(),
         shiny::tags$small(
-  "If your dataset is already in a tidy format, you can proceed directly by clicking ",
-  shiny::tags$em("Complete Ingestion"),
-  ".",
+          "If your dataset is already in a tidy format, you can proceed directly by clicking ",
+          shiny::tags$em("Complete Ingestion"),
+          ".",
 
-  shiny::tags$br(),
-  shiny::tags$br(),
+          shiny::tags$br(),
+          shiny::tags$br(),
 
-  shiny::tags$b("What is a tidy format?"),
-  shiny::tags$ul(
-    shiny::tags$li("Each occurrence must correspond to a single row."),
-    shiny::tags$li("Do not store a single variable across multiple columns (e.g., species names split into separate columns).")
-  )
-)
+          shiny::tags$b("What is a tidy format?"),
+          shiny::tags$ul(
+            shiny::tags$li("Each occurrence must correspond to a single row."),
+            shiny::tags$li("Do not store a single variable across multiple columns (e.g., species names split into separate columns).")
+          )
+        )
       ),
 
       shiny::actionButton(
@@ -103,10 +103,50 @@ mod_ingest_ui <- function(id) {
     bslib::card(
       bslib::card_header("Preview"),
 
-      bslib::navset_card_tab(
-        bslib::nav_panel("Raw data", DT::DTOutput(ns("raw_tbl"))),
-        bslib::nav_panel("Tidy / Pivot", shiny::uiOutput(ns("pivot_ui"))),
-        bslib::nav_panel("Column summary", DT::DTOutput(ns("col_stats")))
+      shiny::tags$style(shiny::HTML(sprintf("
+        #%s .ingest-dt-wrap .dataTables_wrapper {
+          width: 100%%;
+        }
+
+        #%s .ingest-dt-wrap table.dataTable {
+          width: 100%% !important;
+          table-layout: auto;
+        }
+
+        #%s .ingest-dt-wrap table.dataTable th,
+        #%s .ingest-dt-wrap table.dataTable td {
+          white-space: nowrap !important;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          max-width: 360px;
+          vertical-align: middle;
+        }
+
+        #%s .ingest-dt-wrap .dataTables_scrollBody {
+          border-bottom: 1px solid #dee2e6;
+        }
+
+        #%s .ingest-dt-wrap .dataTables_scrollBody table {
+          margin-bottom: 0 !important;
+        }
+      ",
+        ns("preview_root"),
+        ns("preview_root"),
+        ns("preview_root"),
+        ns("preview_root"),
+        ns("preview_root"),
+        ns("preview_root")
+      ))),
+
+      shiny::div(
+        id = ns("preview_root"),
+        class = "ingest-dt-wrap",
+
+        bslib::navset_card_tab(
+          bslib::nav_panel("Raw data", DT::DTOutput(ns("raw_tbl"))),
+          bslib::nav_panel("Tidy / Pivot", shiny::uiOutput(ns("pivot_ui"))),
+          bslib::nav_panel("Column summary", DT::DTOutput(ns("col_stats")))
+        )
       )
     )
   )
@@ -180,6 +220,41 @@ mod_ingest_ui <- function(id) {
   )
 
   dplyr::bind_rows(log_df, new_rows)
+}
+
+# -------- helper: DataTable preview style --------
+.ingest_preview_dt <- function(df, page_length = 25, scroll_y = "500px") {
+  DT::datatable(
+    df,
+    rownames = FALSE,
+    escape = TRUE,
+    class = "stripe hover compact",
+    options = list(
+      scrollX = TRUE,
+      scrollY = scroll_y,
+      pageLength = page_length,
+      autoWidth = FALSE,
+      deferRender = TRUE,
+      searchHighlight = TRUE,
+      columnDefs = list(
+        list(
+          targets = "_all",
+          className = "dt-nowrap"
+        )
+      )
+    ),
+    callback = DT::JS(
+      "table.on('draw.dt', function() {
+         table.columns.adjust();
+       });
+       setTimeout(function() {
+         table.columns.adjust();
+       }, 100);
+       setTimeout(function() {
+         table.columns.adjust();
+       }, 400);"
+    )
+  )
 }
 
 #' Ingestion module server
@@ -352,9 +427,10 @@ mod_ingest_server <- function(id, example_map) {
     output$raw_tbl <- DT::renderDT({
       shiny::req(rv$raw)
 
-      DT::datatable(
+      .ingest_preview_dt(
         utils::head(aurora_drop_internal_cols(rv$raw), 200),
-        options = list(scrollX = TRUE, pageLength = 10)
+        page_length = 25,
+        scroll_y = "500px"
       )
     })
 
@@ -383,7 +459,7 @@ mod_ingest_server <- function(id, example_map) {
       DT::datatable(
         stats,
         rownames = FALSE,
-        options = list(scrollX = TRUE, pageLength = 10)
+        options = list(scrollX = TRUE, pageLength = 25)
       )
     })
 
@@ -460,7 +536,7 @@ mod_ingest_server <- function(id, example_map) {
             padding-top: 1.9rem;
           }
 
-          .pivot-actions {
+          #%s .pivot-actions {
             display: flex;
             flex-wrap: wrap;
             gap: 0.45rem;
@@ -490,6 +566,7 @@ mod_ingest_server <- function(id, example_map) {
             width: 100%%;
           }
         ",
+          block_id,
           block_id,
           block_id,
           block_id,
@@ -715,9 +792,10 @@ mod_ingest_server <- function(id, example_map) {
     output$pivot_after <- DT::renderDT({
       shiny::req(pv$data)
 
-      DT::datatable(
+      .ingest_preview_dt(
         utils::head(aurora_drop_internal_cols(pv$data), 200),
-        options = list(scrollX = TRUE, pageLength = 10)
+        page_length = 25,
+        scroll_y = "500px"
       )
     })
 
