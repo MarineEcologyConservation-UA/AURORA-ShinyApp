@@ -294,7 +294,6 @@ mod_dwc_mapping_ui <- function(id) {
                 class = "p-3",
                 shiny::h4("Map each column to a Darwin Core term"),
                 shiny::uiOutput(ns("mapping_export_note")),
-
                 shiny::uiOutput(ns("scientific_name_note")),
 
                 shiny::div(
@@ -483,13 +482,13 @@ mod_dwc_mapping_ui <- function(id) {
                     fill = FALSE,
                     bslib::card_header(
                       shiny::tagList(
-                        "organismQuantity and sampleSizeValue Dependecy Fields ",
+                        "organismQuantity and sampleSizeValue Dependency Fields ",
                         bslib::tooltip(
                           shiny::tags$span(
                             shiny::icon("info-circle"),
                             style = "cursor: help;"
                           ),
-                          "These are fields suggested because another mapped or created field usually requires an dependecy term."
+                          "These are fields suggested because another mapped or created field usually requires a dependency term."
                         )
                       )
                     ),
@@ -563,7 +562,7 @@ mod_dwc_mapping_ui <- function(id) {
                       shiny::icon("triangle-exclamation", style = "margin-right: 7px; color: #d9534f;"),
                       shiny::tags$strong("Note:"),
                       "While our date-formatting engine works hard, it isn't flawless. ",
-                      "Handling every possible date and time combination is a bit like solving a Rubik's Cube in a blender. ",
+                      "Handling every possible date and time combination is complex. ",
                       "It will do its best, but please review the results carefully. If your ",
                       shiny::tags$code("eventDate"),
                       " is too messy, please preprocess values before ingestion."
@@ -844,6 +843,7 @@ mod_dwc_mapping_ui <- function(id) {
       if (r$term %in% dwc_terms) return(r$term)
     }
   }
+
   ""
 }
 
@@ -864,6 +864,7 @@ mod_dwc_mapping_ui <- function(id) {
 
   d <- stringdist::stringdist(key, terms_key, method = "jw", p = 0.1)
   i <- which.min(d)
+
   if (!length(i) || !is.finite(d[i])) return("")
   if (d[i] <= 0.22) terms2[i] else ""
 }
@@ -875,6 +876,7 @@ mod_dwc_mapping_ui <- function(id) {
 
   a2 <- a[, c("user_column", "dwc_term"), drop = FALSE]
   b2 <- b[, c("user_column", "dwc_term"), drop = FALSE]
+
   identical(a2, b2)
 }
 
@@ -938,11 +940,16 @@ mod_dwc_mapping_ui <- function(id) {
   dup <- unique(dup)
 
   dep_msgs <- character(0)
+
   if (!is.null(final_df) && is.data.frame(final_df)) {
     deps <- .detect_missing_dependencies(final_df)
+
     if (nrow(deps) > 0) {
       dep_msgs <- paste0(
-        deps$trigger_term, " is present but ", deps$required_term, " is missing."
+        deps$trigger_term,
+        " is present but ",
+        deps$required_term,
+        " is missing."
       )
     }
   }
@@ -960,7 +967,63 @@ mod_dwc_mapping_ui <- function(id) {
   )
 }
 
-.validation_ui_block <- function(v) {
+.validation_has_duplicate_mapping <- function(validation) {
+  duplicate_terms <- validation$duplicate_terms %||% character(0)
+  length(duplicate_terms) > 0
+}
+
+.issues_have_duplicate_occurrenceID <- function(issues) {
+  if (is.null(issues) || !is.data.frame(issues) || nrow(issues) == 0) {
+    return(FALSE)
+  }
+
+  if (!all(c("field", "rule", "severity") %in% names(issues))) {
+    return(FALSE)
+  }
+
+  any(
+    as.character(issues$field) == "occurrenceID" &
+      as.character(issues$rule) == "duplicate_occurrenceID" &
+      toupper(as.character(issues$severity)) == "ERROR",
+    na.rm = TRUE
+  )
+}
+
+.blocking_issue_details <- function(validation, issues = NULL) {
+  out <- list(
+    duplicate_mappings = character(0),
+    duplicate_occurrenceID = character(0)
+  )
+
+  duplicate_terms <- validation$duplicate_terms %||% character(0)
+  duplicate_terms <- unique(duplicate_terms[!is.na(duplicate_terms) & duplicate_terms != ""])
+  out$duplicate_mappings <- duplicate_terms
+
+  if (!is.null(issues) && is.data.frame(issues) && nrow(issues) > 0) {
+    if (all(c("field", "rule", "severity", "message") %in% names(issues))) {
+      sub <- issues[
+        as.character(issues$field) == "occurrenceID" &
+          as.character(issues$rule) == "duplicate_occurrenceID" &
+          toupper(as.character(issues$severity)) == "ERROR",
+        ,
+        drop = FALSE
+      ]
+
+      if (nrow(sub) > 0) {
+        out$duplicate_occurrenceID <- unique(as.character(sub$message))
+      }
+    }
+  }
+
+  out
+}
+
+.has_blocking_validation_or_cleaning <- function(validation, issues = NULL) {
+  isTRUE(.validation_has_duplicate_mapping(validation)) ||
+    isTRUE(.issues_have_duplicate_occurrenceID(issues))
+}
+
+.validation_ui_block <- function(v, issues = NULL) {
   make_alert <- function(type, title, items = NULL, text = NULL) {
     shiny::tags$div(
       class = paste("alert", paste0("alert-", type), "mb-2"),
@@ -976,40 +1039,81 @@ mod_dwc_mapping_ui <- function(id) {
     )
   }
 
+  blocking <- .blocking_issue_details(v, issues)
+
+  has_blocking <- length(blocking$duplicate_mappings) > 0 ||
+    length(blocking$duplicate_occurrenceID) > 0
+
   tag_list <- list()
 
-  if (length(v$missing_required) > 0) {
-    tag_list <- c(tag_list, list(
-      make_alert(
-        "danger",
-        "Missing required terms:",
-        v$missing_required
+  if (has_blocking) {
+    block_items <- list()
+
+    if (length(blocking$duplicate_mappings) > 0) {
+      block_items <- c(
+        block_items,
+        list(
+          shiny::tags$li(
+            shiny::tags$strong("Duplicate Darwin Core mappings: "),
+            paste(blocking$duplicate_mappings, collapse = ", ")
+          )
+        )
       )
-    ))
-  } else {
+    }
+
+    if (length(blocking$duplicate_occurrenceID) > 0) {
+      block_items <- c(
+        block_items,
+        list(
+          shiny::tags$li(
+            shiny::tags$strong("Duplicate occurrenceID values: "),
+            "occurrenceID must uniquely identify each occurrence record."
+          )
+        )
+      )
+    }
+
     tag_list <- c(tag_list, list(
-      make_alert("success", "All required terms for the selected database are present.")
+      shiny::tags$div(
+        class = "alert alert-danger mb-2",
+        style = "padding: 0.75rem 1rem;",
+        shiny::tags$b("Blocking errors detected."),
+        shiny::tags$div(
+          "The workflow cannot continue until the following structural errors are fixed:"
+        ),
+        shiny::tags$ul(
+          style = "margin-top: 0.35rem; margin-bottom: 0;",
+          block_items
+        )
+      )
     ))
   }
 
-  if (length(v$duplicate_terms) > 0) {
-    tag_list <- c(tag_list, list(
-      make_alert(
-        "danger",
-        "Duplicate mappings are not allowed:",
-        v$duplicate_terms
-      )
-    ))
-  }
+  if (!has_blocking) {
+    if (length(v$missing_required) > 0) {
+      tag_list <- c(tag_list, list(
+        make_alert(
+          "warning",
+          "Missing required terms:",
+          v$missing_required,
+          text = "The app will allow you to continue, but the selected repository may require these terms before accepting the dataset."
+        )
+      ))
+    } else {
+      tag_list <- c(tag_list, list(
+        make_alert("success", "All required terms for the selected database are present.")
+      ))
+    }
 
-  if (length(v$dependency_messages) > 0) {
-    tag_list <- c(tag_list, list(
-      make_alert(
-        "warning",
-        "Dependency field warnings:",
-        v$dependency_messages
-      )
-    ))
+    if (length(v$dependency_messages) > 0) {
+      tag_list <- c(tag_list, list(
+        make_alert(
+          "warning",
+          "Dependency field warnings:",
+          v$dependency_messages
+        )
+      ))
+    }
   }
 
   shiny::tagList(tag_list)
@@ -1017,6 +1121,7 @@ mod_dwc_mapping_ui <- function(id) {
 
 .detect_missing_dependencies <- function(df) {
   deps <- .dwc_term_dependencies()
+
   if (is.null(df) || !is.data.frame(df) || nrow(deps) == 0) {
     return(deps[0, , drop = FALSE])
   }
@@ -1042,6 +1147,7 @@ mod_dwc_mapping_ui <- function(id) {
   if (field %in% names(df) && !isTRUE(overwrite)) {
     return(df)
   }
+
   df[[field]] <- value
   df
 }
@@ -1052,6 +1158,7 @@ mod_dwc_mapping_ui <- function(id) {
   }
 
   idx_fill <- is.na(df$basisOfRecord) | trimws(as.character(df$basisOfRecord)) == ""
+
   if (isTRUE(overwrite)) {
     idx_fill <- rep(TRUE, nrow(df))
   }
@@ -1117,27 +1224,77 @@ mod_dwc_mapping_ui <- function(id) {
   df
 }
 
-.show_missing_terms_modal <- function(session, validation, step_label = "this step") {
+.show_validation_modal <- function(session, validation, issues = NULL, step_label = "this step") {
   missing_required <- validation$missing_required %||% character(0)
-  duplicate_terms <- validation$duplicate_terms %||% character(0)
+  blocking <- .blocking_issue_details(validation, issues)
 
-  if (length(missing_required) == 0 && length(duplicate_terms) == 0) {
-    return(invisible(NULL))
+  has_blocking <- length(blocking$duplicate_mappings) > 0 ||
+    length(blocking$duplicate_occurrenceID) > 0
+
+  has_warning <- length(missing_required) > 0
+
+  if (!has_blocking && !has_warning) {
+    return(invisible(FALSE))
+  }
+
+  title_txt <- if (has_blocking) "Validation blocked" else "Validation warning"
+  header_txt <- if (has_blocking) "Blocking error" else "Warning"
+
+  intro_txt <- if (has_blocking) {
+    paste0(
+      "The workflow cannot continue because one or more structural errors were detected. ",
+      "Please fix the blocking errors below before continuing."
+    )
+  } else {
+    paste0(
+      "Please revise the minimum required terms for the selected repository. ",
+      "The AURORA Shiny App will allow you to proceed, but the repository may require further revisions before the dataset is accepted."
+    )
   }
 
   body_parts <- list(
     shiny::tags$div(
       style = "color:#b91c1c; font-weight:700; margin-bottom:0.75rem;",
-      "Warning"
+      header_txt
     ),
-    shiny::tags$p(
-      paste0(
-        "Please revise the minimum required terms for the selected repository. Although the AURORA Shiny App will allow you to proceed, the repository may require further revisions before the dataset is accepted."
-      )
-    )
+    shiny::tags$p(intro_txt)
   )
 
-  if (length(missing_required) > 0) {
+  if (has_blocking) {
+    block_items <- list()
+
+    if (length(blocking$duplicate_mappings) > 0) {
+      block_items <- c(
+        block_items,
+        list(
+          shiny::tags$li(
+            shiny::tags$strong("Duplicate Darwin Core mappings: "),
+            paste(blocking$duplicate_mappings, collapse = ", "),
+            ". Each Darwin Core term can only be mapped once."
+          )
+        )
+      )
+    }
+
+    if (length(blocking$duplicate_occurrenceID) > 0) {
+      block_items <- c(
+        block_items,
+        lapply(blocking$duplicate_occurrenceID, function(msg) {
+          shiny::tags$li(msg)
+        })
+      )
+    }
+
+    body_parts <- c(
+      body_parts,
+      list(
+        shiny::tags$p(
+          shiny::tags$strong("Blocking errors found. These must be fixed before continuing:")
+        ),
+        shiny::tags$ul(block_items)
+      )
+    )
+  } else if (length(missing_required) > 0) {
     body_parts <- c(
       body_parts,
       list(
@@ -1147,23 +1304,24 @@ mod_dwc_mapping_ui <- function(id) {
     )
   }
 
-  if (length(duplicate_terms) > 0) {
-    body_parts <- c(
-      body_parts,
-      list(
-        shiny::tags$p("Duplicate Darwin Core mappings found:"),
-        shiny::tags$ul(lapply(duplicate_terms, shiny::tags$li))
-      )
-    )
-  }
-
   shiny::showModal(
     shiny::modalDialog(
-      title = shiny::tags$span(style = "color:#b91c1c;", "Validation warning"),
+      title = shiny::tags$span(style = "color:#b91c1c;", title_txt),
       easyClose = TRUE,
       footer = shiny::modalButton("Close"),
       body_parts
     )
+  )
+
+  invisible(has_blocking)
+}
+
+.show_missing_terms_modal <- function(session, validation, step_label = "this step") {
+  .show_validation_modal(
+    session = session,
+    validation = validation,
+    issues = NULL,
+    step_label = step_label
   )
 }
 
@@ -1252,6 +1410,13 @@ mod_dwc_mapping_server <- function(id, df_in) {
       )
     })
 
+    current_blocking <- shiny::reactive({
+      .has_blocking_validation_or_cleaning(
+        validation = current_validation(),
+        issues = rv$issues
+      )
+    })
+
     reset_to_mapping_tab <- function() {
       session$onFlushed(function() {
         bslib::nav_select(
@@ -1285,7 +1450,7 @@ mod_dwc_mapping_server <- function(id, df_in) {
           coord_epsg_in = epsg_in,
           target_epsg = 4326,
           force_parzer = force_parse,
-          swap_auto_fix = swap_auto_fix_flag,
+          swap_auto_fixes = swap_auto_fix_flag,
           preserve_original_coords = preserve_original_coords_flag,
           create_geodetic_datum = create_geodetic_datum_flag,
           geodetic_datum_value = geodetic_datum_value_flag,
@@ -1299,6 +1464,8 @@ mod_dwc_mapping_server <- function(id, df_in) {
         rv$cleaned <- df_to_clean
         rv$issues <- data.frame(
           row = NA_integer_,
+          original_row = NA_integer_,
+          original_id = NA_character_,
           field = "pipeline",
           rule = "clean_dwc_pipeline_error",
           severity = "ERROR",
@@ -1396,6 +1563,7 @@ mod_dwc_mapping_server <- function(id, df_in) {
             term <- input[[input_id]] %||% ""
 
             meta_row <- term_meta[term_meta$term == term, , drop = FALSE]
+
             html <- if (nrow(meta_row) == 0) {
               if (term == "") {
                 "Select a term to see definition and examples."
@@ -1431,6 +1599,8 @@ mod_dwc_mapping_server <- function(id, df_in) {
     })
 
     output$workflow_status <- shiny::renderUI({
+      has_blocking <- isTRUE(current_blocking())
+
       shiny::tagList(
         shiny::tags$p(
           shiny::tags$b("Target data repository: "),
@@ -1449,6 +1619,14 @@ mod_dwc_mapping_server <- function(id, df_in) {
           if (isTRUE(rv$formatting_done)) "Yes" else "No"
         ),
         shiny::tags$p(
+          shiny::tags$b("Blocking errors: "),
+          if (has_blocking) {
+            shiny::tags$span(style = "color:#b91c1c; font-weight:700;", "Yes")
+          } else {
+            shiny::tags$span(style = "color:#047857; font-weight:700;", "No")
+          }
+        ),
+        shiny::tags$p(
           shiny::tags$b("Field mapping complete: "),
           if (!is.null(rv$cleaned) && isTRUE(rv$formatting_done) && isTRUE(rv$ready)) "Yes" else "No"
         )
@@ -1456,7 +1634,7 @@ mod_dwc_mapping_server <- function(id, df_in) {
     })
 
     output$validation_ui <- shiny::renderUI({
-      .validation_ui_block(current_validation())
+      .validation_ui_block(current_validation(), rv$issues)
     })
 
     output$mapping_export_note <- shiny::renderUI({
@@ -1532,6 +1710,7 @@ mod_dwc_mapping_server <- function(id, df_in) {
             col <- key_map[[k]]
 
             init_term <- ""
+
             if (!is.null(rv$mapping) &&
                 is.data.frame(rv$mapping) &&
                 all(c("user_column", "dwc_term") %in% names(rv$mapping))) {
@@ -1588,7 +1767,7 @@ mod_dwc_mapping_server <- function(id, df_in) {
         return(
           shiny::tags$div(
             class = "alert alert-light",
-            "Apply mapping first to detect dependecy fields."
+            "Apply mapping first to detect dependency fields."
           )
         )
       }
@@ -1599,7 +1778,7 @@ mod_dwc_mapping_server <- function(id, df_in) {
         return(
           shiny::tags$div(
             class = "alert alert-light",
-            "No dependecy fields are currently suggested."
+            "No dependency fields are currently suggested."
           )
         )
       }
@@ -1684,6 +1863,25 @@ mod_dwc_mapping_server <- function(id, df_in) {
       shiny::req(df)
 
       map_df <- mapping_tbl()
+      validation_now <- .validation_state(
+        map_df = map_df,
+        final_df = NULL,
+        target_database = input$target_database %||% "GBIF"
+      )
+
+      if (.validation_has_duplicate_mapping(validation_now)) {
+        rv$ready <- FALSE
+
+        .show_validation_modal(
+          session = session,
+          validation = validation_now,
+          issues = NULL,
+          step_label = "applying mapping"
+        )
+
+        return(invisible(NULL))
+      }
+
       rv$mapping <- map_df
       rv$mapped <- .apply_mapping(df, map_df)
       rv$created <- NULL
@@ -1838,6 +2036,21 @@ mod_dwc_mapping_server <- function(id, df_in) {
     shiny::observeEvent(input$continue_to_formatting, {
       shiny::req(!is.null(rv$mapped))
 
+      validation_now <- current_validation()
+
+      if (.validation_has_duplicate_mapping(validation_now)) {
+        rv$ready <- FALSE
+
+        .show_validation_modal(
+          session = session,
+          validation = validation_now,
+          issues = rv$issues,
+          step_label = "continuing to formatting"
+        )
+
+        return(invisible(NULL))
+      }
+
       bslib::nav_select(
         id = "main_tabs",
         selected = "formatting",
@@ -1849,11 +2062,27 @@ mod_dwc_mapping_server <- function(id, df_in) {
       df_final <- current_preclean_df()
       shiny::req(df_final)
 
-      .show_missing_terms_modal(
-        session = session,
-        validation = current_validation(),
-        step_label = "applying formatting"
-      )
+      validation_before <- current_validation()
+
+      if (.validation_has_duplicate_mapping(validation_before)) {
+        rv$formatting_done <- FALSE
+        rv$ready <- FALSE
+
+        .show_validation_modal(
+          session = session,
+          validation = validation_before,
+          issues = rv$issues,
+          step_label = "applying formatting"
+        )
+
+        bslib::nav_select(
+          id = "main_tabs",
+          selected = "mapping",
+          session = session
+        )
+
+        return(invisible(NULL))
+      }
 
       shiny::withProgress(
         message = "Applying formatting",
@@ -1862,18 +2091,54 @@ mod_dwc_mapping_server <- function(id, df_in) {
         {
           shiny::incProgress(0.25, detail = "Running cleaning pipeline...")
           run_clean_pipeline(df_final)
+
           shiny::incProgress(0.65, detail = "Preparing preview and issues...")
+
+          validation_after <- current_validation()
+          has_blocking <- .has_blocking_validation_or_cleaning(
+            validation = validation_after,
+            issues = rv$issues
+          )
+
           rv$formatting_done <- TRUE
-          rv$ready <- TRUE
+          rv$ready <- !isTRUE(has_blocking)
+
           shiny::incProgress(1, detail = "Done.")
         }
       )
 
-      bslib::nav_select(
-        id = "main_tabs",
-        selected = "preview",
-        session = session
+      validation_after_modal <- current_validation()
+      has_blocking_after <- .has_blocking_validation_or_cleaning(
+        validation = validation_after_modal,
+        issues = rv$issues
       )
+
+      .show_validation_modal(
+        session = session,
+        validation = validation_after_modal,
+        issues = rv$issues,
+        step_label = "applying formatting"
+      )
+
+      if (isTRUE(has_blocking_after)) {
+        shiny::showNotification(
+          "Blocking errors were found. The next workflow tabs will remain locked until these errors are fixed.",
+          type = "error",
+          duration = 8
+        )
+
+        bslib::nav_select(
+          id = "main_tabs",
+          selected = "issues",
+          session = session
+        )
+      } else {
+        bslib::nav_select(
+          id = "main_tabs",
+          selected = "preview",
+          session = session
+        )
+      }
     })
 
     output$preview_tbl <- DT::renderDT({
@@ -1915,13 +2180,17 @@ mod_dwc_mapping_server <- function(id, df_in) {
       }
 
       hide_cols <- intersect(c("row", "original_id"), names(iss))
+
       if (length(hide_cols) > 0) {
         iss <- iss[, setdiff(names(iss), hide_cols), drop = FALSE]
       }
 
       preferred_order <- c("original_row", "field", "rule", "severity", "message")
-      iss <- iss[, c(intersect(preferred_order, names(iss)),
-                    setdiff(names(iss), preferred_order)), drop = FALSE]
+
+      iss <- iss[, c(
+        intersect(preferred_order, names(iss)),
+        setdiff(names(iss), preferred_order)
+      ), drop = FALSE]
 
       DT::datatable(
         iss,
@@ -1941,16 +2210,23 @@ mod_dwc_mapping_server <- function(id, df_in) {
       },
       content = function(file) {
         iss <- rv$issues
-        if (is.null(iss) || !is.data.frame(iss)) iss <- data.frame()
+
+        if (is.null(iss) || !is.data.frame(iss)) {
+          iss <- data.frame()
+        }
 
         hide_cols <- intersect(c("row", "original_id"), names(iss))
+
         if (length(hide_cols) > 0) {
           iss <- iss[, setdiff(names(iss), hide_cols), drop = FALSE]
         }
 
         preferred_order <- c("original_row", "field", "rule", "severity", "message")
-        iss <- iss[, c(intersect(preferred_order, names(iss)),
-                      setdiff(names(iss), preferred_order)), drop = FALSE]
+
+        iss <- iss[, c(
+          intersect(preferred_order, names(iss)),
+          setdiff(names(iss), preferred_order)
+        ), drop = FALSE]
 
         utils::write.csv(iss, file, row.names = FALSE, fileEncoding = "UTF-8")
       }

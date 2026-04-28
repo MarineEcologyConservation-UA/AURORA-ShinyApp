@@ -83,7 +83,7 @@ mod_about_ui <- function(id) {
           bslib::card_body(
             shiny::p(
               class = "home-note",
-              "Somensi, A., Araújo, S. M., … Matos, F. L. (2026). Aurora Shiny App: Streamlining biodiversity data sharing (Version 1.0)."
+              "Magnenti, Á. S., Araújo, S. M., … Matos, F. L. (2026). Aurora Shiny App: Streamlining biodiversity data sharing (Version 1.0)."
             ),
             shiny::p(
               class = "home-note",
