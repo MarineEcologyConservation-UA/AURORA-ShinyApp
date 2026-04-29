@@ -129,6 +129,24 @@ mod_about_ui <- function(id) {
       ),
 
       # =========================
+      # INSTITUTIONAL SUPPORT
+      # =========================
+      bslib::card(
+        class = "mb-4",
+        bslib::card_header("Institutional support"),
+        bslib::card_body(
+          shiny::div(
+            style = "display:flex; justify-content:center; align-items:center; width:100%;",
+            shiny::tags$img(
+              src = "partners_logo.png",
+              alt = "Participating institutions logos",
+              style = "max-width:100%; height:auto; display:block;"
+            )
+          )
+        )
+      ),
+
+      # =========================
       # FUNDING
       # =========================
       bslib::card(
