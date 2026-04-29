@@ -1441,6 +1441,18 @@ mod_taxonomy_match_server <- function(id, df_in) {
       )
     })
 
+    count_observations_for_inputName <- function(nm) {
+      df <- df_in()
+      src <- current_input_col()
+
+      if (!is.data.frame(df) || is.null(src) || !(src %in% names(df))) {
+        return(NA_integer_)
+      }
+
+      src_vals <- normalize_ws(df[[src]])
+      sum(src_vals == normalize_ws(nm), na.rm = TRUE)
+    }
+
     open_choice_popup <- function(row_index, selected_id) {
       shiny::req(!is.null(rv$lookup), row_index >= 1, row_index <= nrow(rv$lookup))
 
@@ -1868,6 +1880,8 @@ mod_taxonomy_match_server <- function(id, df_in) {
 
                 apply_choice_to_rows(same_rows, val)
 
+                obs_count <- count_observations_for_inputName(nm_same)
+
                 add_issue(
                   NA_integer_,
                   src,
@@ -1875,8 +1889,8 @@ mod_taxonomy_match_server <- function(id, df_in) {
                   "INFO",
                   paste0(
                     "Choice applied to ",
-                    length(same_rows),
-                    " row(s) with inputName='",
+                    ifelse(is.na(obs_count), length(same_rows), obs_count),
+                    " observation(s) with inputName='",
                     nm_same,
                     "'."
                   )
@@ -1910,6 +1924,8 @@ mod_taxonomy_match_server <- function(id, df_in) {
       apply_choice_to_rows(same_rows, selected_id)
       shiny::removeModal()
 
+      obs_count <- count_observations_for_inputName(nm)
+
       add_issue(
         NA_integer_,
         src,
@@ -1917,8 +1933,8 @@ mod_taxonomy_match_server <- function(id, df_in) {
         "INFO",
         paste0(
           "Choice applied to ",
-          length(same_rows),
-          " row(s) with inputName='",
+          ifelse(is.na(obs_count), length(same_rows), obs_count),
+          " observation(s) with inputName='",
           nm,
           "'."
         )
