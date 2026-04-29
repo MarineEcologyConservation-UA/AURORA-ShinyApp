@@ -1513,7 +1513,7 @@ mod_dwc_mapping_server <- function(id, df_in) {
         "id_source_cols",
         choices = cols,
         selected = character(0),
-        server = TRUE
+        server = FALSE
       )
 
       shiny::updateSelectizeInput(
@@ -1521,7 +1521,7 @@ mod_dwc_mapping_server <- function(id, df_in) {
         "remarks_source_cols",
         choices = cols,
         selected = character(0),
-        server = TRUE
+        server = FALSE
       )
     }, ignoreInit = FALSE)
 
@@ -1535,14 +1535,14 @@ mod_dwc_mapping_server <- function(id, df_in) {
         session,
         "id_source_cols",
         choices = cols,
-        server = TRUE
+        server = FALSE
       )
 
       shiny::updateSelectizeInput(
         session,
         "remarks_source_cols",
         choices = cols,
-        server = TRUE
+        server = FALSE
       )
     }, ignoreInit = TRUE)
 
