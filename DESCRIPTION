@@ -1,10 +1,9 @@
-Package: shinyRv02
+Package: shinyRv01
 Type: Package
-Title: Shiny R v02 (Package-Style Project)
+Title: Shiny R v01 (Package-Style Project)
 Version: 0.0.1
 Authors@R: person("Alvaro", "Somensi",
-    role = c("aut", "cre"),
-    email = "alvaro@example.com"
+    role = c("aut", "cre")
     )
 Description: Package-style structure for a Shiny app with reusable helper
     functions (I/O + tidying) and Shiny modules.
