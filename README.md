@@ -1,5 +1,7 @@
 # shinyRv01
 
+<img src="inst/app/www/aurora_logo_home.png" alt="AURORA Shiny App" width="180">
+
 Package-style skeleton for a Shiny app + reusable functions.
 
 ## Quick start (dev)
