@@ -30,3 +30,10 @@ AURORA_DwCA_User_Case.pdf
 *.zip
 *.rar
 test_folder/
+
+inst/extdata/Fake Biodiversity Dataset with Dates - Fake Biodiversity Dataset with Dates.csv
+inst/extdata/aurora_good_quality_data_densitydata_id_corrected.csv
+inst/extdata/aurora_like_readme.csv
+inst/extdata/dataset_example.csv
+inst/extdata/event2.csv
+inst/extdata/occurrence2.csv
