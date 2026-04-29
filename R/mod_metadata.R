@@ -798,7 +798,6 @@ mod_metadata_server <- function(id) {
     )
 
     go_to_tab <- function(target_tab) {
-      #cat("DEBUG go_to_tab() ->", target_tab, "\n")
       session$sendCustomMessage(
         paste0("metadata-click-tab-", id),
         list(target = target_tab)
@@ -815,7 +814,6 @@ mod_metadata_server <- function(id) {
           btn_id <- paste0("prev_", current)
           target <- prev_tab
           shiny::observeEvent(input[[btn_id]], {
-            #cat("DEBUG click ->", btn_id, "| target:", target, "\n")
             go_to_tab(target)
           }, ignoreInit = TRUE)
         })
@@ -826,16 +824,11 @@ mod_metadata_server <- function(id) {
           btn_id <- paste0("next_", current)
           target <- next_tab
           shiny::observeEvent(input[[btn_id]], {
-            #cat("DEBUG click ->", btn_id, "| target:", target, "\n")
             go_to_tab(target)
           }, ignoreInit = TRUE)
         })
       }
     }
-
-    #shiny::observe({
-      #cat("DEBUG current metadata tab input ->", input$metadata_tabs %||% "NULL", "\n")
-    #})
 
 
     export_metadata_path <- shiny::reactive({
