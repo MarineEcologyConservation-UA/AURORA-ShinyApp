@@ -86,6 +86,23 @@ mod_identification_cleaning_ui <- function(id) {
   color: #5C7AEA !important;
   font-weight: 600 !important;
 }
+
+#%s .idc-main .dataTables_wrapper {
+  width: 100%%;
+}
+
+#%s .idc-main table.dataTable {
+  width: 100%% !important;
+}
+
+#%s .idc-main table.dataTable th,
+#%s .idc-main table.dataTable td {
+  white-space: nowrap;
+}
+
+#%s .idc-main table.dataTable td input {
+  min-width: 160px;
+}
 ",
       ns("root"), ns("root"), ns("root"), ns("root"),
       ns("root"), ns("root"), ns("root"),
@@ -93,39 +110,62 @@ mod_identification_cleaning_ui <- function(id) {
       ns("root"), ns("root"), ns("root"),
       ns("root"), ns("root"), ns("root"),
       ns("root"), ns("root"), ns("root"),
-      ns("root"), ns("root"), ns("root")
+      ns("root"), ns("root"), ns("root"),
+      ns("root"), ns("root"), ns("root"), ns("root"), ns("root")
     ))),
 
     shiny::tags$script(
       shiny::HTML("
     (function() {
+      window.__idcScrollStore = window.__idcScrollStore || {};
+
       function getScrollBody(id) {
         var root = document.getElementById(id);
         if (!root) return null;
-        return root.querySelector('.dataTables_scrollBody');
+
+        var body = root.querySelector('.dataTables_scrollBody');
+        if (body) return body;
+
+        var parent = root.closest('.idc-main');
+        if (parent) {
+          return parent.querySelector('.dataTables_scrollBody');
+        }
+
+        return null;
       }
 
       function rememberScroll(id) {
         var body = getScrollBody(id);
         if (!body) return;
-        body.dataset.lastScrollTop = body.scrollTop || 0;
-        body.dataset.lastScrollLeft = body.scrollLeft || 0;
+
+        window.__idcScrollStore[id] = {
+          top: body.scrollTop || 0,
+          left: body.scrollLeft || 0
+        };
       }
 
       function restoreScroll(id) {
         var body = getScrollBody(id);
         if (!body) return;
-        var top = parseInt(body.dataset.lastScrollTop || '0', 10);
-        var left = parseInt(body.dataset.lastScrollLeft || '0', 10);
-        body.scrollTop = isNaN(top) ? 0 : top;
-        body.scrollLeft = isNaN(left) ? 0 : left;
+
+        var saved = window.__idcScrollStore[id];
+        if (!saved) return;
+
+        body.scrollTop = saved.top || 0;
+        body.scrollLeft = saved.left || 0;
       }
 
       document.addEventListener('scroll', function(e) {
         var body = e.target;
         if (!body || !body.classList || !body.classList.contains('dataTables_scrollBody')) return;
-        body.dataset.lastScrollTop = body.scrollTop || 0;
-        body.dataset.lastScrollLeft = body.scrollLeft || 0;
+
+        var root = body.closest('.datatables') || body.closest('.html-widget-output');
+        if (!root || !root.id) return;
+
+        window.__idcScrollStore[root.id] = {
+          top: body.scrollTop || 0,
+          left: body.scrollLeft || 0
+        };
       }, true);
 
       Shiny.addCustomMessageHandler('idc-remember-scroll', function(x) {
@@ -134,6 +174,9 @@ mod_identification_cleaning_ui <- function(id) {
 
       Shiny.addCustomMessageHandler('idc-restore-scroll', function(x) {
         setTimeout(function() { restoreScroll(x.id); }, 0);
+        setTimeout(function() { restoreScroll(x.id); }, 75);
+        setTimeout(function() { restoreScroll(x.id); }, 200);
+        setTimeout(function() { restoreScroll(x.id); }, 500);
       });
     })();
     ")
@@ -805,14 +848,24 @@ mod_identification_cleaning_server <- function(id, df_in, mapping_in) {
           paging = FALSE,
           searching = TRUE,
           info = FALSE,
+          ordering = FALSE,
           scrollX = TRUE,
           scrollY = "520px",
           scrollCollapse = TRUE,
-          autoWidth = TRUE,
-          order = list(list(which(names(df_disp) == "reviewedScientificName") - 1L, "asc")),
+          autoWidth = FALSE,
+          deferRender = TRUE,
           columnDefs = list(
-            list(visible = FALSE, targets = hide_idx)
+            list(visible = FALSE, targets = hide_idx),
+            list(width = "220px", targets = "_all")
           )
+        ),
+        callback = DT::JS(
+          "setTimeout(function() {",
+          "  table.columns.adjust();",
+          "}, 50);",
+          "setTimeout(function() {",
+          "  table.columns.adjust();",
+          "}, 200);"
         )
       )
 
