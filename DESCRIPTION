@@ -3,7 +3,8 @@ Type: Package
 Title: Shiny R v01 (Package-Style Project)
 Version: 0.0.1
 Authors@R: person("Alvaro", "Somensi",
-    role = c("aut", "cre")
+    role = c("aut", "cre"),
+    email = "alvarosomensi@ua.pt"
     )
 Description: Package-style structure for a Shiny app with reusable helper
     functions (I/O + tidying) and Shiny modules.
