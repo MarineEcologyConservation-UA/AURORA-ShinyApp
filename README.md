@@ -1,4 +1,4 @@
-# shinyRv02
+# shinyRv01
 
 Package-style skeleton for a Shiny app + reusable functions.
 
