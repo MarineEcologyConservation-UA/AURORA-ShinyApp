@@ -26,3 +26,7 @@ cache/
 logs/
 
 AURORA_DwCA_User_Case.pdf
+
+*.zip
+*.rar
+test_folder/

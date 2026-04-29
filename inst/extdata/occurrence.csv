@@ -1,110 +1,51 @@
-"","verbatimScientificName","LSID","scientificName","basisOfRecord","occurrenceStatus","occurrenceID","eventID"
-"1","Acantephyra eximiia","urn:lsid:marinespecies.org:taxname:107580","Acanthephyra eximea Smith, 1884","materialSample","present","2009-05-30_WM1200_OTMS_1","2009-05-30_WM1200_OTMS"
-"2","Acantephyra pelagica","urn:lsid:marinespecies.org:taxname:107581","Acanthephyra pelagica (Risso, 1816)","materialSample","present","2009-05-30_WM1200_OTMS_2","2009-05-30_WM1200_OTMS"
-"3","A. rostratus","urn:lsid:marinespecies.org:taxname:126684","Alepocephalus rostratus Risso, 1820","materialSample","present","2009-05-30_WM1200_OTMS_3","2009-05-30_WM1200_OTMS"
-"4","Argyropelecus hemigymnus","urn:lsid:marinespecies.org:taxname:127309","Argyropelecus hemigymnus Cocco, 1829","materialSample","present","2009-05-30_WM1200_OTMS_4","2009-05-30_WM1200_OTMS"
-"5","Aristeus antennatus","urn:lsid:marinespecies.org:taxname:107083","Aristeus antennatus (Risso, 1816)","materialSample","present","2009-05-30_WM1200_OTMS_5","2009-05-30_WM1200_OTMS"
-"6","Bathypterois sp.","urn:lsid:marinespecies.org:taxname:125669","Bathypterois Günther, 1878","materialSample","present","2009-05-30_WM1200_OTMS_6","2009-05-30_WM1200_OTMS"
-"7","Bonellia viridis","urn:lsid:marinespecies.org:taxname:110363","Bonellia viridis Rolando, 1822","materialSample","present","2009-05-30_WM1200_OTMS_7","2009-05-30_WM1200_OTMS"
-"8","Chaceon mediterraneus","urn:lsid:marinespecies.org:taxname:107372","Chaceon mediterraneus Manning & Holthuis, 1989","materialSample","present","2009-05-30_WM1200_OTMS_8","2009-05-30_WM1200_OTMS"
-"9","Coelorinchus mediterraneus","urn:lsid:marinespecies.org:taxname:280313","Coelorinchus mediterraneus Iwamoto & Ungaro, 2002","materialSample","present","2009-05-30_WM1200_OTMS_9","2009-05-30_WM1200_OTMS"
-"10","Etmopterus spinax","urn:lsid:marinespecies.org:taxname:105913","Etmopterus spinax (Linnaeus, 1758)","materialSample","present","2009-05-30_WM1200_OTMS_10","2009-05-30_WM1200_OTMS"
-"11","Galeus melastomus","urn:lsid:marinespecies.org:taxname:105812","Galeus melastomus Rafinesque, 1810","materialSample","present","2009-05-30_WM1200_OTMS_11","2009-05-30_WM1200_OTMS"
-"12","Gennadas elegans","urn:lsid:marinespecies.org:taxname:107095","Gennadas elegans (Smith, 1882)","materialSample","present","2009-05-30_WM1200_OTMS_12","2009-05-30_WM1200_OTMS"
-"13","Geryon longipes","urn:lsid:marinespecies.org:taxname:107373","Geryon longipes A. Milne-Edwards, 1882","materialSample","present","2009-05-30_WM1200_OTMS_13","2009-05-30_WM1200_OTMS"
-"14","Gryphus vitreus","urn:lsid:marinespecies.org:taxname:104068","Gryphus vitreus (Born, 1778)","materialSample","present","2009-05-30_WM1200_OTMS_14","2009-05-30_WM1200_OTMS"
-"15","Lampanyctus crocodilus","urn:lsid:marinespecies.org:taxname:126612","Lampanyctus crocodilus (Risso, 1810)","materialSample","present","2009-05-30_WM1200_OTMS_15","2009-05-30_WM1200_OTMS"
-"16","Lepidion lepidion","urn:lsid:marinespecies.org:taxname:126495","Lepidion lepidion (Risso, 1810)","materialSample","present","2009-05-30_WM1200_OTMS_16","2009-05-30_WM1200_OTMS"
-"17","Pasiphaea multidentata","urn:lsid:marinespecies.org:taxname:107676","Pasiphaea multidentata Esmark, 1866","materialSample","present","2009-05-30_WM1200_OTMS_17","2009-05-30_WM1200_OTMS"
-"18","Pelagia noctiluca","urn:lsid:marinespecies.org:taxname:135305","Pelagia noctiluca (Forsskål, 1775)","materialSample","present","2009-05-30_WM1200_OTMS_18","2009-05-30_WM1200_OTMS"
-"19","Plesionika acanthonotus","urn:lsid:marinespecies.org:taxname:107654","Plesionika acanthonotus (Smith, 1882)","materialSample","present","2009-05-30_WM1200_OTMS_19","2009-05-30_WM1200_OTMS"
-"20","Sergestes arcticus","urn:lsid:marinespecies.org:taxname:107125","Sergestes arcticus Krøyer, 1855","materialSample","present","2009-05-30_WM1200_OTMS_20","2009-05-30_WM1200_OTMS"
-"21","Stereomastis sculpta","urn:lsid:marinespecies.org:taxname:107700","Stereomastis sculpta (Smith, 1880)","materialSample","present","2009-05-30_WM1200_OTMS_21","2009-05-30_WM1200_OTMS"
-"22","Acantephyra eximiia","urn:lsid:marinespecies.org:taxname:107580","Acanthephyra eximea Smith, 1884","materialSample","present","2009-06-01_WM2000_OTMS_22","2009-06-01_WM2000_OTMS"
-"23","Acantephyra pelagica","urn:lsid:marinespecies.org:taxname:107581","Acanthephyra pelagica (Risso, 1816)","materialSample","present","2009-06-01_WM2000_OTMS_23","2009-06-01_WM2000_OTMS"
-"24","A. rostratus","urn:lsid:marinespecies.org:taxname:126684","Alepocephalus rostratus Risso, 1820","materialSample","present","2009-06-01_WM2000_OTMS_24","2009-06-01_WM2000_OTMS"
-"25","Aristeus antennatus","urn:lsid:marinespecies.org:taxname:107083","Aristeus antennatus (Risso, 1816)","materialSample","present","2009-06-01_WM2000_OTMS_25","2009-06-01_WM2000_OTMS"
-"26","Bathypterois sp.","urn:lsid:marinespecies.org:taxname:125669","Bathypterois Günther, 1878","materialSample","present","2009-06-01_WM2000_OTMS_26","2009-06-01_WM2000_OTMS"
-"27","Bonellia viridis","urn:lsid:marinespecies.org:taxname:110363","Bonellia viridis Rolando, 1822","materialSample","present","2009-06-01_WM2000_OTMS_27","2009-06-01_WM2000_OTMS"
-"28","Chaceon mediterraneus","urn:lsid:marinespecies.org:taxname:107372","Chaceon mediterraneus Manning & Holthuis, 1989","materialSample","present","2009-06-01_WM2000_OTMS_28","2009-06-01_WM2000_OTMS"
-"29","Chrisaora hysoscella","urn:lsid:marinespecies.org:taxname:135304","Chrysaora hysoscella (Linnaeus, 1767)","materialSample","present","2009-06-01_WM2000_OTMS_29","2009-06-01_WM2000_OTMS"
-"30","Coryphaenoides guentheri","urn:lsid:marinespecies.org:taxname:158958","Coryphaenoides guentheri (Vaillant, 1888)","materialSample","present","2009-06-01_WM2000_OTMS_30","2009-06-01_WM2000_OTMS"
-"31","Lampanyctus crocodilus","urn:lsid:marinespecies.org:taxname:126612","Lampanyctus crocodilus (Risso, 1810)","materialSample","present","2009-06-01_WM2000_OTMS_31","2009-06-01_WM2000_OTMS"
-"32","Lepidion lepidion","urn:lsid:marinespecies.org:taxname:126495","Lepidion lepidion (Risso, 1810)","materialSample","present","2009-06-01_WM2000_OTMS_32","2009-06-01_WM2000_OTMS"
-"33","Munida tenuimana","urn:lsid:marinespecies.org:taxname:107166","Munida tenuimana G.O. Sars, 1872","materialSample","present","2009-06-01_WM2000_OTMS_33","2009-06-01_WM2000_OTMS"
-"34","Myctophidae sp.","urn:lsid:marinespecies.org:taxname:125498","Myctophidae Gill, 1893","materialSample","present","2009-06-01_WM2000_OTMS_34","2009-06-01_WM2000_OTMS"
-"35","Pasiphaea multidentata","urn:lsid:marinespecies.org:taxname:107676","Pasiphaea multidentata Esmark, 1866","materialSample","present","2009-06-01_WM2000_OTMS_35","2009-06-01_WM2000_OTMS"
-"36","Pelagia noctiluca","urn:lsid:marinespecies.org:taxname:135305","Pelagia noctiluca (Forsskål, 1775)","materialSample","present","2009-06-01_WM2000_OTMS_36","2009-06-01_WM2000_OTMS"
-"37","Sergestes arcticus","urn:lsid:marinespecies.org:taxname:107125","Sergestes arcticus Krøyer, 1855","materialSample","present","2009-06-01_WM2000_OTMS_37","2009-06-01_WM2000_OTMS"
-"38","Sergia robusta","urn:lsid:marinespecies.org:taxname:107136","Sergia robusta (Smith, 1882)","materialSample","present","2009-06-01_WM2000_OTMS_38","2009-06-01_WM2000_OTMS"
-"39","Stereomastis sculpta","urn:lsid:marinespecies.org:taxname:107700","Stereomastis sculpta (Smith, 1880)","materialSample","present","2009-06-01_WM2000_OTMS_39","2009-06-01_WM2000_OTMS"
-"40","Acantephyra eximiia","urn:lsid:marinespecies.org:taxname:107580","Acanthephyra eximea Smith, 1884","materialSample","present","2009-06-04_WM3000_OTMS_40","2009-06-04_WM3000_OTMS"
-"41","Acantephyra pelagica","urn:lsid:marinespecies.org:taxname:107581","Acanthephyra pelagica (Risso, 1816)","materialSample","present","2009-06-04_WM3000_OTMS_41","2009-06-04_WM3000_OTMS"
-"42","Argyropelecus hemigymnus","urn:lsid:marinespecies.org:taxname:127309","Argyropelecus hemigymnus Cocco, 1829","materialSample","present","2009-06-04_WM3000_OTMS_42","2009-06-04_WM3000_OTMS"
-"43","Aristeus antennatus","urn:lsid:marinespecies.org:taxname:107083","Aristeus antennatus (Risso, 1816)","materialSample","present","2009-06-04_WM3000_OTMS_43","2009-06-04_WM3000_OTMS"
-"44","Bathypterois sp.","urn:lsid:marinespecies.org:taxname:125669","Bathypterois Günther, 1878","materialSample","present","2009-06-04_WM3000_OTMS_44","2009-06-04_WM3000_OTMS"
-"45","Chaceon mediterraneus","urn:lsid:marinespecies.org:taxname:107372","Chaceon mediterraneus Manning & Holthuis, 1989","materialSample","present","2009-06-04_WM3000_OTMS_45","2009-06-04_WM3000_OTMS"
-"46","Coryphaenoides guentheri","urn:lsid:marinespecies.org:taxname:158958","Coryphaenoides guentheri (Vaillant, 1888)","materialSample","present","2009-06-04_WM3000_OTMS_46","2009-06-04_WM3000_OTMS"
-"47","Gennadas elegans","urn:lsid:marinespecies.org:taxname:107095","Gennadas elegans (Smith, 1882)","materialSample","present","2009-06-04_WM3000_OTMS_47","2009-06-04_WM3000_OTMS"
-"48","Lampanyctus crocodilus","urn:lsid:marinespecies.org:taxname:126612","Lampanyctus crocodilus (Risso, 1810)","materialSample","present","2009-06-04_WM3000_OTMS_48","2009-06-04_WM3000_OTMS"
-"49","Pasiphaea multidentata","urn:lsid:marinespecies.org:taxname:107676","Pasiphaea multidentata Esmark, 1866","materialSample","present","2009-06-04_WM3000_OTMS_49","2009-06-04_WM3000_OTMS"
-"50","Pasiphaea sivado","urn:lsid:marinespecies.org:taxname:107677","Pasiphaea sivado (Risso, 1816)","materialSample","present","2009-06-04_WM3000_OTMS_50","2009-06-04_WM3000_OTMS"
-"51","Pyrosoma atlanticum","urn:lsid:marinespecies.org:taxname:137250","Pyrosoma atlanticum Péron, 1804","materialSample","present","2009-06-04_WM3000_OTMS_51","2009-06-04_WM3000_OTMS"
-"52","Sergestes arcticus","urn:lsid:marinespecies.org:taxname:107125","Sergestes arcticus Krøyer, 1855","materialSample","present","2009-06-04_WM3000_OTMS_52","2009-06-04_WM3000_OTMS"
-"53","Sergia robusta","urn:lsid:marinespecies.org:taxname:107136","Sergia robusta (Smith, 1882)","materialSample","present","2009-06-04_WM3000_OTMS_53","2009-06-04_WM3000_OTMS"
-"54","Stereomastis sculpta","urn:lsid:marinespecies.org:taxname:107700","Stereomastis sculpta (Smith, 1880)","materialSample","present","2009-06-04_WM3000_OTMS_54","2009-06-04_WM3000_OTMS"
-"55","Acantephyra pelagica","urn:lsid:marinespecies.org:taxname:107581","Acanthephyra pelagica (Risso, 1816)","materialSample","present","2009-06-07_CM1200_OTMS_55","2009-06-07_CM1200_OTMS"
-"56","Argyropelecus hemigymnus","urn:lsid:marinespecies.org:taxname:127309","Argyropelecus hemigymnus Cocco, 1829","materialSample","present","2009-06-07_CM1200_OTMS_56","2009-06-07_CM1200_OTMS"
-"57","Aristeus antennatus","urn:lsid:marinespecies.org:taxname:107083","Aristeus antennatus (Risso, 1816)","materialSample","present","2009-06-07_CM1200_OTMS_57","2009-06-07_CM1200_OTMS"
-"58","Bathypterois sp.","urn:lsid:marinespecies.org:taxname:125669","Bathypterois Günther, 1878","materialSample","present","2009-06-07_CM1200_OTMS_58","2009-06-07_CM1200_OTMS"
-"59","Etmopterus spinax","urn:lsid:marinespecies.org:taxname:105913","Etmopterus spinax (Linnaeus, 1758)","materialSample","present","2009-06-07_CM1200_OTMS_59","2009-06-07_CM1200_OTMS"
-"60","Galeus melastomus","urn:lsid:marinespecies.org:taxname:105812","Galeus melastomus Rafinesque, 1810","materialSample","present","2009-06-07_CM1200_OTMS_60","2009-06-07_CM1200_OTMS"
-"61","Gennadas elegans","urn:lsid:marinespecies.org:taxname:107095","Gennadas elegans (Smith, 1882)","materialSample","present","2009-06-07_CM1200_OTMS_61","2009-06-07_CM1200_OTMS"
-"62","Geryon longipes","urn:lsid:marinespecies.org:taxname:107373","Geryon longipes A. Milne-Edwards, 1882","materialSample","present","2009-06-07_CM1200_OTMS_62","2009-06-07_CM1200_OTMS"
-"63","Gryphus vitreus","urn:lsid:marinespecies.org:taxname:104068","Gryphus vitreus (Born, 1778)","materialSample","present","2009-06-07_CM1200_OTMS_63","2009-06-07_CM1200_OTMS"
-"64","Lampanyctus crocodilus","urn:lsid:marinespecies.org:taxname:126612","Lampanyctus crocodilus (Risso, 1810)","materialSample","present","2009-06-07_CM1200_OTMS_64","2009-06-07_CM1200_OTMS"
-"65","Lepidion lepidion","urn:lsid:marinespecies.org:taxname:126495","Lepidion lepidion (Risso, 1810)","materialSample","present","2009-06-07_CM1200_OTMS_65","2009-06-07_CM1200_OTMS"
-"66","Myctophidae sp.","urn:lsid:marinespecies.org:taxname:125498","Myctophidae Gill, 1893","materialSample","present","2009-06-07_CM1200_OTMS_66","2009-06-07_CM1200_OTMS"
-"67","Plesionika acanthonotus","urn:lsid:marinespecies.org:taxname:107654","Plesionika acanthonotus (Smith, 1882)","materialSample","present","2009-06-07_CM1200_OTMS_67","2009-06-07_CM1200_OTMS"
-"68","Pyrosoma atlanticum","urn:lsid:marinespecies.org:taxname:137250","Pyrosoma atlanticum Péron, 1804","materialSample","present","2009-06-07_CM1200_OTMS_68","2009-06-07_CM1200_OTMS"
-"69","Sergestes arcticus","urn:lsid:marinespecies.org:taxname:107125","Sergestes arcticus Krøyer, 1855","materialSample","present","2009-06-07_CM1200_OTMS_69","2009-06-07_CM1200_OTMS"
-"70","Sergia robusta","urn:lsid:marinespecies.org:taxname:107136","Sergia robusta (Smith, 1882)","materialSample","present","2009-06-07_CM1200_OTMS_70","2009-06-07_CM1200_OTMS"
-"71","Sipunculus norvegicus","urn:lsid:marinespecies.org:taxname:424077","Sipunculus norvegicus Danielssen, 1869","materialSample","present","2009-06-07_CM1200_OTMS_71","2009-06-07_CM1200_OTMS"
-"72","Acantephyra pelagica","urn:lsid:marinespecies.org:taxname:107581","Acanthephyra pelagica (Risso, 1816)","materialSample","present","2009-05-30_WM1200_AD_72","2009-05-30_WM1200_AD"
-"73","Aristeus antennatus","urn:lsid:marinespecies.org:taxname:107083","Aristeus antennatus (Risso, 1816)","materialSample","present","2009-05-30_WM1200_AD_73","2009-05-30_WM1200_AD"
-"74","Bathypterois mediterraneus","urn:lsid:marinespecies.org:taxname:299942","Bathypterois mediterraneus Bauchot, 1962","materialSample","present","2009-05-30_WM1200_AD_74","2009-05-30_WM1200_AD"
-"75","Coelorinchus mediterraneus","urn:lsid:marinespecies.org:taxname:280313","Coelorinchus mediterraneus Iwamoto & Ungaro, 2002","materialSample","present","2009-05-30_WM1200_AD_75","2009-05-30_WM1200_AD"
-"76","Geryon longipes","urn:lsid:marinespecies.org:taxname:107373","Geryon longipes A. Milne-Edwards, 1882","materialSample","present","2009-05-30_WM1200_AD_76","2009-05-30_WM1200_AD"
-"77","Gryphus vitreus","urn:lsid:marinespecies.org:taxname:104068","Gryphus vitreus (Born, 1778)","materialSample","present","2009-05-30_WM1200_AD_77","2009-05-30_WM1200_AD"
-"78","Lampanyctus crocodilus","urn:lsid:marinespecies.org:taxname:126612","Lampanyctus crocodilus (Risso, 1810)","materialSample","present","2009-05-30_WM1200_AD_78","2009-05-30_WM1200_AD"
-"79","Munida tenuimana","urn:lsid:marinespecies.org:taxname:107166","Munida tenuimana G.O. Sars, 1872","materialSample","present","2009-05-30_WM1200_AD_79","2009-05-30_WM1200_AD"
-"80","Pasiphaea multidentata","urn:lsid:marinespecies.org:taxname:107676","Pasiphaea multidentata Esmark, 1866","materialSample","present","2009-05-30_WM1200_AD_80","2009-05-30_WM1200_AD"
-"81","Pelagia noctiluca","urn:lsid:marinespecies.org:taxname:135305","Pelagia noctiluca (Forsskål, 1775)","materialSample","present","2009-05-30_WM1200_AD_81","2009-05-30_WM1200_AD"
-"82","Plesionika acanthonotus","urn:lsid:marinespecies.org:taxname:107654","Plesionika acanthonotus (Smith, 1882)","materialSample","present","2009-05-30_WM1200_AD_82","2009-05-30_WM1200_AD"
-"83","Sergestes arcticus","urn:lsid:marinespecies.org:taxname:107125","Sergestes arcticus Krøyer, 1855","materialSample","present","2009-05-30_WM1200_AD_83","2009-05-30_WM1200_AD"
-"84","Acantephyra eximia","urn:lsid:marinespecies.org:taxname:564909","Acanthephyra eximia Smith, 1884","materialSample","present","2009-05-31_WM1200_AD_84","2009-05-31_WM1200_AD"
-"85","Argyropelecus hemigymnus","urn:lsid:marinespecies.org:taxname:127309","Argyropelecus hemigymnus Cocco, 1829","materialSample","present","2009-05-31_WM1200_AD_85","2009-05-31_WM1200_AD"
-"86","Aristeus antennatus","urn:lsid:marinespecies.org:taxname:107083","Aristeus antennatus (Risso, 1816)","materialSample","present","2009-05-31_WM1200_AD_86","2009-05-31_WM1200_AD"
-"87","Galeus melastomus","urn:lsid:marinespecies.org:taxname:105812","Galeus melastomus Rafinesque, 1810","materialSample","present","2009-05-31_WM1200_AD_87","2009-05-31_WM1200_AD"
-"88","Geryon longipes","urn:lsid:marinespecies.org:taxname:107373","Geryon longipes A. Milne-Edwards, 1882","materialSample","present","2009-05-31_WM1200_AD_88","2009-05-31_WM1200_AD"
-"89","Gryphus vitreus","urn:lsid:marinespecies.org:taxname:104068","Gryphus vitreus (Born, 1778)","materialSample","present","2009-05-31_WM1200_AD_89","2009-05-31_WM1200_AD"
-"90","Myctophidae sp.","urn:lsid:marinespecies.org:taxname:125498","Myctophidae Gill, 1893","materialSample","present","2009-05-31_WM1200_AD_90","2009-05-31_WM1200_AD"
-"91","Pelagia noctiluca","urn:lsid:marinespecies.org:taxname:135305","Pelagia noctiluca (Forsskål, 1775)","materialSample","present","2009-05-31_WM1200_AD_91","2009-05-31_WM1200_AD"
-"92","Plesionika acanthonotus","urn:lsid:marinespecies.org:taxname:107654","Plesionika acanthonotus (Smith, 1882)","materialSample","present","2009-05-31_WM1200_AD_92","2009-05-31_WM1200_AD"
-"93","Stereomastis sculpta","urn:lsid:marinespecies.org:taxname:107700","Stereomastis sculpta (Smith, 1880)","materialSample","present","2009-05-31_WM1200_AD_93","2009-05-31_WM1200_AD"
-"94","Acantephyra eximia","urn:lsid:marinespecies.org:taxname:564909","Acanthephyra eximia Smith, 1884","materialSample","present","2009-06-01_WM2000_AD_94","2009-06-01_WM2000_AD"
-"95","Argyropelecus hemigymnus","urn:lsid:marinespecies.org:taxname:127309","Argyropelecus hemigymnus Cocco, 1829","materialSample","present","2009-06-01_WM2000_AD_95","2009-06-01_WM2000_AD"
-"96","Aristeus antennatus","urn:lsid:marinespecies.org:taxname:107083","Aristeus antennatus (Risso, 1816)","materialSample","present","2009-06-01_WM2000_AD_96","2009-06-01_WM2000_AD"
-"97","Bathypterois mediterraneus","urn:lsid:marinespecies.org:taxname:299942","Bathypterois mediterraneus Bauchot, 1962","materialSample","present","2009-06-01_WM2000_AD_97","2009-06-01_WM2000_AD"
-"98","Chrisaora hysoscella","urn:lsid:marinespecies.org:taxname:135304","Chrysaora hysoscella (Linnaeus, 1767)","materialSample","present","2009-06-01_WM2000_AD_98","2009-06-01_WM2000_AD"
-"99","Gennadas elegans","urn:lsid:marinespecies.org:taxname:107095","Gennadas elegans (Smith, 1882)","materialSample","present","2009-06-01_WM2000_AD_99","2009-06-01_WM2000_AD"
-"100","Lepidion lepidion","urn:lsid:marinespecies.org:taxname:126495","Lepidion lepidion (Risso, 1810)","materialSample","present","2009-06-01_WM2000_AD_100","2009-06-01_WM2000_AD"
-"101","Pelagia noctiluca","urn:lsid:marinespecies.org:taxname:135305","Pelagia noctiluca (Forsskål, 1775)","materialSample","present","2009-06-01_WM2000_AD_101","2009-06-01_WM2000_AD"
-"102","Stereomastis sculpta","urn:lsid:marinespecies.org:taxname:107700","Stereomastis sculpta (Smith, 1880)","materialSample","present","2009-06-01_WM2000_AD_102","2009-06-01_WM2000_AD"
-"103","Acantephyra eximia","urn:lsid:marinespecies.org:taxname:564909","Acanthephyra eximia Smith, 1884","materialSample","present","2009-06-04_WM3000_AD_103","2009-06-04_WM3000_AD"
-"104","Argyropelecus hemigymnus","urn:lsid:marinespecies.org:taxname:127309","Argyropelecus hemigymnus Cocco, 1829","materialSample","present","2009-06-04_WM3000_AD_104","2009-06-04_WM3000_AD"
-"105","Aristeus antennatus","urn:lsid:marinespecies.org:taxname:107083","Aristeus antennatus (Risso, 1816)","materialSample","present","2009-06-04_WM3000_AD_105","2009-06-04_WM3000_AD"
-"106","Bathypterois mediterraneus","urn:lsid:marinespecies.org:taxname:299942","Bathypterois mediterraneus Bauchot, 1962","materialSample","present","2009-06-04_WM3000_AD_106","2009-06-04_WM3000_AD"
-"107","Lampanyctus crocodilus","urn:lsid:marinespecies.org:taxname:126612","Lampanyctus crocodilus (Risso, 1810)","materialSample","present","2009-06-04_WM3000_AD_107","2009-06-04_WM3000_AD"
-"108","Pasiphaea multidentata","urn:lsid:marinespecies.org:taxname:107676","Pasiphaea multidentata Esmark, 1866","materialSample","present","2009-06-04_WM3000_AD_108","2009-06-04_WM3000_AD"
-"109","Stereomastis sculpta","urn:lsid:marinespecies.org:taxname:107700","Stereomastis sculpta (Smith, 1880)","materialSample","present","2009-06-04_WM3000_AD_109","2009-06-04_WM3000_AD"
+ï»¿occurrenceID,eventID,scientificName,basisOfRecord,occurrenceStatus,kingdom,class,decimalLatitude,decimalLongitude,declared_environment,test_case,expected_future_flag
+OCC_001,ST_001,Sardina pilchardus,HumanObservation,present,Animalia,Actinopterygii,41.20,-8.95,marine,valid_control,
+OCC_002,ST_002,Engraulis encrasicolus,HumanObservation,present,Animalia,Cephalopoda,41.22,-8.97,marine,valid_control,
+OCC_003,ST_003,Octopus vulgaris,HumanObservation,present,Animalia,Malacostraca,38.55,-9.50,marine,valid_control,
+OCC_004,ST_004,Carcinus maenas,HumanObservation,present,Animalia,Mammalia,-23.80,-45.80,marine,valid_control,
+OCC_005,ST_005,Delphinus delphis,HumanObservation,present,Animalia,Actinopterygii,52.10,2.00,marine,valid_control,
+OCC_006,ST_001,Sardina pilchardus,HumanObservation,present,Animalia,Cephalopoda,41.20,-8.95,marine,valid_control,
+OCC_007,ST_002,Engraulis encrasicolus,HumanObservation,present,Animalia,Malacostraca,41.22,-8.97,marine,valid_control,
+OCC_008,ST_003,Octopus vulgaris,HumanObservation,present,Animalia,Mammalia,38.55,-9.50,marine,valid_control,
+OCC_009,ST_004,Carcinus maenas,HumanObservation,present,Animalia,Actinopterygii,-23.80,-45.80,marine,valid_control,
+OCC_010,ST_005,Delphinus delphis,HumanObservation,present,Animalia,Cephalopoda,52.10,2.00,marine,valid_control,
+OCC_011,ST_001,Sardina pilchardus,HumanObservation,present,Animalia,Malacostraca,91,-8.95,marine,lat_gt_90,coords_out_of_range
+OCC_012,ST_002,Engraulis encrasicolus,HumanObservation,present,Animalia,Mammalia,-91,-8.95,marine,lat_lt_-90,coords_out_of_range
+OCC_013,ST_003,Octopus vulgaris,HumanObservation,present,Animalia,Actinopterygii,41.20,181,marine,lon_gt_180,coords_out_of_range
+OCC_014,ST_004,Carcinus maenas,HumanObservation,present,Animalia,Cephalopoda,41.20,-181,marine,lon_lt_-180,coords_out_of_range
+OCC_015,ST_005,Delphinus delphis,HumanObservation,present,Animalia,Malacostraca,abc,-8.95,marine,lat_text,non_numeric_coord
+OCC_016,ST_001,Sardina pilchardus,HumanObservation,present,Animalia,Mammalia,41.20,west,marine,lon_text,non_numeric_coord
+OCC_017,ST_002,Engraulis encrasicolus,HumanObservation,present,Animalia,Actinopterygii,,,marine,blank_coords,missing_coords
+OCC_018,ST_003,Octopus vulgaris,HumanObservation,present,Animalia,Cephalopoda,0,0,marine,null_island,coords_zero_zero
+OCC_019,ST_004,Carcinus maenas,HumanObservation,present,Animalia,Malacostraca,-8.61,41.15,marine,swapped_suspected_1,coords_swapped_suspected
+OCC_020,ST_005,Delphinus delphis,HumanObservation,present,Animalia,Mammalia,-46.63,-23.55,marine,swapped_suspected_2,coords_swapped_suspected
+OCC_021,ST_007,Sardina pilchardus,HumanObservation,present,Animalia,Actinopterygii,41.1496,-8.6109,marine,marine_on_land_porto,marine_point_on_land
+OCC_022,ST_008,Engraulis encrasicolus,HumanObservation,present,Animalia,Cephalopoda,38.7223,-9.1393,marine,marine_on_land_lisbon,marine_point_on_land
+OCC_023,ST_008,Octopus vulgaris,HumanObservation,present,Animalia,Malacostraca,-23.5505,-46.6333,marine,marine_on_land_saopaulo,marine_point_on_land
+OCC_024,ST_008,Carcinus maenas,HumanObservation,present,Animalia,Mammalia,40.4168,-3.7038,marine,marine_on_land_madrid,marine_point_on_land
+OCC_025,ST_008,Delphinus delphis,HumanObservation,present,Animalia,Actinopterygii,48.8566,2.3522,marine,marine_on_land_paris,marine_point_on_land
+OCC_026,ST_001,Sardina pilchardus,HumanObservation,present,Animalia,Cephalopoda,41.20,-8.95,terrestrial,terrestrial_at_sea_porto,terrestrial_point_at_sea
+OCC_027,ST_003,Engraulis encrasicolus,HumanObservation,present,Animalia,Malacostraca,38.55,-9.50,terrestrial,terrestrial_at_sea_lisbon,terrestrial_point_at_sea
+OCC_028,ST_004,Octopus vulgaris,HumanObservation,present,Animalia,Mammalia,-23.80,-45.80,terrestrial,terrestrial_at_sea_brazil,terrestrial_point_at_sea
+OCC_029,ST_005,Carcinus maenas,HumanObservation,present,Animalia,Actinopterygii,52.10,2.00,terrestrial,terrestrial_at_sea_nsea,terrestrial_point_at_sea
+OCC_030,ST_006,Delphinus delphis,HumanObservation,present,Animalia,Cephalopoda,35.00,140.00,terrestrial,terrestrial_at_sea_pacific,terrestrial_point_at_sea
+OCC_031,ST_999,Sardina pilchardus,HumanObservation,present,Animalia,Malacostraca,41.20,-8.95,marine,missing_event_link_1,eventID_no_corresponding_event
+OCC_032,NO_EVENT,Engraulis encrasicolus,HumanObservation,present,Animalia,Mammalia,41.22,-8.97,marine,missing_event_link_2,eventID_no_corresponding_event
+OCC_033,ST_003,,HumanObservation,present,Animalia,Actinopterygii,41.20,-8.95,marine,blank_scientificName_1,required_field_empty_value
+OCC_034,ST_004,,HumanObservation,present,Animalia,Cephalopoda,41.1496,-8.6109,marine,blank_scientificName_2,required_field_empty_value
+OCC_035_DUP,ST_005,Delphinus delphis,HumanObservation,present,Animalia,Malacostraca,41.20,-8.95,marine,duplicate_occurrenceID_a,id_duplicated
+OCC_035_DUP,ST_001,Sardina pilchardus,HumanObservation,present,Animalia,Mammalia,41.22,-8.97,marine,duplicate_occurrenceID_b,id_duplicated
+OCC_037,ST_010,Engraulis encrasicolus,HumanObservation,present,Animalia,Actinopterygii,41.1500,-8.7000,marine,coastal_buffer_marine,coastal_ambiguous
+OCC_038,ST_010,Octopus vulgaris,HumanObservation,present,Animalia,Cephalopoda,41.1500,-8.7000,terrestrial,coastal_buffer_terr,coastal_ambiguous
+OCC_039,ST_004,Carcinus maenas,HumanObservation,present,Animalia,Malacostraca,"41,1496",-8.6109,marine,comma_decimal_lat,non_numeric_coord_if_not_parsed
+OCC_040,ST_005,Delphinus delphis,HumanObservation,present,Animalia,Mammalia,41.1496,"-8,6109",marine,comma_decimal_lon,non_numeric_coord_if_not_parsed
+OCC_041,ST_001,,HumanObservation,present,Animalia,Actinopterygii,,,marine,occ_blank_event_valid_1,not_shown_on_map_with_current_code
+OCC_042,ST_002,,HumanObservation,present,Animalia,Cephalopoda,,,marine,occ_blank_event_valid_2,not_shown_on_map_with_current_code
+OCC_043,ST_003,,HumanObservation,present,Animalia,Malacostraca,,,marine,occ_blank_event_valid_3,not_shown_on_map_with_current_code
+OCC_044,ST_010,Carcinus maenas,HumanObservation,present,Animalia,Mammalia,95,-8.90,marine,out_of_range_but_numeric,coords_out_of_range
+OCC_045,ST_009,Delphinus delphis,HumanObservation,present,Animalia,Actinopterygii,41.18,-8.90,marine,event_issue_parent_bad,event_parentEventID_problem
+OCC_046,ST_008,Sardina pilchardus,HumanObservation,present,Animalia,Cephalopoda,41.10,-8.85,marine,event_issue_date_bad,event_eventDate_problem
+OCC_047,ST_011,Engraulis encrasicolus,HumanObservation,present,Animalia,Malacostraca,41.20,-8.95,marine,valid_control_2,
+OCC_048,ST_012,Octopus vulgaris,HumanObservation,present,Animalia,Mammalia,41.25,-8.99,marine,valid_control_3,
+OCC_049,ST_001,,HumanObservation,present,Animalia,Actinopterygii,41.20,-8.95,marine,blank_scientificName_3,required_field_empty_value
+OCC_050,ST_002,Delphinus delphis,HumanObservation,present,Animalia,Cephalopoda,0,0,terrestrial,null_island_terrestrial,coords_zero_zero
