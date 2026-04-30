@@ -87,13 +87,25 @@ mod_about_ui <- function(id) {
             ),
             shiny::p(
               class = "home-note",
-              style = "margin-bottom:0; word-break: break-word;",
+              style = "margin-bottom:0.5rem; word-break: break-word;",
               shiny::tags$a(
                 href = "http://bio-shiny.ua.pt:3838/aurora",
                 target = "_blank",
                 rel = "noopener noreferrer",
                 "http://bio-shiny.ua.pt:3838/aurora"
               )
+            ),
+            shiny::p(
+              class = "home-note",
+              style = "margin-bottom:0;",
+              shiny::strong("License: "),
+              shiny::tags$a(
+                href = "https://creativecommons.org/licenses/by/4.0/",
+                target = "_blank",
+                rel = "noopener noreferrer",
+                "CC-BY 4.0"
+              ),
+              shiny::span(" — This work may be shared and adapted, including for commercial purposes, provided appropriate credit is given.")
             )
           )
         ),
