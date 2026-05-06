@@ -83,7 +83,7 @@ mod_about_ui <- function(id) {
           bslib::card_body(
             shiny::p(
               class = "home-note",
-              "Magnenti, Á. S., Araújo, S. M., … Matos, F. L. (2026). Aurora Shiny App: Streamlining biodiversity data sharing (Version 1.0)."
+              "Magnenti, Á. S., Araújo, S. M., Teixeira H., Hilário A., Ramalho S., Ramirez-Llodra E., Matos, F. L. (2026). Aurora Shiny App: Streamlining biodiversity data sharing (Version 1.0)."
             ),
             shiny::p(
               class = "home-note",
@@ -168,7 +168,7 @@ mod_about_ui <- function(id) {
 
           shiny::p(
             class = "home-note",
-            "AURORA project is funded by the Flanders Marine Institute (VLIZ) through the DTO-BioFlow project funded by the European Union."
+            "AURORA project was funded by the European Union under the Horizon Europe Programme with Grant Agreement No. 101112823 (DTO-BioFlow) through an FSTP call."
           ),
 
           shiny::div(
