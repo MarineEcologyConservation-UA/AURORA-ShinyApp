@@ -10,7 +10,7 @@ Authors@R: c(
     ),
     person(
         "Fábio", "L. Matos",
-        role = "aut",
+        role = c("aut", "cre"),
         email = "fmatos@ua.pt"
     )
 )
