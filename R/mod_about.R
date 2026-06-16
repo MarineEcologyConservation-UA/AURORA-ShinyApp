@@ -89,10 +89,10 @@ mod_about_ui <- function(id) {
               class = "home-note",
               style = "margin-bottom:0.5rem; word-break: break-word;",
               shiny::tags$a(
-                href = "http://bio-shiny.ua.pt:3838/aurora",
+                href = "http://bio-shiny.ua.pt/aurora",
                 target = "_blank",
                 rel = "noopener noreferrer",
-                "http://bio-shiny.ua.pt:3838/aurora"
+                "http://bio-shiny.ua.pt/aurora"
               )
             ),
             shiny::p(

@@ -1,8 +1,20 @@
 server <- function(input, output, session) {
 
+  # Define example_map with proper validation
   example_map <- list(
-    "Example (dataset_example.csv)" = system.file("extdata", "dataset_example.csv", package = "shinyRv02")
+    "Example (dataset_example.csv)" = system.file("extdata", "dataset_example.csv", package = "AURORAShinyApp"),
+    "Test Formats Geo (test_formats_geo.csv)" = system.file("extdata", "test_formats_geo.csv", package = "AURORAShinyApp"),
+    "Occurrence (occurrence.csv)" = system.file("extdata", "occurrence.csv", package = "AURORAShinyApp"),
+    "Event (event.csv)" = system.file("extdata", "event.csv", package = "AURORAShinyApp"),
+    "Density Data (aurora_good_quality_data_densitydata_id_corrected.xlsx)" = system.file("extdata", "aurora_good_quality_data_densitydata_id_corrected.xlsx", package = "AURORAShinyApp")
   )
+
+  # Filter out any that don't exist
+  example_map <- Filter(function(x) x != "" && file.exists(x), example_map)
+
+  if (length(example_map) == 0) {
+    warning("No example datasets found. Users will need to upload their own data.")
+  }
 
   `%||%` <- function(x, y) if (is.null(x)) y else x
 
@@ -16,6 +28,11 @@ server <- function(input, output, session) {
     isTRUE(out)
   }
 
+  # --- Initialize Homepage Module with Visitor Tracking ---
+  # IMPORTANT: Use "home" to match the ID in ui.R
+  mod_homepage_server("home", session = session)
+
+  # Initialize ingest module with example_map
   ingest <- mod_ingest_server("ingest", example_map = example_map)
 
   dwc_map <- mod_dwc_mapping_server(
@@ -34,13 +51,38 @@ server <- function(input, output, session) {
     df_in = id_cleaning$df_out
   )
 
-  # --- Build DwC-A -----------------------------------------------------------
-  dwc_terms_path <- system.file("extdata", "dwc_terms.csv", package = "shinyRv02")
-  dwc_terms <- read.csv(
-    dwc_terms_path,
-    stringsAsFactors = FALSE,
-    fileEncoding = "UTF-8"
-  )
+  # --- Build DwC-A with proper error handling ---
+  dwc_terms <- NULL
+  dwc_terms_path <- system.file("extdata", "dwc_terms.csv", package = "AURORAShinyApp")
+  
+  if (dwc_terms_path != "" && file.exists(dwc_terms_path)) {
+    dwc_terms <- tryCatch({
+      read.csv(
+        dwc_terms_path,
+        stringsAsFactors = FALSE,
+        fileEncoding = "UTF-8"
+      )
+    }, error = function(e) {
+      warning("Failed to load dwc_terms.csv: ", conditionMessage(e))
+      NULL
+    })
+  } else {
+    warning("dwc_terms.csv file not found in package extdata directory.")
+  }
+
+  # Check if dwc_terms was loaded successfully
+  if (is.null(dwc_terms) || nrow(dwc_terms) == 0) {
+    shiny::showNotification(
+      "Warning: Darwin Core terms file could not be loaded. Some functionality may be limited.",
+      type = "warning",
+      duration = 10
+    )
+    # Create a minimal placeholder dwc_terms data frame
+    dwc_terms <- data.frame(
+      term = character(),
+      stringsAsFactors = FALSE
+    )
+  }
 
   dwca <- mod_build_dwca_server(
     "dwca",

@@ -36,5 +36,5 @@ apply_pivot_longer(
 list(data=..., dropped_na=..., dropped_zero=..., meta=...)
 }
 \description{
-Pure helper (no Shiny). Intended to be called by modules.
+Intended to be called by modules.
 }

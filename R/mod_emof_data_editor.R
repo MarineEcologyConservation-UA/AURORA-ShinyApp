@@ -277,6 +277,20 @@ mod_emof_data_editor_ui <- function(id) {
       width: 100%;
       margin-bottom: 0;
     }
+    
+    /* Layout Alignment Fix: Force equal table columns and allow cell spacing */
+    ", root_sel, " table.dataTable {
+      table-layout: fixed !important;
+      width: 100% !important;
+    }
+    
+    ", root_sel, " table.dataTable td, 
+    ", root_sel, " table.dataTable th {
+      text-overflow: ellipsis;
+      overflow: hidden;
+      white-space: nowrap;
+      padding: 8px 10px !important;
+    }
   ")
 
   shiny::tagList(
@@ -610,10 +624,12 @@ mod_emof_data_editor_server <- function(id, emof_in) {
         options = list(
           scrollX = TRUE,
           pageLength = 15,
-          autoWidth = TRUE,
+          autoWidth = FALSE, # FIX: Turn off fluid column shrinking
           ordering = FALSE,
           columnDefs = list(
-            list(visible = FALSE, targets = hide_idx)
+            list(visible = FALSE, targets = hide_idx),
+            # FIX: Force explicit class assignment to ensure empty column layout integrity
+            list(className = "dt-left", targets = "_all")
           )
         )
       )

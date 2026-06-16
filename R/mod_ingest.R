@@ -21,7 +21,7 @@ mod_ingest_ui <- function(id) {
         ns("source"),
         "Source",
         choices = c("Upload file" = "upload", "Example dataset" = "example"),
-        selected = "example"
+        selected = "upload"
       ),
 
       shiny::conditionalPanel(
@@ -295,19 +295,100 @@ mod_ingest_server <- function(id, example_map) {
       )
     })
 
+    # --------------------------------------------------
+    # GET PATH REACTIVE
+    # --------------------------------------------------
     get_path <- shiny::reactive({
       if (input$source == "upload") {
+        shiny::req(input$file)
         shiny::req(input$file$datapath)
+        
+        # Validate file path exists
+        if (!file.exists(input$file$datapath)) {
+          shiny::showNotification(
+            "Uploaded file not found. Please try uploading again.",
+            type = "error",
+            duration = 10
+          )
+          return(NULL)
+        }
+        
         list(path = input$file$datapath, label = input$file$name)
       } else {
         shiny::req(input$example_pick)
-        list(path = example_map[[input$example_pick]], label = input$example_pick)
+        
+        # Validate example_map is provided and not empty
+        if (is.null(example_map) || length(example_map) == 0) {
+          shiny::showNotification(
+            "No example datasets are configured. Please contact the administrator.",
+            type = "error",
+            duration = 10
+          )
+          return(NULL)
+        }
+        
+        # Check if selected example exists in map
+        if (!(input$example_pick %in% names(example_map))) {
+          shiny::showNotification(
+            "Selected example dataset not found in the example map.",
+            type = "error",
+            duration = 10
+          )
+          return(NULL)
+        }
+        
+        example_path <- example_map[[input$example_pick]]
+        
+        # Validate example file path exists
+        if (is.null(example_path) || is.na(example_path) || example_path == "") {
+          shiny::showNotification(
+            paste("Example dataset path is invalid:", input$example_pick),
+            type = "error",
+            duration = 10
+          )
+          return(NULL)
+        }
+        
+        if (!file.exists(example_path)) {
+          shiny::showNotification(
+            paste("Example dataset file not found:", example_path),
+            type = "error",
+            duration = 10
+          )
+          return(NULL)
+        }
+        
+        list(
+          path = example_path, 
+          label = input$example_pick
+        )
       }
     })
 
+    # --------------------------------------------------
+    # LOAD DATA
+    # --------------------------------------------------
     shiny::observeEvent(input$load, {
+      # Validate path first
       p <- get_path()
+      
+      if (is.null(p)) {
+        rv$raw <- NULL
+        rv$tidy <- NULL
+        rv$src_label <- NULL
+        rv$encoding_used <- NULL
+        rv$ingest_complete <- FALSE
+        rv$dropped_log <- .init_drop_log()
 
+        pv$baseline <- NULL
+        pv$data <- NULL
+        pv$history <- list()
+        pv$history_labels <- character()
+        pv$is_pivoted <- FALSE
+        return()
+      }
+
+      # Read the file
       df <- tryCatch({
         read_any_table(
           path = p$path,
@@ -324,7 +405,12 @@ mod_ingest_server <- function(id, example_map) {
         NULL
       })
 
-      if (is.null(df)) {
+      if (is.null(df) || nrow(df) == 0) {
+        shiny::showNotification(
+          "The file is empty or could not be read properly.",
+          type = "error",
+          duration = 10
+        )
         rv$raw <- NULL
         rv$tidy <- NULL
         rv$src_label <- p$label
@@ -368,14 +454,23 @@ mod_ingest_server <- function(id, example_map) {
       pv$history <- list()
       pv$history_labels <- character()
       pv$is_pivoted <- FALSE
+
+      shiny::showNotification(
+        paste("Dataset loaded successfully:", p$label),
+        type = "message",
+        duration = 4
+      )
     })
 
+    # --------------------------------------------------
+    # COMPLETE INGEST
+    # --------------------------------------------------
     shiny::observeEvent(input$complete_ingest, {
       shiny::req(pv$data)
 
-      if (nrow(pv$data) == 0) {
+      if (is.null(pv$data) || nrow(pv$data) == 0) {
         shiny::showNotification(
-          "The current dataset is empty.",
+          "The current dataset is empty. Please load a file first.",
           type = "error",
           duration = 4
         )
@@ -400,9 +495,12 @@ mod_ingest_server <- function(id, example_map) {
       )
     })
 
+    # --------------------------------------------------
+    # LOAD INFO OUTPUT
+    # --------------------------------------------------
     output$load_info <- shiny::renderText({
       if (is.null(rv$raw)) {
-        return("No dataset loaded yet.")
+        return("No dataset loaded yet. Please load or upload a file.")
       }
 
       current_rows <- if (is.null(pv$data)) 0 else nrow(pv$data)

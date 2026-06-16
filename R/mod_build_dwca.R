@@ -87,6 +87,16 @@ mod_build_dwca_ui <- function(id) {
 
         .dwca-dt-wrap {
           padding-bottom: 8px;
+          min-height: 400px;
+          overflow: hidden;
+        }
+
+        .dwca-dt-wrap .dataTables_wrapper {
+          min-height: 400px;
+        }
+
+        .dwca-dt-wrap table.dataTable {
+          margin-bottom: 0;
         }
 
         .dwca-qc-pre {
@@ -104,6 +114,23 @@ mod_build_dwca_ui <- function(id) {
 
         .dwca-preview-card .tab-content {
           padding-top: 0.5rem;
+          min-height: 450px;
+          display: flex;
+          flex-direction: column;
+        }
+
+        .dwca-preview-card .tab-pane {
+          display: none;
+          flex: 1;
+        }
+
+        .dwca-preview-card .tab-pane.active {
+          display: flex;
+          flex-direction: column;
+        }
+
+        .dwca-preview-card .tab-pane.active .dwca-dt-wrap {
+          flex: 1;
         }
 
         .dwca-subgrid {
@@ -210,15 +237,6 @@ mod_build_dwca_ui <- function(id) {
           margin-bottom: 0;
         }
 
-        .dwca-resource-type-wrap .radio {
-          margin-top: 0;
-          margin-bottom: 0.35rem;
-        }
-
-        .dwca-resource-type-wrap .radio:last-child {
-          margin-bottom: 0;
-        }
-
         .dwca-stepper {
           display: flex;
           gap: 0.65rem;
@@ -291,6 +309,28 @@ mod_build_dwca_ui <- function(id) {
       "))
     ),
 
+    shiny::tags$script(shiny::HTML("
+      $(document).ready(function() {
+        $(document).on('click', '.dwca-preview-card [data-bs-toggle=\"tab\"]', function(e) {
+          e.preventDefault();
+          e.stopPropagation();
+          
+          var target = $(this).attr('data-bs-target') || $(this).attr('href');
+          if (target && target !== '#') {
+            $('.dwca-preview-card .tab-pane').removeClass('active show');
+            $('.dwca-preview-card [data-bs-toggle=\"tab\"]').removeClass('active');
+            
+            $(target).addClass('active show');
+            $(this).addClass('active').attr('aria-selected', 'true');
+            
+            setTimeout(function() {
+              $.fn.dataTable.tables({ visible: true, api: true }).columns.adjust();
+            }, 100);
+          }
+        });
+      });
+    ")),
+
     shiny::div(
       class = "dwca-page",
 
@@ -307,7 +347,21 @@ mod_build_dwca_ui <- function(id) {
         class = "dwca-top-card mb-4",
         bslib::card_header("Build settings"),
         bslib::card_body(
-          shiny::uiOutput(ns("build_info_ui"))
+          shiny::selectInput(
+            inputId = ns("format_choice"),
+            label = "Select dataset format",
+            choices = c(
+              "Sampling event (Event core)" = "sampling_event",
+              "Occurrence (Occurrence core)" = "occurrence_core"
+            ),
+            selected = "sampling_event",
+            width = "100%"
+          ),
+
+          shiny::tags$hr(),
+
+          shiny::uiOutput(ns("format_guide_text")),
+          shiny::uiOutput(ns("build_stepper_ui"))
         )
       ),
 
@@ -498,7 +552,7 @@ mod_build_dwca_server <- function(id, df_in, dwc_terms, target_database_in, pre_
     })
 
     resource_type_rx <- shiny::reactive({
-      normalize_resource_type(input$resource_type)
+      normalize_resource_type(input$format_choice)
     })
 
     resource_config <- shiny::reactive({
@@ -860,6 +914,95 @@ mod_build_dwca_server <- function(id, df_in, dwc_terms, target_database_in, pre_
       )
     }
 
+    output$format_guide_text <- shiny::renderUI({
+      sel <- input$format_choice %||% "sampling_event"
+      sel <- normalize_resource_type(sel)
+
+      repo_nm <- repo_col()
+      cfg <- resource_config()
+
+      manual_link <- shiny::tags$a(
+        href = "https://manual.obis.org/formatting.html",
+        target = "_blank",
+        rel = "noopener noreferrer",
+        "https://manual.obis.org/formatting.html"
+      )
+
+      if (identical(sel, "sampling_event")) {
+        guide <- shiny::tagList(
+          shiny::tags$p(
+            "Sampling event (Event core) is recommended when your dataset is organized around sampling efforts (e.g. surveys, deployments, stations) that can contain multiple occurrences or measurements per event. This preserves hierarchical relationships between events and occurrences."
+          ),
+          shiny::tags$ul(
+            shiny::tags$li("Use when you have repeated sampling at defined locations/times or multiple records per sampling unit."),
+            shiny::tags$li("Key fields: ", shiny::tags$code("eventID"), ", ", shiny::tags$code("parentEventID"), ", ", shiny::tags$code("eventDate"), ", ", shiny::tags$code("scientificName")),
+            shiny::tags$li("eMoF is useful to represent measurements or traits associated with events.")
+          )
+        )
+      } else {
+        guide <- shiny::tagList(
+          shiny::tags$p(
+            "Occurrence (Occurrence core) is recommended when your records are independent occurrence observations (e.g. opportunistic observations, single captures, museum specimens) without a defined event hierarchy."
+          ),
+          shiny::tags$ul(
+            shiny::tags$li("Use when each record is a standalone occurrence and there's no repeated sampling structure."),
+            shiny::tags$li("Key fields: ", shiny::tags$code("occurrenceID"), ", ", shiny::tags$code("eventDate"), ", ", shiny::tags$code("decimalLatitude"), ", ", shiny::tags$code("decimalLongitude"), ", ", shiny::tags$code("scientificName")),
+            shiny::tags$li("eMoF can be used for measurement records tied to occurrences.")
+          )
+        )
+      }
+
+      repo_note <- shiny::tags$p(
+        class = "dwca-section-note",
+        paste0(
+          "Repository rules currently applied: ", repo_nm, ". Active architecture: ", cfg$architecture_label,
+          ". Required fields are included automatically and are not shown here. Strongly recommended fields start selected. Recommended and optional fields start unselected."
+        )
+      )
+
+      shiny::tagList(
+        guide,
+        shiny::tags$p(class = "dwca-section-note", "See the OBIS Formatting Manual for examples and repository-specific recommendations: ", manual_link),
+        repo_note
+      )
+    })
+
+    output$build_stepper_ui <- shiny::renderUI({
+      cfg <- resource_config()
+      steps <- cfg$steps
+
+      current_step_safe <- rv$current_step %||% first_step_from_steps(steps)
+      current_idx <- step_index(current_step_safe, steps)
+      if (is.null(current_idx)) current_idx <- 1L
+
+      pill_label <- function(step_name) {
+        if (identical(step_name, "event")) return("Event")
+        if (identical(step_name, "occurrence") && identical(cfg$resource_type, "occurrence_core")) return("Occurrence.Core")
+        if (identical(step_name, "occurrence")) return("Occurrence")
+        if (identical(step_name, "emof")) return("eMoF")
+        step_name
+      }
+
+      pills <- lapply(seq_along(steps), function(i) {
+        st <- steps[[i]]
+        cls <- "dwca-step-pill"
+
+        if (i < current_idx) {
+          cls <- paste(cls, "is-done")
+        }
+        if (i == current_idx) {
+          cls <- paste(cls, "is-active")
+        }
+
+        shiny::tags$div(
+          class = cls,
+          shiny::tags$span(pill_label(st))
+        )
+      })
+
+      shiny::div(class = "dwca-stepper", pills)
+    })
+
     current_step_title <- shiny::reactive({
       cfg <- resource_config()
       steps <- cfg$steps
@@ -889,73 +1032,6 @@ mod_build_dwca_server <- function(id, df_in, dwc_terms, target_database_in, pre_
 
     output$current_step_title_ui <- shiny::renderUI({
       shiny::span(current_step_title())
-    })
-
-    output$build_info_ui <- shiny::renderUI({
-      cfg <- resource_config()
-      steps <- cfg$steps
-
-      current_step_safe <- rv$current_step %||% first_step_from_steps(steps)
-      current_idx <- step_index(current_step_safe, steps)
-
-      if (is.null(current_idx)) {
-        current_idx <- 1L
-      }
-
-      pill_label <- function(step_name) {
-        if (identical(step_name, "event")) return("Event")
-        if (identical(step_name, "occurrence") && identical(cfg$resource_type, "occurrence_core")) return("Occurrence.Core")
-        if (identical(step_name, "occurrence")) return("Occurrence")
-        if (identical(step_name, "emof")) return("eMoF")
-        step_name
-      }
-
-      pills <- lapply(seq_along(steps), function(i) {
-        st <- steps[[i]]
-        cls <- "dwca-step-pill"
-
-        if (i < current_idx) {
-          cls <- paste(cls, "is-done")
-        }
-        if (i == current_idx) {
-          cls <- paste(cls, "is-active")
-        }
-
-        shiny::tags$div(
-          class = cls,
-          shiny::tags$span(pill_label(st))
-        )
-      })
-
-      shiny::tagList(
-        shiny::div(
-          class = "dwca-resource-type-wrap",
-          shiny::radioButtons(
-            session$ns("resource_type"),
-            "Resource type",
-            choices = c(
-              "Sampling event (Event core)" = "sampling_event",
-              "Occurrence (Occurrence core)" = "occurrence_core"
-            ),
-            selected = cfg$resource_type,
-            inline = FALSE
-          )
-        ),
-        shiny::p(
-          class = "dwca-section-note",
-          paste0(
-            "Repository rules currently applied: ",
-            repo_col(),
-            ". Active architecture: ",
-            cfg$architecture_label,
-            ". Required fields are included automatically and are not shown here. Strongly recommended fields start selected. Recommended and optional fields start unselected."
-          )
-        ),
-        shiny::div(
-          class = "dwca-stepper",
-          pills
-        )
-      )
     })
 
     output$selection_warning_ui <- shiny::renderUI({
@@ -1080,7 +1156,7 @@ mod_build_dwca_server <- function(id, df_in, dwc_terms, target_database_in, pre_
       make_emof_panel <- function(title, search_id, terms_output_id) {
         shiny::tags$div(
           shiny::tags$div(class = "dwca-term-group-title", title),
-          shiny::div(
+          shiny::tags$div(
             class = "dwca-help-block",
             "Select the columns that should become eMoF records at this level."
           ),
@@ -1256,13 +1332,13 @@ mod_build_dwca_server <- function(id, df_in, dwc_terms, target_database_in, pre_
       )
     }
 
-    shiny::observeEvent(list(df_in(), target_database_in(), input$resource_type), {
+    shiny::observeEvent(list(df_in(), target_database_in(), input$format_choice), {
       cfg_snapshot <- resource_config()
       clear_built_result()
       set_step_to_first(cfg_snapshot$steps)
     }, ignoreInit = FALSE)
 
-    shiny::observeEvent(list(table_term_specs(), input$resource_type), {
+    shiny::observeEvent(list(table_term_specs(), input$format_choice), {
       specs_snapshot <- table_term_specs()
       cfg_snapshot <- resource_config()
 
@@ -1275,7 +1351,7 @@ mod_build_dwca_server <- function(id, df_in, dwc_terms, target_database_in, pre_
       }
     }, ignoreInit = TRUE)
 
-    shiny::observeEvent(list(emof_candidate_specs(), input$resource_type), {
+    shiny::observeEvent(list(emof_candidate_specs(), input$format_choice), {
       spec_snapshot <- emof_candidate_specs()
       cfg_snapshot <- resource_config()
       reset_emof_checkboxes(spec_snapshot, cfg_snapshot)
@@ -1422,7 +1498,8 @@ mod_build_dwca_server <- function(id, df_in, dwc_terms, target_database_in, pre_
         rownames = FALSE,
         options = list(
           scrollX = TRUE,
-          pageLength = 10
+          pageLength = 10,
+          dom = "ltip"
         )
       )
     }, server = TRUE)
@@ -1438,7 +1515,8 @@ mod_build_dwca_server <- function(id, df_in, dwc_terms, target_database_in, pre_
         rownames = FALSE,
         options = list(
           scrollX = TRUE,
-          pageLength = 10
+          pageLength = 10,
+          dom = "ltip"
         )
       )
     }, server = TRUE)
@@ -1454,7 +1532,8 @@ mod_build_dwca_server <- function(id, df_in, dwc_terms, target_database_in, pre_
         rownames = FALSE,
         options = list(
           scrollX = TRUE,
-          pageLength = 10
+          pageLength = 10,
+          dom = "ltip"
         )
       )
     }, server = TRUE)

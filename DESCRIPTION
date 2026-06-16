@@ -1,19 +1,20 @@
-Package: shinyRv02
+Package: AURORAShinyApp
 Type: Package
-Title: Shiny R v01 (Package-Style Project)
-Version: 0.0.1
-Authors@R: c(
-    person(
-        "Alvaro", "Somensi",
-        role = c("aut", "cre"),
-        email = "alvarosomensi@ua.pt"
-    ),
-    person(
-        "Fábio", "L. Matos",
-        role = c("aut", "cre"),
-        email = "fmatos@ua.pt"
+Title: AURORA Shiny App (Package-Style Project)
+Version: 1.0
+Authors@R:
+    c(
+        person(
+            "Alvaro", "Somensi",
+            role = "aut",
+            email = "alvarosomensi@ua.pt"
+        ),
+        person(
+            "Fábio", "L. Matos",
+            role = c("aut", "cre"),
+            email = "fmatos@ua.pt"
+        )
     )
-)
 Description: Package-style structure for a Shiny app with reusable helper
     functions (I/O + tidying) and Shiny modules.
 License: MIT + file LICENSE
@@ -42,7 +43,17 @@ Imports:
     marmap,
     plotly,
     parsedate,
-    readODS
+    readODS,
+    bsicons,
+    geographiclib,
+    ggplot2,
+    jsonlite,
+    lubridate,
+    RSQLite,
+    stringr,
+    tidyr,
+    tidyselect,
+    shinyjs
 Suggests:
     testthat (>= 3.0.0)
 Config/testthat/edition: 3

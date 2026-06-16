@@ -2,7 +2,7 @@
 
 #' Apply a safe pivot_longer operation (wide -> long)
 #'
-#' Pure helper (no Shiny). Intended to be called by modules.
+#' Intended to be called by modules.
 #'
 #' @param df data.frame
 #' @param id_cols character vector of ID columns to keep

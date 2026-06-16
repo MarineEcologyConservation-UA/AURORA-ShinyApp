@@ -1,14 +1,11 @@
 # =========================================================
 # Taxonomy Match Module (WoRMS / GBIF)
-# - GBIF remains available
 # - WoRMS uses ONLY worrms::wm_records_taxamatch()
 # - GBIF uses ONLY rgbif::name_backbone(verbose = TRUE)
-# - input column configurable (default: scientificName at this stage)
+# - input column configurable (default: scientificName)
 # - normalisedQuery explicit and always created
 # - one lookup row per unique inputName
 # - selectable output columns to keep in final dataset
-# - notes block moved to the top
-# - dropped rows are logged for later QC merge
 # File: R/mod_taxonomy_match.R
 # =========================================================
 
@@ -170,7 +167,7 @@ mod_taxonomy_match_ui <- function(id) {
                 ),
                 shiny::tags$li(
                   shiny::tags$b("Database Authorities"),
-                  " — Marine taxa are validated against the World Register of Marine Species (worrms package, wm_records_taxamatch()). Terrestrial taxa are matched against the GBIF Backbone Taxonomy via the rgbif package."
+                  " — Marine taxa can be validated against the World Register of Marine Species (worrms package, wm_records_taxamatch()). Terrestrial taxa should be matched against the GBIF Backbone Taxonomy via the rgbif package."
                 ),
                 shiny::tags$li(
                   shiny::tags$b("Ambiguity Resolution"),
@@ -206,8 +203,8 @@ mod_taxonomy_match_ui <- function(id) {
                     inputId = ns("tax_db"),
                     label = "Database",
                     choices = c(
-                      "WoRMS (marine)" = "worms",
-                      "GBIF Backbone (terrestrial)" = "gbif"
+                      "WoRMS (marine only)" = "worms",
+                      "GBIF Backbone" = "gbif"
                     ),
                     selected = "worms",
                     inline = FALSE
@@ -370,6 +367,8 @@ mod_taxonomy_match_server <- function(id, df_in) {
       "kingdom",
       "phylum",
       "family",
+      "class",
+      "order",
       "genus",
       "scientificNameAuthorship"
     )
@@ -2272,7 +2271,7 @@ mod_taxonomy_match_server <- function(id, df_in) {
         disp <- data.frame()
       }
 
-      DT::datatable(
+      dt <- DT::datatable(
         disp,
         escape = FALSE,
         rownames = FALSE,
@@ -2292,6 +2291,29 @@ mod_taxonomy_match_server <- function(id, df_in) {
           drawCallback = DT::JS("function() { Shiny.bindAll(this.api().table().node()); }")
         )
       )
+
+      # If we have rows and the status column exists, shade rows by status
+      if (nrow(disp) > 0 && "taxonMatchStatus" %in% names(disp)) {
+        cols_to_style <- names(disp)
+
+        # colours: light red for ambiguous, light green for matched
+        ambiguous_color <- "#fee2e2" # light red/pink
+        matched_color <- "#d1fae5"   # light green
+
+        # apply style for AMBIGUOUS and various MATCHED variants
+        dt <- DT::formatStyle(
+          dt,
+          columns = cols_to_style,
+          valueColumns = "taxonMatchStatus",
+          backgroundColor = DT::styleEqual(
+            c("AMBIGUOUS", "MATCHED", "MATCHED_AUTO", "MATCHED_MANUAL"),
+            c(ambiguous_color, matched_color, matched_color, matched_color)
+          ),
+          target = "row"
+        )
+      }
+
+      dt
     })
 
     output$issues_tbl <- DT::renderDT({

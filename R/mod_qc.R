@@ -1487,15 +1487,15 @@ mod_qc_ui <- function(id) {
       bslib::navset_card_tab(
         id = ns("qc_tabs"),
         selected = "data_overview",
-        title = "Data overview",
+        title = "Data Processing Overview",
 
         bslib::nav_panel(
-          "Data overview",
+          "Data summary",
           value = "data_overview",
 
           shiny::div(
             class = "qc-title",
-            shiny::h3("Data Overview & Summary")
+            shiny::h3("Data Summary")
           ),
 
           shiny::fluidRow(
@@ -1904,7 +1904,7 @@ mod_qc_server <- function(id, event_in, occ_in, emof_in = NULL, pre_issues_in = 
                 radius = 4,
                 stroke = FALSE,
                 fillOpacity = 0.7,
-                color = "#2563eb",
+                color = "#eb2525",
                 group = "Occurrence records",
                 popup = paste0("<b>source:</b> occurrence<br><b>id:</b> ", rec_occ$id)
               )
@@ -1918,7 +1918,7 @@ mod_qc_server <- function(id, event_in, occ_in, emof_in = NULL, pre_issues_in = 
                 radius = 4,
                 stroke = FALSE,
                 fillOpacity = 0.6,
-                color = "#059669",
+                color = "#960c05",
                 group = "Event records",
                 popup = paste0("<b>source:</b> event<br><b>id:</b> ", rec_ev$id)
               )
@@ -2007,6 +2007,7 @@ mod_qc_server <- function(id, event_in, occ_in, emof_in = NULL, pre_issues_in = 
       shiny::span("Records by date (Events)")
     })
 
+    # Replace existing output$overview_date_plot rendering code with this heatmap (year x month)
     output$overview_date_plot <- shiny::renderPlot(
       expr = {
         dc <- qc_res()$overview$date_counts
@@ -2023,48 +2024,83 @@ mod_qc_server <- function(id, event_in, occ_in, emof_in = NULL, pre_issues_in = 
 
         df_dates$date_parsed <- suppressWarnings(as.Date(df_dates$date_str, format = "%Y-%m-%d"))
         df_dates <- df_dates[!is.na(df_dates$date_parsed), , drop = FALSE]
-
         if (nrow(df_dates) == 0) return(NULL)
 
-        plot_data <- data.frame(
-          date = df_dates$date_parsed,
-          count = df_dates$count,
-          stringsAsFactors = FALSE
-        )
+        # Extract year and month
+        df_dates$year <- format(df_dates$date_parsed, "%Y")
+        df_dates$month_num <- as.integer(format(df_dates$date_parsed, "%m"))
+        df_dates$month_label <- factor(month.abb[df_dates$month_num], levels = month.abb)
 
-        ggplot2::ggplot(plot_data, ggplot2::aes(x = date, y = count)) +
-          ggplot2::geom_col(fill = "#5985a7", color = "white", width = 0.8) +
-          ggplot2::scale_x_date(
-            date_labels = "%Y-%m-%d",
-            breaks = scales::pretty_breaks(n = 6),
-            expand = ggplot2::expansion(mult = c(0.05, 0.05))
+        # Aggregate counts by year + month
+        agg <- stats::aggregate(count ~ year + month_num + month_label, data = df_dates, sum)
+
+        # Build full year x month grid so missing months show as zero
+        years <- sort(unique(agg$year))
+        grid <- expand.grid(year = years, month_num = 1:12, stringsAsFactors = FALSE)
+        grid$month_label <- factor(month.abb[grid$month_num], levels = month.abb)
+
+        agg_full <- merge(grid, agg, by = c("year", "month_num", "month_label"), all.x = TRUE, sort = FALSE)
+        agg_full$count[is.na(agg_full$count)] <- 0
+
+        # Show most recent year at top (GitHub-style). Reverse year factor levels.
+        year_levels <- sort(unique(agg_full$year), decreasing = TRUE)
+        agg_full$year <- factor(agg_full$year, levels = year_levels)
+
+        # Choose color ramp similar to GitHub contribution (light gray -> green).
+        low_col <- "#ebedf0"   # light gray
+        high_col <- "#216e39"  # deep green
+
+        # Prepare legend breaks as integers only
+        max_cnt <- max(agg_full$count, na.rm = TRUE)
+        if (is.na(max_cnt) || max_cnt <= 0) {
+          breaks_vec <- c(0L)
+        } else if (max_cnt <= 10) {
+          breaks_vec <- seq.int(0L, as.integer(max_cnt), by = 1L)
+        } else {
+          # use pretty breaks then round to integers and ensure they are within [0, max_cnt]
+          pb <- pretty(0:as.integer(max_cnt), n = 5)
+          pb <- unique(pmax(0L, pmin(as.integer(max_cnt), round(pb))))
+          breaks_vec <- sort(pb)
+          if (length(breaks_vec) == 0) breaks_vec <- c(0L, as.integer(max_cnt))
+        }
+
+        # Create heatmap with square tiles (coord_fixed) and no extra axis expansion
+        p <- ggplot2::ggplot(agg_full, ggplot2::aes(x = month_label, y = year, fill = count)) +
+          ggplot2::geom_tile(color = NA, width = 0.95, height = 0.95) +
+          ggplot2::scale_x_discrete(expand = c(0, 0)) +
+          ggplot2::scale_y_discrete(expand = c(0, 0)) +
+          ggplot2::scale_fill_gradient(
+            low = low_col, high = high_col,
+            breaks = breaks_vec,
+            labels = breaks_vec,
+            guide = ggplot2::guide_colorbar(title = "Count", barwidth = 10, barheight = 0.6, ticks = TRUE)
           ) +
-          ggplot2::scale_y_continuous(
-            breaks = scales::pretty_breaks(n = 5),
-            labels = scales::label_number(big.mark = ","),
-            expand = ggplot2::expansion(mult = c(0, 0.1))
-          ) +
-          ggplot2::labs(
-            title = NULL,
-            x = "Event Date",
-            y = "Count of Records"
-          ) +
+          ggplot2::labs(x = "Month", y = "Year") +
+          ggplot2::coord_fixed(ratio = 1) +   # square tiles: fixes horizontal distortion
           ggplot2::theme_minimal(base_size = 11) +
           ggplot2::theme(
-            plot.margin = ggplot2::margin(t = 10, r = 15, b = 20, l = 15),
-            panel.grid.minor = ggplot2::element_blank(),
-            panel.grid.major.x = ggplot2::element_blank(),
-            panel.grid.major.y = ggplot2::element_line(color = "#e5e7eb", linewidth = 0.3),
-            axis.text.x = ggplot2::element_text(angle = 45, hjust = 1, vjust = 1, size = 11, color = "black"),
-            axis.text.y = ggplot2::element_text(size = 11, color = "black"),
-            axis.title = ggplot2::element_text(size = 12, face = "bold")
+            axis.title = ggplot2::element_text(size = 11, face = "bold"),
+            axis.text.x = ggplot2::element_text(size = 10, angle = 0, vjust = 0.5, hjust = 0.5),
+            axis.text.y = ggplot2::element_text(size = 10),
+            panel.grid = ggplot2::element_blank(),
+            legend.position = "bottom",
+            plot.margin = ggplot2::margin(t = 8, r = 12, b = 8, l = 8)
           )
+
+        # Optionally add count labels when values are very small
+        if (!is.na(max_cnt) && max_cnt <= 9) {
+          p <- p + ggplot2::geom_text(ggplot2::aes(label = count), size = 3, color = "black", data = agg_full)
+        }
+
+        print(p)
       },
       height = 380,
       width = 1200,
       res = 96,
       bg = "white"
     )
+
+
 
     output$overview_tax_plot <- if (has_plotly) {
       plotly::renderPlotly({
